@@ -2,9 +2,12 @@ import MarkdownIt from "markdown-it";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: false });
 
-/** Renders markdown to HTML with raw HTML disabled (§6.2). */
+/** Renders markdown to HTML with raw HTML disabled (§6.2). `- [ ]` / `- [x]` become checkboxes. */
 export function renderMarkdown(text: string): string {
-  return md.render(text);
+  return md
+    .render(text)
+    .replace(/<li>\[ \] /g, '<li><input type="checkbox" disabled> ')
+    .replace(/<li>\[[xX]\] /g, '<li><input type="checkbox" disabled checked> ');
 }
 
 /** Human-readable age such as "3m", "2h", "5d". */
@@ -27,4 +30,11 @@ export function lastLine(text: string): string {
     .map((l) => l.trim())
     .filter(Boolean);
   return (lines.at(-1) ?? "").replace(/^-\s*/, "");
+}
+
+/** Checklist progress of a markdown section: done / total task items. */
+export function planProgress(text: string): { done: number; total: number } {
+  const items = text.match(/^\s*[-*]\s+\[( |x|X)\]/gm) ?? [];
+  const done = items.filter((i) => /\[[xX]\]/.test(i)).length;
+  return { done, total: items.length };
 }

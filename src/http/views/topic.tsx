@@ -98,6 +98,9 @@ export function TopicFragment({ t, index, now }: { t: IndexedTopic; index: AiInd
       hx-swap="outerHTML"
     >
       <header class="topic-head">
+        <a class="back" href="/board">
+          ← Board
+        </a>
         <h1>{t.fm.title}</h1>
         <p class="meta">
           <code>{t.id}</code> · created {ago(t.fm.created, now)} ago · updated{" "}

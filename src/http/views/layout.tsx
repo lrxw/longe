@@ -20,7 +20,7 @@ export function Layout({ title, project, blocking, active, children }: LayoutPro
         <script src="/public/vendor/htmx.min.js"></script>
         <script src="/public/vendor/sse.js"></script>
       </head>
-      <body hx-ext="sse" sse-connect="/events">
+      <body hx-ext="sse" sse-connect="/events" data-page={active} data-back="/board">
         <header class="top">
           <a class="brand" href="/">
             <span id="badge" hx-get="/fragments/badge" hx-trigger="sse:changed" hx-swap="outerHTML">
@@ -39,6 +39,16 @@ export function Layout({ title, project, blocking, active, children }: LayoutPro
           </nav>
         </header>
         <main>{children}</main>
+        <footer class="hints">
+          <kbd>i</kbd> inbox · <kbd>b</kbd> board
+          {active === "topic" ? (
+            <>
+              {" · "}
+              <kbd>esc</kbd> back
+            </>
+          ) : null}
+        </footer>
+        <script src="/public/app.js"></script>
       </body>
     </html>
   );
