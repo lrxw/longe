@@ -34,7 +34,7 @@ npm link                       # puts `longe` on PATH, pointing at this checkout
 cd /path/to/project
 longe init                     # creates .ai/{config.yml,topics/,questions/,AGENT-INSTRUCTIONS.md}
 git add .ai && git commit -m "chore: add longe board"
-longe serve --open             # UI at http://127.0.0.1:7311, REST at /api/v1, MCP at /mcp
+longe serve -d --open          # UI at http://127.0.0.1:7311 (one server for all your repos)
 ```
 
 Then tell your agent to follow the protocol. Add one line to `CLAUDE.md`, `AGENTS.md`,
@@ -55,8 +55,8 @@ Two transports. **stdio** spawns `longe mcp` per agent session and needs no serv
 
 ```sh
 claude mcp add longe -- longe mcp --repo .
-# or, while `longe serve` runs:
-claude mcp add --transport http longe http://127.0.0.1:7311/mcp
+# or, while `longe serve` runs (per-repo endpoint, no repo argument needed):
+claude mcp add --transport http longe http://127.0.0.1:7311/r/<name>/mcp
 ```
 
 ### Codex CLI (`~/.codex/config.toml`)
@@ -184,16 +184,17 @@ Put that in the project's `.claude/settings.json` (or `~/.claude/settings.json`)
 
 ## Several projects, one board
 
-Every `longe init`, `longe mcp` and `longe serve --repo` registers its repo in
-`~/.config/longe/repos.yml`. Run `longe serve` from a folder that has no `.ai/` (or with
-`--all`) and you get **hub mode**: one process, one port, every registered repo.
+`longe serve` runs **one server per machine** on port 7311 and serves every registered repo.
+Every `longe init`, `longe serve` (run inside a project) and `longe mcp` registers its repo in
+`~/.config/longe/repos.yml`; a running server picks registry changes up live.
 
 ```sh
-longe serve -d --open          # from ~ or any non-project folder → hub
-longe repos                    # list  |  add <dir> [--name n]  |  remove <dir>  |  rename <dir> <name>  |  prune
+longe serve -d --open          # start (or just open) — inside a project this lands on its board
+longe repos                    # list | add <dir> [--name n] | remove <dir> | rename <dir> <name> | prune
 ```
 
-- **Inbox** merges all repos, blocking first, each card tagged with its repo.
+- **`/`**: overview tiles per repo (topics per status, blocking count) above the merged inbox,
+  blocking first, each card tagged with its repo.
 - **Board** and topic pages live under `/r/<name>/…`; a switcher in the header moves between repos.
 - **REST**: `/r/<name>/api/v1/…`, or `/api/v1/…` with a `repo` field. `list_topics` without
   `repo` aggregates across repos and adds `repo` to each summary.
@@ -202,19 +203,17 @@ longe repos                    # list  |  add <dir> [--name n]  |  remove <dir> 
   per repo.
 - Hooks and notifications work per repo, from each repo's own `.ai/config.yml`.
 - A registered path that disappears is shown as unavailable; `longe repos prune` forgets it.
-  Registry changes are picked up on the next `longe serve` start.
 
 ## Background server
 
 ```sh
-longe serve -d --open          # detached; log in ~/.cache/longe/serve/<project>-<hash>.log
-longe status                   # every recorded server and whether it answers
-longe stop                     # stop the one for this repo (--all for every one)
+longe serve -d                 # detached; log in ~/.cache/longe/serve/hub.log
+longe status                   # running? which repos?
+longe stop
 ```
 
-`longe serve` is idempotent per repo and port: running it again while a server is up just prints
-the URL (and opens the browser with `--open`) instead of failing. Each repo needs its own port
-(`--port 7312` for the second one).
+`longe serve` is idempotent: if the server is already up it prints the URL (and opens the
+browser with `--open`) instead of failing.
 
 ## Notifications
 
@@ -225,10 +224,10 @@ Desktop notification (via `node-notifier`) on a new blocking question and on a t
 
 ```
 longe init    [--repo <dir>]
-longe serve   [--repo <dir>] [--port 7311] [--open] [--daemon|-d] [--all]
+longe serve   [--repo <dir>] [--port 7311] [--open] [--daemon|-d]
 longe repos   [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
 longe status
-longe stop    [--repo <dir>] [--all]
+longe stop
 longe mcp     [--repo <dir>]
 longe answers [--repo <dir>] [--json]
 ```

@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
+import { watch } from "node:fs";
 import path from "node:path";
-import { hasAiDir } from "../store/registry.js";
+import { hasAiDir, readRegistry, registryPath } from "../store/registry.js";
 import { type AppContext, type AppOptions, closeAppContext, createAppContext } from "./context.js";
 
 /** One repo as the hub sees it. `ctx` is undefined when the path is gone or has no .ai/. */
@@ -13,7 +14,7 @@ export interface HubRepo {
 }
 
 export interface HubEvents {
-  changed: [{ repo: string; kind: "topic" | "question" | "error" | "hook"; id: string }];
+  changed: [{ repo: string; kind: "topic" | "question" | "error" | "hook" | "repos"; id: string }];
 }
 
 /**
@@ -23,8 +24,64 @@ export interface HubEvents {
 export class Hub extends EventEmitter<HubEvents> {
   readonly repos = new Map<string, HubRepo>();
 
+  private registryWatcher: ReturnType<typeof watch> | undefined;
+  private syncing: Promise<void> = Promise.resolve();
+  private opts: AppOptions = {};
+
   constructor(public readonly mode: "single" | "hub") {
     super();
+  }
+
+  /**
+   * Keeps the hub in sync with ~/.config/longe/repos.yml: repos added by a
+   * later `longe init` / `longe serve` appear without a restart, removed ones
+   * are closed. Polling fallback in case fs.watch misses events.
+   */
+  async followRegistry(opts: AppOptions): Promise<void> {
+    this.opts = opts;
+    await this.syncRegistry();
+    const file = registryPath();
+    const trigger = () => {
+      this.syncing = this.syncing.then(() => this.syncRegistry()).catch(() => {});
+    };
+    try {
+      this.registryWatcher = watch(path.dirname(file), { persistent: false }, (_e, name) => {
+        if (!name || name === path.basename(file)) trigger();
+      });
+    } catch {
+      // directory may not exist yet; polling covers it
+    }
+    const timer = setInterval(trigger, 3000);
+    timer.unref();
+  }
+
+  async syncRegistry(): Promise<void> {
+    let entries: { name: string; path: string }[];
+    try {
+      entries = await readRegistry();
+    } catch {
+      return;
+    }
+    const wanted = new Map(entries.map((e) => [e.name, e.path]));
+    let changed = false;
+    for (const [name, r] of this.repos) {
+      if (wanted.get(name) !== r.root) {
+        if (r.ctx) await closeAppContext(r.ctx);
+        this.repos.delete(name);
+        changed = true;
+      }
+    }
+    for (const [name, root] of wanted) {
+      const have = this.repos.get(name);
+      if (!have) {
+        await this.add(name, root, this.opts);
+        changed = true;
+      } else if (have.missing && (await hasAiDir(root))) {
+        await this.add(name, root, this.opts); // came back
+        changed = true;
+      }
+    }
+    if (changed) this.emit("changed", { repo: "", kind: "repos", id: "" });
   }
 
   get(name: string): HubRepo | undefined {
@@ -77,6 +134,7 @@ export class Hub extends EventEmitter<HubEvents> {
   }
 
   async close(): Promise<void> {
+    this.registryWatcher?.close();
     for (const r of this.live()) await closeAppContext(r.ctx as AppContext);
   }
 
@@ -99,5 +157,12 @@ export async function createMultiHub(
 ): Promise<Hub> {
   const hub = new Hub("hub");
   for (const r of repos) await hub.add(r.name, r.root, opts);
+  return hub;
+}
+
+/** Hub that mirrors the registry file and follows it while running. */
+export async function createRegistryHub(opts: AppOptions = {}): Promise<Hub> {
+  const hub = new Hub("hub");
+  await hub.followRegistry(opts);
   return hub;
 }

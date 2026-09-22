@@ -10,7 +10,6 @@ describe("parseCli", () => {
       open: false,
       json: false,
       daemon: false,
-      all: false,
       repoGiven: false,
       rest: [],
     });
@@ -24,7 +23,6 @@ describe("parseCli", () => {
       open: true,
       json: false,
       daemon: false,
-      all: false,
       repoGiven: true,
       rest: [],
     });
@@ -34,7 +32,7 @@ describe("parseCli", () => {
     expect(parseCli(["mcp"]).command).toBe("mcp");
     expect(parseCli(["answers", "--json"])).toMatchObject({ command: "answers", json: true });
     expect(parseCli(["serve", "-d"])).toMatchObject({ command: "serve", daemon: true });
-    expect(parseCli(["stop", "--all"])).toMatchObject({ command: "stop", all: true });
+    expect(parseCli(["stop"]).command).toBe("stop");
     expect(parseCli(["status"]).command).toBe("status");
     expect(parseCli(["repos", "add", "/x", "--name", "X"])).toMatchObject({
       command: "repos",

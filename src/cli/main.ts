@@ -23,9 +23,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "serve": {
       const { runServe } = await import("./serve.js");
-      const { hasAiDir } = await import("../store/registry.js");
-      const hubMode = cli.all || (!cli.repoGiven && !(await hasAiDir(repo)));
-      await runServe({ repo, port: cli.port, open: cli.open, daemon: cli.daemon, hub: hubMode });
+      await runServe({ repo, port: cli.port, open: cli.open, daemon: cli.daemon });
       return new Promise(() => {}); // runs until SIGINT
     }
     case "status": {
@@ -34,7 +32,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "stop": {
       const { runStop } = await import("./serve.js");
-      return runStop(cli.all ? undefined : repo, cli.all);
+      return runStop();
     }
     case "repos": {
       const { runRepos } = await import("./repos.js");

@@ -18,6 +18,7 @@ export interface HealthInfo {
   project: string;
   pid: number;
   port: number;
+  repos?: { name: string; root: string; missing: string | null }[];
 }
 
 export function serveStateDir(): string {
@@ -127,7 +128,7 @@ export async function startDaemon(opts: StartDaemonOptions): Promise<DaemonRecor
   const deadline = Date.now() + 8000;
   while (Date.now() < deadline) {
     const h = await probeHealth(opts.port, 400);
-    if (h && h.root === opts.root) {
+    if (h && (opts.root === "*" ? h.root === "*" : h.root === opts.root)) {
       return {
         pid: h.pid,
         port: opts.port,

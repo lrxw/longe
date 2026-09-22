@@ -372,6 +372,48 @@ form.answer {
   margin: 0 0 1rem;
 }
 
+/* overview strip (hub) */
+.overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.8rem 1rem;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+.tile:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.tile.missing {
+  opacity: 0.6;
+}
+.tile strong {
+  font-size: 1.02em;
+}
+.tile .counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.tile .counts .status {
+  font-size: 0.75em;
+  padding: 0.05em 0.55em;
+}
+
 /* board */
 .columns {
   display: grid;

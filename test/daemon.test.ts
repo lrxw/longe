@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +12,7 @@ import {
   writeRecord,
 } from "../src/cli/daemon.js";
 import { runInit } from "../src/cli/init.js";
+import { registerRepo } from "../src/store/registry.js";
 
 let dir: string;
 async function freePort(): Promise<number> {
@@ -38,8 +39,9 @@ afterEach(async () => {
 describe("serve --daemon", () => {
   it("starts detached, answers /health, is listed, and stops", async () => {
     const port = await freePort();
+    await registerRepo(dir);
     const rec = await startDaemon({
-      root: dir,
+      root: "*",
       port,
       script: path.resolve("src/cli/main.ts"),
       execArgv: ["--import", "tsx"],
@@ -47,9 +49,10 @@ describe("serve --daemon", () => {
     await writeRecord(rec);
     expect(isAlive(rec.pid)).toBe(true);
     const h = await probeHealth(port);
-    expect(h?.root).toBe(dir);
+    expect(h?.root).toBe("*");
     expect(h?.pid).toBe(rec.pid);
-    expect((await listRecords()).map((r) => r.root)).toEqual([dir]);
+    expect(h?.repos?.map((r) => r.root)).toEqual([await realpath(dir)]);
+    expect((await listRecords()).map((r) => r.root)).toEqual(["*"]);
     expect(await readFile(rec.log, "utf8")).toContain("longe serving");
 
     expect(await stopDaemon(rec)).toBe(true);

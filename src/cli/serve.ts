@@ -1,10 +1,10 @@
 import { exec } from "node:child_process";
 import path from "node:path";
 import { serve } from "@hono/node-server";
-import { createMultiHub, createSingleHub, type Hub } from "../app/hub.js";
+import { createRegistryHub } from "../app/hub.js";
 import { createHttpApp } from "../http/app.js";
 import { desktopNotifier } from "../notify/notifier.js";
-import { readRegistry, registerRepo } from "../store/registry.js";
+import { hasAiDir, registerRepo } from "../store/registry.js";
 import {
   isAlive,
   listRecords,
@@ -16,12 +16,11 @@ import {
 } from "./daemon.js";
 
 export interface ServeOptions {
+  /** Repo to register before starting (cwd by default); ignored when it has no .ai/. */
   repo: string;
   port: number;
   open: boolean;
   daemon: boolean;
-  /** Serve every registered repo from one process. */
-  hub: boolean;
 }
 
 export function openBrowser(url: string): void {
@@ -34,58 +33,51 @@ export function openBrowser(url: string): void {
   exec(cmd, () => {});
 }
 
+const HUB = "*";
+
+/**
+ * `longe serve`: one hub process per machine, serving every registered repo on
+ * one port. Running it inside a project registers that project first, so a hub
+ * that is already up picks it up live.
+ */
 export async function runServe(opts: ServeOptions): Promise<void> {
   const url = `http://127.0.0.1:${opts.port}`;
-  const rootKey = opts.hub ? "*" : opts.repo;
-  const label = opts.hub ? "all registered repos (hub mode)" : opts.repo;
 
-  // Already running for this repo? Reuse it instead of failing with EADDRINUSE.
+  let entry: { name: string } | undefined;
+  if (await hasAiDir(opts.repo)) entry = await registerRepo(opts.repo).catch(() => undefined);
+  const landing = entry ? `${url}/r/${entry.name}/board` : url;
+
+  // Already running? Reuse it instead of failing with EADDRINUSE.
   const existing = await probeHealth(opts.port);
   if (existing) {
-    if (existing.root === rootKey) {
-      process.stdout.write(`longe already serving ${label} at ${url} (pid ${existing.pid})\n`);
-      if (opts.open) openBrowser(url);
+    if (existing.root === HUB) {
+      process.stdout.write(
+        `longe already running at ${url} (pid ${existing.pid})${entry ? `\n  ${landing}` : ""}\n`,
+      );
+      if (opts.open) openBrowser(landing);
       process.exit(0);
     }
     process.stderr.write(
-      `Port ${opts.port} is used by longe for ${existing.root === "*" ? "the hub" : existing.root}.\n` +
-        `Pick another port: longe serve --port ${opts.port + 1}\n`,
+      `Port ${opts.port} is used by another longe (${existing.root}). Pick a port: longe serve --port ${opts.port + 1}\n`,
     );
     process.exit(1);
   }
 
   if (opts.daemon) {
-    const rec = await startDaemon({
-      root: rootKey,
-      port: opts.port,
-      extraArgs: opts.hub ? ["--all"] : [],
-    });
+    const rec = await startDaemon({ root: HUB, port: opts.port });
     await writeRecord(rec);
-    const stopHint = opts.hub
-      ? "longe stop --all"
-      : `longe stop --repo ${JSON.stringify(opts.repo)}`;
     process.stdout.write(
-      `longe serving ${label} in the background\n  UI   ${url}\n  pid  ${rec.pid}\n  log  ${rec.log}\n  stop with: ${stopHint}\n`,
+      `longe running in the background\n  UI   ${landing}\n  pid  ${rec.pid}\n  log  ${rec.log}\n  stop with: longe stop\n`,
     );
-    if (opts.open) openBrowser(url);
+    if (opts.open) openBrowser(landing);
     process.exit(0);
   }
 
-  let hub: Hub;
-  if (opts.hub) {
-    const repos = await readRegistry();
-    hub = await createMultiHub(
-      repos.map((r) => ({ name: r.name, root: r.path })),
-      { notify: desktopNotifier },
-    );
-  } else {
-    await registerRepo(opts.repo).catch(() => undefined);
-    hub = await createSingleHub(opts.repo, { notify: desktopNotifier });
-  }
+  const hub = await createRegistryHub({ notify: desktopNotifier });
   const app = createHttpApp(hub, { port: opts.port });
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: opts.port }, (info) => {
     const lines = [
-      `longe serving ${label}`,
+      "longe serving all registered repos",
       `  UI    ${url}`,
       `  REST  ${url}/api/v1  (docs: ${url}/api/docs)`,
       `  MCP   ${url}/mcp`,
@@ -97,20 +89,20 @@ export async function runServe(opts: ServeOptions): Promise<void> {
           : `  repo    ${r.name.padEnd(20)} ${r.root}  ${url}${hub.base(r.name)}/board`,
       );
     }
-    if (opts.hub && hub.list().length === 0) {
+    if (hub.list().length === 0) {
       lines.push(
-        "  (no repos registered yet: run `longe init` in a project or `longe repos add <dir>`)",
+        "  (no repos registered yet: run `longe init` in a project, or `longe repos add <dir>`)",
       );
     }
     process.stdout.write(`${lines.join("\n")}\n`);
     void writeRecord({
       pid: process.pid,
       port: info.port,
-      root: rootKey,
+      root: HUB,
       startedAt: new Date().toISOString(),
       log: process.env.LONGE_DAEMON ? "(daemon log)" : "(foreground)",
     });
-    if (opts.open) openBrowser(url);
+    if (opts.open) openBrowser(landing);
   });
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
@@ -124,7 +116,7 @@ export async function runServe(opts: ServeOptions): Promise<void> {
   });
   const shutdown = async () => {
     server.close();
-    await removeRecord(rootKey);
+    await removeRecord(HUB);
     await hub.close();
     process.exit(0);
   };
@@ -132,42 +124,40 @@ export async function runServe(opts: ServeOptions): Promise<void> {
   process.on("SIGTERM", () => void shutdown());
 }
 
-/** `longe status`: every known serve process and whether it still answers. */
+/** `longe status`: the hub process, if any, and the repos it serves. */
 export async function runStatus(): Promise<number> {
   const recs = await listRecords();
   if (recs.length === 0) {
-    process.stdout.write("No longe serve processes recorded.\n");
+    process.stdout.write("longe is not running. Start it with: longe serve -d\n");
     return 0;
   }
   for (const r of recs) {
     const h = await probeHealth(r.port);
-    const state =
-      h && h.root === r.root ? "running" : isAlive(r.pid) ? "pid alive, not answering" : "stale";
-    if (state === "stale") await removeRecord(r.root);
-    const name = r.root === "*" ? "hub" : path.basename(r.root);
-    const where = r.root === "*" ? "(all registered repos)" : r.root;
-    process.stdout.write(
-      `${state.padEnd(24)} ${name.padEnd(24)} http://127.0.0.1:${r.port}  pid ${r.pid}  ${where}\n`,
-    );
+    const state = h ? "running" : isAlive(r.pid) ? "pid alive, not answering" : "stale";
+    if (state === "stale") {
+      await removeRecord(r.root);
+      continue;
+    }
+    process.stdout.write(`${state}  http://127.0.0.1:${r.port}  pid ${r.pid}\n`);
+    for (const repo of h?.repos ?? []) {
+      process.stdout.write(
+        `  ${repo.missing ? "missing" : "repo   "} ${repo.name.padEnd(20)} ${repo.root}\n`,
+      );
+    }
   }
   return 0;
 }
 
-/** `longe stop [--repo]`: stop the serve for one repo (or the hub), or all when --all. */
-export async function runStop(repo: string | undefined, all: boolean): Promise<number> {
+/** `longe stop`: stop the hub. */
+export async function runStop(): Promise<number> {
   const recs = await listRecords();
-  const targets = all ? recs : recs.filter((r) => r.root === repo || r.root === "*");
-  if (targets.length === 0) {
-    process.stdout.write(
-      all ? "Nothing to stop.\n" : `No longe serve recorded for ${repo}. Try: longe status\n`,
-    );
-    return all ? 0 : 1;
+  if (recs.length === 0) {
+    process.stdout.write("longe is not running.\n");
+    return 0;
   }
-  for (const r of targets) {
+  for (const r of recs) {
     const stopped = await stopDaemon(r);
-    process.stdout.write(
-      `${stopped ? "stopped" : "was not running"}  ${r.root === "*" ? "hub" : r.root} (pid ${r.pid})\n`,
-    );
+    process.stdout.write(`${stopped ? "stopped" : "was not running"} (pid ${r.pid})\n`);
   }
   return 0;
 }

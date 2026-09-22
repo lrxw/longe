@@ -9,7 +9,6 @@ export interface ParsedCli {
   open: boolean;
   json: boolean;
   daemon: boolean;
-  all: boolean;
   /** `--repo` was given explicitly (serve: single mode even without .ai/ in cwd). */
   repoGiven: boolean;
   /** Positional arguments after the command (repos add <path> …). */
@@ -22,10 +21,10 @@ export const DEFAULT_PORT = 7311;
 const USAGE = `Usage:
   longe init   [--repo <dir>]
   longe serve  [--repo <dir>] [--port <n>] [--open] [--daemon|-d]
-               # no --repo and no .ai/ in cwd: hub mode, serves every registered repo
+               # one server for every registered repo; run inside a project to register it
   longe repos  [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
-  longe status                              # background servers
-  longe stop   [--repo <dir>] [--all]       # stop a background server
+  longe status                              # is the server running, which repos
+  longe stop                                # stop the background server
   longe mcp    [--repo <dir>]
 
 Options:
@@ -33,7 +32,6 @@ Options:
   --port   HTTP port for serve                                (default: ${DEFAULT_PORT})
   --open   Open the browser after serve starts
   --daemon, -d   Run serve in the background (log in ~/.cache/longe/serve/)
-  --all    With stop: stop every recorded server. With serve: force hub mode
   --name   With repos add: display name
   -h, --help
 `;
@@ -99,7 +97,6 @@ export function parseCli(argv: string[]): ParsedCli {
     open: values.open,
     json: values.json,
     daemon: values.daemon,
-    all: values.all,
     repoGiven: argv.includes("--repo") || argv.some((a) => a.startsWith("--repo=")),
     rest: positionals.slice(1),
     ...(values.name !== undefined ? { name: values.name } : {}),

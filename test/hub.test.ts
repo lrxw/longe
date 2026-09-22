@@ -5,7 +5,7 @@ import { serve } from "@hono/node-server";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createMultiHub, type Hub } from "../src/app/hub.js";
+import { createMultiHub, createRegistryHub, type Hub } from "../src/app/hub.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
 import { newQuestionText } from "../src/store/question.js";
@@ -214,5 +214,30 @@ describe("hub mode", () => {
       await client.close();
       server.close();
     }
+  }, 20000);
+});
+
+describe("registry hub", () => {
+  it("follows the registry file live and shows an overview", async () => {
+    await registerRepo(shop);
+    hub = await createRegistryHub({ index: { debounceMs: 20, usePolling: true } });
+    expect(hub.list().map((r) => r.name)).toEqual(["shop"]);
+    const app = createHttpApp(hub, { port: 1 });
+    let html = await (await app.request("/")).text();
+    expect(html).toContain('class="overview"');
+    expect(html).toContain("1 active");
+
+    await registerRepo(blog);
+    const start = Date.now();
+    while (!hub.get("blog") && Date.now() - start < 8000)
+      await new Promise((r) => setTimeout(r, 50));
+    expect(hub.get("blog")?.ctx).toBeDefined();
+    html = await (await app.request("/")).text();
+    expect(html).toContain("Blog Q?");
+
+    await unregisterRepo(shop);
+    const s2 = Date.now();
+    while (hub.get("shop") && Date.now() - s2 < 8000) await new Promise((r) => setTimeout(r, 50));
+    expect(hub.get("shop")).toBeUndefined();
   }, 20000);
 });

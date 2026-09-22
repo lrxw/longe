@@ -13,6 +13,7 @@ import { mountMcp } from "./mcp.js";
 import { BoardFragment } from "./views/board.js";
 import { AnsweredStub, InboxFragment, type InboxItem, QuestionCard } from "./views/inbox.js";
 import { Badge, Layout, type RepoNav } from "./views/layout.js";
+import { OverviewStrip, type RepoOverview } from "./views/overview.js";
 import { StatusActions, TopicFragment } from "./views/topic.js";
 
 export const PUBLIC_DIR = path.resolve(import.meta.dirname, "../../public");
@@ -121,6 +122,19 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       .list()
       .filter((r) => r.missing)
       .map((r) => nav(hub, r));
+  const overview = (): RepoOverview[] =>
+    hub.list().map((r) => {
+      const counts: Record<string, number> = {};
+      let blocking = 0;
+      let open = 0;
+      if (r.ctx) {
+        for (const t of r.ctx.index.topics.values())
+          counts[t.fm.status] = (counts[t.fm.status] ?? 0) + 1;
+        blocking = r.ctx.index.blockingCount();
+        open = r.ctx.index.inbox().length;
+      }
+      return { nav: nav(hub, r), counts, blocking, open };
+    });
   const inboxFragment = () => (
     <InboxFragment
       items={inboxItems()}
@@ -128,6 +142,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       errors={inboxErrors()}
       hooks={inboxHooks()}
       missing={inboxMissing()}
+      overview={hub.mode === "hub" ? <OverviewStrip repos={overview()} /> : null}
     />
   );
   const projectLabel = () =>

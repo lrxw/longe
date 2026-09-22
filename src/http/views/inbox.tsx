@@ -1,4 +1,5 @@
 import { raw } from "hono/html";
+import type { Child } from "hono/jsx";
 import type { HookStatus } from "../../app/hooks.js";
 import type { IndexedQuestion } from "../../index/index.js";
 import { ago, renderMarkdown } from "../format.js";
@@ -130,17 +131,20 @@ export function InboxFragment({
   errors,
   hooks,
   missing,
+  overview,
 }: {
   items: InboxItem[];
   now: Date;
   errors: { file: string; message: string; repo?: string }[];
   hooks: { label?: string | undefined; status: HookStatus }[];
   missing: RepoNav[];
+  overview?: Child;
 }) {
   const blocking = items.filter((i) => i.q.fm.blocking);
   const other = items.filter((i) => !i.q.fm.blocking);
   return (
     <div id="inbox" hx-get="/fragments/inbox" hx-trigger="sse:changed" hx-swap="outerHTML">
+      {overview}
       <ErrorList errors={errors} />
       {missing.length > 0 ? (
         <section class="errors">
