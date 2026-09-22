@@ -1,35 +1,138 @@
 # longe
 
-> Working name was `aiboard`; the repository folder may still carry that name until you `mv` it.
+Local-first board for work done by AI coding agents in one repository.
 
-Local-first, single-user board for tracking work done by AI coding agents in one repository.
-The repository's `.ai/` folder is the source of truth; longe is a viewer plus a validated
-write layer reachable through MCP, REST, or direct file edits.
+- **What was done, what was decided** — one markdown file per topic (Goal, Plan, Decisions, Log),
+  committed with the code.
+- **What is waiting on me** — an inbox of questions agents asked, blocking ones first, answer with
+  one click.
+
+The repo's `.ai/` folder is the source of truth. longe is a viewer plus a validated write layer
+that agents reach through **MCP** (stdio or HTTP), **REST**, or by editing the files. Binds to
+`127.0.0.1` only, no auth, no database, no telemetry.
 
 Full specification: [SPEC.md](./SPEC.md).
 
-## Status
-
-Phases 0–4 complete: scaffold, store, domain, index, HTML UI, MCP (stdio + Streamable HTTP), REST + OpenAPI. Phase 5 (docs, publish) pending.
-
-## Development
+## Install
 
 ```sh
-pnpm install
-pnpm test          # vitest
-pnpm typecheck
-pnpm lint
-pnpm dev init --repo /path/to/project
+npm i -g longe                 # once published
+npm i -g github:lrxw/longe     # straight from GitHub (builds on install)
 ```
 
-## Using in another project
+From a clone:
 
 ```sh
-pnpm build
-pnpm link --global          # exposes `longe` on PATH
+git clone https://github.com/lrxw/longe && cd longe
+pnpm install && pnpm build
+npm link                       # puts `longe` on PATH, pointing at this checkout
+```
+
+## Set up a project
+
+```sh
 cd /path/to/project
-longe init                # creates .ai/
+longe init                     # creates .ai/{config.yml,topics/,questions/,AGENT-INSTRUCTIONS.md}
+git add .ai && git commit -m "chore: add longe board"
+longe serve --open             # UI at http://127.0.0.1:7311, REST at /api/v1, MCP at /mcp
 ```
+
+Then tell your agent to follow the protocol. Add one line to `CLAUDE.md`, `AGENTS.md`,
+`.cursorrules` or equivalent:
+
+```
+Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
+```
+
+`longe init` is idempotent and never overwrites existing files.
+
+## Connect an agent (MCP)
+
+Two transports. **stdio** spawns `longe mcp` per agent session and needs no server.
+**HTTP** talks to a running `longe serve` at `http://127.0.0.1:7311/mcp` (Streamable HTTP).
+
+### Claude Code
+
+```sh
+claude mcp add longe -- longe mcp --repo .
+# or, while `longe serve` runs:
+claude mcp add --transport http longe http://127.0.0.1:7311/mcp
+```
+
+### Codex CLI (`~/.codex/config.toml`)
+
+```toml
+[mcp_servers.longe]
+command = "longe"
+args = ["mcp", "--repo", "."]
+```
+
+### Gemini CLI (`.gemini/settings.json` or `~/.gemini/settings.json`)
+
+```json
+{ "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
+```
+
+HTTP variant: `{ "mcpServers": { "longe": { "httpUrl": "http://127.0.0.1:7311/mcp" } } }`
+
+### Cursor (`.cursor/mcp.json`)
+
+```json
+{ "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
+```
+
+HTTP variant: `{ "mcpServers": { "longe": { "url": "http://127.0.0.1:7311/mcp" } } }`
+
+### Cline (MCP settings)
+
+```json
+{ "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."], "disabled": false } } }
+```
+
+The MCP server also exposes the resource `longe://agent-instructions` and a server-level
+instruction string, for clients that read those.
+
+### Tools
+
+Agent-facing (MCP + REST): `list_topics`, `get_topic`, `create_topic`, `set_plan`, `set_status`,
+`add_decision`, `append_log`, `ask_question`, `check_answers`, `acknowledge_answers`,
+`wait_for_answer`, `withdraw_question`.
+
+Human-facing (REST + UI only): `answer_question`, `approve`, `reject`, `cancel`, `reopen`.
+
+## REST
+
+`POST /api/v1/<tool>` with a JSON body, JSON out. `GET` works for `list_topics`, `get_topic`,
+`check_answers` with query params. Errors are `400` (validation), `404` (unknown id),
+`409` (disallowed transition), body `{ "code", "message" }`.
+
+```sh
+curl -s -X POST http://127.0.0.1:7311/api/v1/create_topic \
+  -H 'content-type: application/json' \
+  -d '{"title":"Billing refactor","goal":"Move invoices to Stripe."}'
+
+curl -s 'http://127.0.0.1:7311/api/v1/list_topics?status=active'
+```
+
+`GET /openapi.json` is generated from the same schemas; `GET /api/docs` is a try-it page.
+
+## Files
+
+Agents (and you) may edit `.ai/**` directly. The watcher re-indexes, validation errors show up
+in the UI, and side effects are applied: a blocking question file appearing on an `active`
+topic moves it to `needs-decision`; answering the last open blocking question moves it back.
+
+```
+.ai/
+  config.yml                 # version, project name, optional hooks
+  topics/<slug>.md           # frontmatter + ## Goal / ## Plan / ## Decisions / ## Log
+  questions/q-YYYYMMDD-xxxx.md
+  AGENT-INSTRUCTIONS.md      # the agent protocol, generated by `longe init`
+```
+
+Statuses: `backlog → active → review → done`, plus `needs-decision` (system-set while a blocking
+question is open) and `cancelled`. Agents may pick up (`backlog → active`) and submit
+(`active → review`). Only a human approves, rejects, cancels, or reopens.
 
 ## Waking the agent when you answer
 
@@ -51,18 +154,18 @@ hooks:
 ```
 
 Placeholders `{question_id}` `{topic_id}` `{answer}` `{question}` expand to the matching
-`LONGE_*` environment variables (safe to use inside double quotes). Output is appended to
+`LONGE_*` environment variables (safe inside double quotes). Output goes to
 `~/.cache/longe/hooks/<project>.log`; the inbox shows running/last status.
 
-Headless agents need explicit permissions (`--permission-mode acceptEdits`, an allowlist,
-or `--dangerously-skip-permissions`). A hook run works in the same checkout as any
-interactive session you have open — point it at a worktree if that is a problem.
+Headless agents need explicit permissions (`--permission-mode acceptEdits`, an allowlist, or
+`--dangerously-skip-permissions`). A hook run works in the same checkout as any interactive
+session you have open — point it at a worktree if that is a problem.
 
 ### 2. Claude Code prompt hook (inject answers into your next prompt)
 
-`longe answers` prints answered-but-unacknowledged questions from the files (no server
-needed) and nothing when there are none. As a `UserPromptSubmit` hook its output becomes
-context for the next turn, so the agent sees the answers as soon as you type anything:
+`longe answers` prints answered-but-unacknowledged questions straight from the files (no
+server needed) and nothing when there are none. As a `UserPromptSubmit` hook its output becomes
+context for the next turn:
 
 ```json
 {
@@ -74,4 +177,43 @@ context for the next turn, so the agent sees the answers as soon as you type any
 }
 ```
 
-Put that in `.claude/settings.json` of the project (or `~/.claude/settings.json`).
+Put that in the project's `.claude/settings.json` (or `~/.claude/settings.json`).
+
+## Notifications
+
+Desktop notification (via `node-notifier`) on a new blocking question and on a topic entering
+`review`. A missing or failing notifier never fails the operation.
+
+## CLI
+
+```
+longe init    [--repo <dir>]
+longe serve   [--repo <dir>] [--port 7311] [--open]
+longe mcp     [--repo <dir>]
+longe answers [--repo <dir>] [--json]
+```
+
+## Development
+
+```sh
+pnpm install
+pnpm test          # vitest (unit + integration incl. MCP over stdio and HTTP)
+pnpm typecheck
+pnpm lint          # biome
+pnpm dev serve --repo /path/to/project --open
+```
+
+Layout: `src/store` (files, atomic writes, ids), `src/domain` (transitions, validation, side
+effects — pure), `src/index` (chokidar watcher, in-memory index, effect runner), `src/tools`
+(the single registry MCP and REST adapt), `src/mcp`, `src/http` (Hono + JSX + htmx), `src/app`
+(context, hooks), `src/cli`.
+
+## Not in v1
+
+Auth, multi-user, multiple repos in one view, worktree tagging, drag-and-drop, a database,
+editing topic text in the UI, cloud sync, telemetry, remote binding. See SPEC.md §12 for the
+design hooks left in place.
+
+## License
+
+MIT

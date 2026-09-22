@@ -1,7 +1,7 @@
 {
   "name": "longe",
   "version": "0.1.0",
-  "description": "Local-first board for tracking work done by AI coding agents in one repository",
+  "description": "Local-first board for tracking work done by AI coding agents: topics, decisions, and a question inbox, stored as markdown in your repo. MCP + REST + htmx UI.",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -10,7 +10,9 @@
   "files": [
     "bin",
     "dist",
-    "public"
+    "public",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"
@@ -22,7 +24,9 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm lint && pnpm typecheck && pnpm test"
   },
   "packageManager": "pnpm@8.15.9",
   "dependencies": {
@@ -43,5 +47,23 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lrxw/longe.git"
+  },
+  "homepage": "https://github.com/lrxw/longe#readme",
+  "bugs": {
+    "url": "https://github.com/lrxw/longe/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "mcp",
+    "claude-code",
+    "kanban",
+    "board",
+    "markdown",
+    "local-first"
+  ]
 }

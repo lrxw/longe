@@ -11,7 +11,12 @@ async function main(argv: string[]): Promise<number> {
       const result = await runInit(repo);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
-      process.stdout.write(`\n.ai/ ready in ${repo}\n`);
+      process.stdout.write(
+        `\n.ai/ ready in ${repo}\n\nNext:\n` +
+          "  1. Add to CLAUDE.md / AGENTS.md:  Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.\n" +
+          "  2. Connect your agent, e.g.:      claude mcp add longe -- longe mcp --repo .\n" +
+          "  3. Open the board:                 longe serve --open\n",
+      );
       return 0;
     }
     case "serve": {
