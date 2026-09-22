@@ -1,0 +1,47 @@
+{
+  "name": "aiboard",
+  "version": "0.1.0",
+  "description": "Local-first board for tracking work done by AI coding agents in one repository",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "aiboard": "./bin/aiboard.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "public"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx src/cli/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "packageManager": "pnpm@8.15.9",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "chokidar": "^5.0.0",
+    "gray-matter": "^4.0.3",
+    "hono": "^4.13.8",
+    "markdown-it": "^15.0.2",
+    "node-notifier": "^10.0.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^26.6.2",
+    "@types/node-notifier": "^8.0.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
