@@ -4,6 +4,7 @@ import { ballHolder, QUESTION_STATUSES, type TopicStatus } from "../../domain/ty
 import type { AiIndex, IndexedQuestion, IndexedTopic } from "../../index/index.js";
 import { ago, renderMarkdown } from "../format.js";
 import { AnsweredStub, QuestionCard } from "./inbox.js";
+import type { RepoNav } from "./layout.js";
 
 const LABELS: Record<TopicStatus, string> = {
   backlog: "Move to backlog",
@@ -14,7 +15,15 @@ const LABELS: Record<TopicStatus, string> = {
   cancelled: "Cancel",
 };
 
-export function StatusActions({ t, error }: { t: IndexedTopic; error?: string | undefined }) {
+export function StatusActions({
+  t,
+  base,
+  error,
+}: {
+  t: IndexedTopic;
+  base: string;
+  error?: string | undefined;
+}) {
   const targets = allowedTargets(t.fm.status, "human");
   const reject = t.fm.status === "review" && targets.includes("active");
   return (
@@ -24,7 +33,7 @@ export function StatusActions({ t, error }: { t: IndexedTopic; error?: string | 
       {targets
         .filter((to) => !(reject && to === "active"))
         .map((to) => (
-          <form hx-post={`/topics/${t.id}/status`} hx-target="#actions" hx-swap="outerHTML">
+          <form hx-post={`${base}/topics/${t.id}/status`} hx-target="#actions" hx-swap="outerHTML">
             <input type="hidden" name="status" value={to} />
             <button
               type="submit"
@@ -57,10 +66,12 @@ function QuestionGroup({
   status,
   questions,
   now,
+  repo,
 }: {
   status: string;
   questions: IndexedQuestion[];
   now: Date;
+  repo: RepoNav;
 }) {
   if (questions.length === 0) return null;
   return (
@@ -70,7 +81,7 @@ function QuestionGroup({
       </summary>
       {questions.map((q) =>
         status === "open" ? (
-          <QuestionCard q={q} now={now} />
+          <QuestionCard q={q} repo={repo} showRepo={false} now={now} />
         ) : status === "answered" || status === "acknowledged" ? (
           <AnsweredStub q={q} />
         ) : (
@@ -88,8 +99,19 @@ function QuestionGroup({
   );
 }
 
-export function TopicFragment({ t, index, now }: { t: IndexedTopic; index: AiIndex; now: Date }) {
+export function TopicFragment({
+  t,
+  index,
+  now,
+  repo,
+}: {
+  t: IndexedTopic;
+  index: AiIndex;
+  now: Date;
+  repo: RepoNav;
+}) {
   const questions = index.questionsForTopic(t.id);
+  const base = repo.base;
   return (
     <div
       id="topic"
@@ -98,7 +120,7 @@ export function TopicFragment({ t, index, now }: { t: IndexedTopic; index: AiInd
       hx-swap="outerHTML"
     >
       <header class="topic-head">
-        <a class="back" href="/board">
+        <a class="back" href={`${base}/board`}>
           ← Board
         </a>
         <h1>{t.fm.title}</h1>
@@ -114,7 +136,7 @@ export function TopicFragment({ t, index, now }: { t: IndexedTopic; index: AiInd
             </>
           ))}
         </p>
-        <StatusActions t={t} />
+        <StatusActions t={t} base={base} />
       </header>
       <div class="grid">
         <section class="md">
@@ -138,6 +160,7 @@ export function TopicFragment({ t, index, now }: { t: IndexedTopic; index: AiInd
             status={s}
             questions={questions.filter((q) => q.fm.status === s)}
             now={now}
+            repo={repo}
           />
         ))}
       </section>

@@ -182,6 +182,28 @@ context for the next turn:
 
 Put that in the project's `.claude/settings.json` (or `~/.claude/settings.json`).
 
+## Several projects, one board
+
+Every `longe init`, `longe mcp` and `longe serve --repo` registers its repo in
+`~/.config/longe/repos.yml`. Run `longe serve` from a folder that has no `.ai/` (or with
+`--all`) and you get **hub mode**: one process, one port, every registered repo.
+
+```sh
+longe serve -d --open          # from ~ or any non-project folder → hub
+longe repos                    # list  |  add <dir> [--name n]  |  remove <dir>  |  rename <dir> <name>  |  prune
+```
+
+- **Inbox** merges all repos, blocking first, each card tagged with its repo.
+- **Board** and topic pages live under `/r/<name>/…`; a switcher in the header moves between repos.
+- **REST**: `/r/<name>/api/v1/…`, or `/api/v1/…` with a `repo` field. `list_topics` without
+  `repo` aggregates across repos and adds `repo` to each summary.
+- **MCP over HTTP**: `/r/<name>/mcp` is a plain per-repo server; `/mcp` serves all repos and adds a
+  required `repo` argument to every tool plus a `list_repos` tool. `longe mcp` (stdio) stays
+  per repo.
+- Hooks and notifications work per repo, from each repo's own `.ai/config.yml`.
+- A registered path that disappears is shown as unavailable; `longe repos prune` forgets it.
+  Registry changes are picked up on the next `longe serve` start.
+
 ## Background server
 
 ```sh
@@ -203,7 +225,8 @@ Desktop notification (via `node-notifier`) on a new blocking question and on a t
 
 ```
 longe init    [--repo <dir>]
-longe serve   [--repo <dir>] [--port 7311] [--open] [--daemon|-d]
+longe serve   [--repo <dir>] [--port 7311] [--open] [--daemon|-d] [--all]
+longe repos   [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
 longe status
 longe stop    [--repo <dir>] [--all]
 longe mcp     [--repo <dir>]

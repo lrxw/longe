@@ -14,6 +14,7 @@ let dir: string;
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "longe-mcp-"));
+  process.env.XDG_CONFIG_HOME = path.join(dir, "config");
   await runInit(dir);
 });
 
@@ -101,6 +102,7 @@ describe("MCP", () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: ["--import", "tsx", path.resolve("src/cli/main.ts"), "mcp", "--repo", dir],
+      env: { ...process.env } as Record<string, string>,
       stderr: "pipe",
     });
     const client = new Client({ name: "test", version: "0" });

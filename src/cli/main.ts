@@ -9,6 +9,8 @@ async function main(argv: string[]): Promise<number> {
   switch (cli.command) {
     case "init": {
       const result = await runInit(repo);
+      const { registerRepo } = await import("../store/registry.js");
+      await registerRepo(repo).catch(() => undefined);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
       process.stdout.write(
@@ -21,7 +23,9 @@ async function main(argv: string[]): Promise<number> {
     }
     case "serve": {
       const { runServe } = await import("./serve.js");
-      await runServe({ repo, port: cli.port, open: cli.open, daemon: cli.daemon });
+      const { hasAiDir } = await import("../store/registry.js");
+      const hubMode = cli.all || (!cli.repoGiven && !(await hasAiDir(repo)));
+      await runServe({ repo, port: cli.port, open: cli.open, daemon: cli.daemon, hub: hubMode });
       return new Promise(() => {}); // runs until SIGINT
     }
     case "status": {
@@ -31,6 +35,10 @@ async function main(argv: string[]): Promise<number> {
     case "stop": {
       const { runStop } = await import("./serve.js");
       return runStop(cli.all ? undefined : repo, cli.all);
+    }
+    case "repos": {
+      const { runRepos } = await import("./repos.js");
+      return runRepos(cli.rest, cli.name);
     }
     case "answers": {
       const { collectAnswers, formatAnswersForAgent } = await import("./answers.js");

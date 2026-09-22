@@ -11,6 +11,8 @@ describe("parseCli", () => {
       json: false,
       daemon: false,
       all: false,
+      repoGiven: false,
+      rest: [],
     });
   });
 
@@ -23,6 +25,8 @@ describe("parseCli", () => {
       json: false,
       daemon: false,
       all: false,
+      repoGiven: true,
+      rest: [],
     });
   });
 
@@ -32,6 +36,11 @@ describe("parseCli", () => {
     expect(parseCli(["serve", "-d"])).toMatchObject({ command: "serve", daemon: true });
     expect(parseCli(["stop", "--all"])).toMatchObject({ command: "stop", all: true });
     expect(parseCli(["status"]).command).toBe("status");
+    expect(parseCli(["repos", "add", "/x", "--name", "X"])).toMatchObject({
+      command: "repos",
+      rest: ["add", "/x"],
+      name: "X",
+    });
   });
 
   it("rejects unknown command", () => {

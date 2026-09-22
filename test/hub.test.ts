@@ -1,0 +1,218 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { serve } from "@hono/node-server";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createMultiHub, type Hub } from "../src/app/hub.js";
+import { runInit } from "../src/cli/init.js";
+import { createHttpApp } from "../src/http/app.js";
+import { newQuestionText } from "../src/store/question.js";
+import { readRegistry, registerRepo, renameRepo, unregisterRepo } from "../src/store/registry.js";
+import { newTopicText } from "../src/store/topic.js";
+
+const json = (r: Response) => r.json() as Promise<Record<string, unknown>>;
+
+let base: string;
+let shop: string;
+let blog: string;
+let hub: Hub;
+const now = new Date();
+
+async function mkRepo(name: string, project: string): Promise<string> {
+  const dir = path.join(base, name);
+  await runInit(dir);
+  await writeFile(path.join(dir, ".ai/config.yml"), `version: 1\nproject: ${project}\n`);
+  await writeFile(
+    path.join(dir, ".ai/topics/t1.md"),
+    newTopicText({ id: "t1", title: `${project} topic`, goal: "g", now }).replace(
+      "status: backlog",
+      "status: active",
+    ),
+  );
+  return dir;
+}
+
+beforeEach(async () => {
+  base = await mkdtemp(path.join(os.tmpdir(), "longe-hub-"));
+  process.env.XDG_CONFIG_HOME = path.join(base, "config");
+  process.env.XDG_CACHE_HOME = path.join(base, "cache");
+  shop = await mkRepo("shop", "Shop");
+  blog = await mkRepo("blog", "Blog");
+  await writeFile(
+    path.join(blog, ".ai/questions/q-20260922-blog.md"),
+    newQuestionText({
+      id: "q-20260922-blog",
+      question: "Blog Q?",
+      blocking: true,
+      topic: "t1",
+      asked_by: "a",
+      now,
+    }),
+  );
+});
+
+afterEach(async () => {
+  await hub?.close();
+  await rm(base, { recursive: true, force: true });
+});
+
+describe("registry", () => {
+  it("registers, dedupes, renames and removes", async () => {
+    const a = await registerRepo(shop);
+    expect(a.name).toBe("shop");
+    const b = await registerRepo(blog, "Shop"); // name clash → suffix
+    expect(b.name).toBe("shop-2");
+    expect((await registerRepo(shop)).name).toBe("shop"); // touch keeps name
+    expect((await readRegistry()).map((r) => r.name)).toEqual(["shop", "shop-2"]);
+    expect((await renameRepo(blog, "The Blog"))?.name).toBe("the-blog");
+    expect(await unregisterRepo(shop)).toBe(true);
+    expect(await unregisterRepo(shop)).toBe(false);
+    expect((await readRegistry()).map((r) => r.name)).toEqual(["the-blog"]);
+    expect(await readFile(path.join(base, "config/longe/repos.yml"), "utf8")).toContain("the-blog");
+  });
+});
+
+describe("hub mode", () => {
+  beforeEach(async () => {
+    hub = await createMultiHub(
+      [
+        { name: "shop", root: shop },
+        { name: "blog", root: blog },
+        { name: "gone", root: path.join(base, "nope") },
+      ],
+      { index: { debounceMs: 20, usePolling: true } },
+    );
+  });
+
+  it("merged inbox with repo tags, missing repos listed, board redirects, prefixed pages", async () => {
+    const app = createHttpApp(hub, { port: 1 });
+    await new Promise((r) => setTimeout(r, 200)); // let the blog watcher apply the blocking effect
+    const inbox = await (await app.request("/")).text();
+    expect(inbox).toContain("<title>(1) Inbox · longe</title>");
+    expect(inbox).toContain("Blog Q?");
+    expect(inbox).toContain('href="/r/blog/board"'); // repo tag on the card
+    expect(inbox).toContain('hx-post="/r/blog/questions/q-20260922-blog/answer"');
+    expect(inbox).toContain("Unavailable repos");
+    expect(inbox).toContain('class="repos"'); // switcher
+
+    const redirect = await app.request("/board");
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("location")).toBe("/r/shop/board");
+
+    const board = await (await app.request("/r/shop/board")).text();
+    expect(board).toContain("Shop topic");
+    expect(board).not.toContain("Blog topic");
+    expect(board).toContain('href="/r/shop/topics/t1"');
+
+    const topic = await (await app.request("/r/blog/topics/t1")).text();
+    expect(topic).toContain("Blog topic");
+    expect(topic).toContain('hx-post="/r/blog/topics/t1/status"');
+    expect((await app.request("/r/nope/board")).status).toBe(404);
+    expect((await app.request("/r/gone/board")).status).toBe(503);
+    expect((await app.request("/topics/t1")).status).toBe(404); // unscoped pages only in single mode
+  });
+
+  it("REST: repo param, prefixed routes, aggregated list_topics", async () => {
+    const app = createHttpApp(hub, { port: 1 });
+    const post = (p: string, body: unknown) =>
+      app.request(p, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    let r = await post("/api/v1/get_topic", { id: "t1" });
+    expect(r.status).toBe(400);
+    expect((await json(r)).message).toMatch(/hub mode/);
+
+    r = await post("/api/v1/get_topic", { id: "t1", repo: "shop" });
+    expect((await json(r)).title).toBe("Shop topic");
+    r = await post("/r/blog/api/v1/get_topic", { id: "t1" });
+    expect((await json(r)).title).toBe("Blog topic");
+
+    r = await app.request("/api/v1/list_topics");
+    const all = (await json(r)).topics as { repo: string; id: string }[];
+    expect(all.map((t) => `${t.repo}/${t.id}`).sort()).toEqual(["blog/t1", "shop/t1"]);
+    r = await app.request("/api/v1/list_topics?repo=shop");
+    expect(((await json(r)).topics as unknown[]).length).toBe(1);
+
+    r = await post("/api/v1/create_topic", { repo: "shop", title: "Via hub", goal: "g" });
+    expect((await json(r)).id).toBe("via-hub");
+    expect(await readFile(path.join(shop, ".ai/topics/via-hub.md"), "utf8")).toContain(
+      "title: Via hub",
+    );
+
+    const doc = (await (await app.request("/openapi.json")).json()) as {
+      paths: Record<
+        string,
+        {
+          post: {
+            requestBody: {
+              content: { "application/json": { schema: { properties: Record<string, unknown> } } };
+            };
+          };
+        }
+      >;
+    };
+    expect(
+      doc.paths["/api/v1/get_topic"]?.post.requestBody.content["application/json"].schema.properties
+        .repo,
+    ).toBeDefined();
+
+    // answering through the prefixed form endpoint unblocks blog/t1
+    await new Promise((r) => setTimeout(r, 200));
+    const form = await app.request("/r/blog/questions/q-20260922-blog/answer", {
+      method: "POST",
+      body: new URLSearchParams({ answer: "yes" }),
+    });
+    expect(form.status).toBe(200);
+    expect(hub.get("blog")?.ctx?.index.topics.get("t1")?.fm.status).toBe("active");
+  });
+
+  it("MCP: hub server takes repo on every tool and lists repos", async () => {
+    const app = createHttpApp(hub, { port: 1 });
+    const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 });
+    await new Promise<void>((r) => server.once("listening", () => r()));
+    const port = (server.address() as { port: number }).port;
+    const client = new Client({ name: "t", version: "0" });
+    try {
+      const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`));
+      await client.connect(transport as never);
+      const tools = await client.listTools();
+      expect(tools.tools.map((t) => t.name)).toContain("list_repos");
+      const lt = tools.tools.find((t) => t.name === "list_topics") as {
+        inputSchema: { required?: string[] };
+      };
+      expect(lt.inputSchema.required).toContain("repo");
+      const repos = (await client.callTool({ name: "list_repos", arguments: {} })) as {
+        content: { text: string }[];
+      };
+      expect(
+        JSON.parse(repos.content[0]?.text ?? "").repos.map((r: { name: string }) => r.name),
+      ).toEqual(["shop", "blog", "gone"]);
+      const t = (await client.callTool({
+        name: "get_topic",
+        arguments: { repo: "blog", id: "t1" },
+      })) as { content: { text: string }[] };
+      expect(JSON.parse(t.content[0]?.text ?? "").title).toBe("Blog topic");
+      const bad = (await client.callTool({
+        name: "get_topic",
+        arguments: { repo: "zzz", id: "t1" },
+      })) as { isError?: boolean };
+      expect(bad.isError).toBe(true);
+      // per-repo endpoint still plain
+      const c2 = new Client({ name: "t2", version: "0" });
+      await c2.connect(
+        new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/r/shop/mcp`)) as never,
+      );
+      const t2 = await c2.listTools();
+      expect(t2.tools.map((t) => t.name)).not.toContain("list_repos");
+      await c2.close();
+    } finally {
+      await client.close();
+      server.close();
+    }
+  }, 20000);
+});

@@ -138,6 +138,15 @@ header.top nav a.on {
   background: var(--accent-soft);
   color: var(--accent);
 }
+header.top nav.repos {
+  flex: 1;
+  gap: 0.15rem;
+  overflow-x: auto;
+}
+header.top nav.repos a.missing {
+  color: var(--muted);
+  text-decoration: line-through;
+}
 #badge:not(:empty) {
   color: var(--block);
 }

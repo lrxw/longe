@@ -2,10 +2,18 @@ import { raw } from "hono/html";
 import type { HookStatus } from "../../app/hooks.js";
 import type { IndexedQuestion } from "../../index/index.js";
 import { ago, renderMarkdown } from "../format.js";
-import { ErrorList } from "./layout.js";
+import { ErrorList, type RepoNav } from "./layout.js";
 
-export function QuestionCard({ q, now }: { q: IndexedQuestion; now: Date }) {
+export interface InboxItem {
+  q: IndexedQuestion;
+  repo: RepoNav;
+  /** Show the repo tag (hub mode with several repos). */
+  showRepo: boolean;
+}
+
+export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date }) {
   const options = q.fm.options ?? [];
+  const base = repo.base;
   return (
     <article class={`card question ${q.fm.blocking ? "blocking" : ""}`} id={`q-${q.id}`}>
       <header>
@@ -14,8 +22,13 @@ export function QuestionCard({ q, now }: { q: IndexedQuestion; now: Date }) {
         ) : (
           <span class="tag">non-blocking</span>
         )}
+        {showRepo ? (
+          <a class="repo" href={`${base}/board`}>
+            {repo.title}
+          </a>
+        ) : null}
         {q.fm.topic ? (
-          <a class="topic" href={`/topics/${q.fm.topic}`}>
+          <a class="topic" href={`${base}/topics/${q.fm.topic}`}>
             {q.fm.topic}
           </a>
         ) : (
@@ -39,7 +52,7 @@ export function QuestionCard({ q, now }: { q: IndexedQuestion; now: Date }) {
       ) : null}
       <form
         class="answer"
-        hx-post={`/questions/${q.id}/answer`}
+        hx-post={`${base}/questions/${q.id}/answer`}
         hx-target={`#q-${q.id}`}
         hx-swap="outerHTML"
       >
@@ -80,11 +93,20 @@ export function AnsweredStub({ q }: { q: IndexedQuestion }) {
   );
 }
 
-export function HookStatusLine({ hooks, now }: { hooks: HookStatus; now: Date }) {
+export function HookStatusLine({
+  hooks,
+  label,
+  now,
+}: {
+  hooks: HookStatus;
+  label?: string | undefined;
+  now: Date;
+}) {
   if (hooks.configured.length === 0) return null;
   const run = hooks.running ?? hooks.last;
   return (
     <p class="hookstatus meta">
+      {label ? <strong>{label} · </strong> : null}
       Agent hook <code>{hooks.configured.join(", ")}</code>:{" "}
       {hooks.running ? (
         <span class="tag block">running since {ago(hooks.running.startedAt, now)}</span>
@@ -103,25 +125,42 @@ export function HookStatusLine({ hooks, now }: { hooks: HookStatus; now: Date })
 }
 
 export function InboxFragment({
-  questions,
+  items,
   now,
   errors,
   hooks,
+  missing,
 }: {
-  questions: IndexedQuestion[];
+  items: InboxItem[];
   now: Date;
-  errors: { file: string; message: string }[];
-  hooks: HookStatus;
+  errors: { file: string; message: string; repo?: string }[];
+  hooks: { label?: string | undefined; status: HookStatus }[];
+  missing: RepoNav[];
 }) {
-  const blocking = questions.filter((q) => q.fm.blocking);
-  const other = questions.filter((q) => !q.fm.blocking);
+  const blocking = items.filter((i) => i.q.fm.blocking);
+  const other = items.filter((i) => !i.q.fm.blocking);
   return (
     <div id="inbox" hx-get="/fragments/inbox" hx-trigger="sse:changed" hx-swap="outerHTML">
       <ErrorList errors={errors} />
-      <HookStatusLine hooks={hooks} now={now} />
-      {questions.length === 0 ? <p class="empty">Nothing is waiting on you.</p> : null}
-      {blocking.map((q) => (
-        <QuestionCard q={q} now={now} />
+      {missing.length > 0 ? (
+        <section class="errors">
+          <h2>Unavailable repos</h2>
+          <ul>
+            {missing.map((r) => (
+              <li>
+                <code>{r.name}</code>: {r.missing} — <code>longe repos remove &lt;path&gt;</code> to
+                forget it
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {hooks.map((h) => (
+        <HookStatusLine hooks={h.status} label={h.label} now={now} />
+      ))}
+      {items.length === 0 ? <p class="empty">Nothing is waiting on you.</p> : null}
+      {blocking.map((i) => (
+        <QuestionCard {...i} now={now} />
       ))}
       {other.length > 0 ? (
         <details class="nonblocking" open={blocking.length === 0}>
@@ -129,8 +168,8 @@ export function InboxFragment({
             {other.length} non-blocking {other.length === 1 ? "question" : "questions"} (agent
             continues on its assumption)
           </summary>
-          {other.map((q) => (
-            <QuestionCard q={q} now={now} />
+          {other.map((i) => (
+            <QuestionCard {...i} now={now} />
           ))}
         </details>
       ) : null}

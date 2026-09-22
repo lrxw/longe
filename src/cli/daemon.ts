@@ -29,6 +29,7 @@ export function serveStateDir(): string {
 }
 
 function recordName(root: string): string {
+  if (root === "*") return "hub";
   const hash = createHash("sha1").update(root).digest("hex").slice(0, 8);
   return `${path.basename(root).replace(/[^a-zA-Z0-9_-]+/g, "-") || "repo"}-${hash}`;
 }
@@ -98,6 +99,7 @@ export interface StartDaemonOptions {
   /** Entry script to run; defaults to the current one. */
   script?: string;
   execArgv?: string[];
+  extraArgs?: string[];
 }
 
 /** Spawns a detached `longe serve` and waits until it answers /health. */
@@ -112,8 +114,8 @@ export async function startDaemon(opts: StartDaemonOptions): Promise<DaemonRecor
       ...(opts.execArgv ?? process.execArgv),
       script,
       "serve",
-      "--repo",
-      opts.root,
+      ...(opts.root === "*" ? [] : ["--repo", opts.root]),
+      ...(opts.extraArgs ?? []),
       "--port",
       String(opts.port),
     ],

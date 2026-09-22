@@ -26,6 +26,7 @@ async function freePort(): Promise<number> {
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "longe-daemon-"));
+  process.env.XDG_CONFIG_HOME = path.join(dir, "config");
   process.env.XDG_CACHE_HOME = path.join(dir, "cache");
   await runInit(dir);
 });

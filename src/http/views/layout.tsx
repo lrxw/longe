@@ -1,15 +1,37 @@
 import type { Child } from "hono/jsx";
 
+export interface RepoNav {
+  name: string;
+  title: string;
+  base: string;
+  missing?: string | undefined;
+}
+
 export interface LayoutProps {
   title: string;
   project: string;
   blocking: number;
   active: "inbox" | "board" | "topic";
+  /** Repos to show in the switcher (hub mode) and the current one, if any. */
+  repos?: RepoNav[] | undefined;
+  current?: RepoNav | undefined;
+  /** Base for the Board link. */
+  base?: string | undefined;
   children?: Child;
 }
 
-export function Layout({ title, project, blocking, active, children }: LayoutProps) {
+export function Layout({
+  title,
+  project,
+  blocking,
+  active,
+  repos,
+  current,
+  base = "",
+  children,
+}: LayoutProps) {
   const badge = blocking > 0 ? `(${blocking}) ` : "";
+  const switcher = repos && repos.length > 1;
   return (
     <html lang="en">
       <head>
@@ -20,7 +42,7 @@ export function Layout({ title, project, blocking, active, children }: LayoutPro
         <script src="/public/vendor/htmx.min.js"></script>
         <script src="/public/vendor/sse.js"></script>
       </head>
-      <body hx-ext="sse" sse-connect="/events" data-page={active} data-back="/board">
+      <body hx-ext="sse" sse-connect="/events" data-page={active} data-back={`${base}/board`}>
         <header class="top">
           <a class="brand" href="/">
             <span id="badge" hx-get="/fragments/badge" hx-trigger="sse:changed" hx-swap="outerHTML">
@@ -28,12 +50,26 @@ export function Layout({ title, project, blocking, active, children }: LayoutPro
             </span>
             longe
           </a>
-          <span class="project">{project}</span>
+          {switcher ? (
+            <nav class="repos">
+              {repos.map((r) => (
+                <a
+                  href={r.missing ? "/" : `${r.base}/board`}
+                  class={`${current?.name === r.name ? "on" : ""} ${r.missing ? "missing" : ""}`}
+                  title={r.missing ?? r.name}
+                >
+                  {r.title}
+                </a>
+              ))}
+            </nav>
+          ) : (
+            <span class="project">{project}</span>
+          )}
           <nav>
             <a href="/" class={active === "inbox" ? "on" : ""}>
               Inbox
             </a>
-            <a href="/board" class={active === "board" ? "on" : ""}>
+            <a href={`${base}/board`} class={active === "board" ? "on" : ""}>
               Board
             </a>
           </nav>
@@ -62,7 +98,11 @@ export function Badge({ blocking }: { blocking: number }) {
   );
 }
 
-export function ErrorList({ errors }: { errors: { file: string; message: string }[] }) {
+export function ErrorList({
+  errors,
+}: {
+  errors: { file: string; message: string; repo?: string }[];
+}) {
   if (errors.length === 0) return null;
   return (
     <section class="errors">
@@ -70,7 +110,11 @@ export function ErrorList({ errors }: { errors: { file: string; message: string 
       <ul>
         {errors.map((e) => (
           <li>
-            <code>{e.file}</code>: {e.message}
+            <code>
+              {e.repo ? `${e.repo}: ` : ""}
+              {e.file}
+            </code>
+            : {e.message}
           </li>
         ))}
       </ul>
