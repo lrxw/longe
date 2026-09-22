@@ -378,3 +378,4 @@ Each phase ends with passing tests and a short written report (done / not done /
 1. Port `7311` confirmed.
 2. `create_topic` stays available to agents via MCP.
 3. Inbox shows non-blocking questions in a separate, collapsed section below blocking ones.
+4. Project renamed from `aiboard` to **longe** (package, CLI, UI, MCP server name). The `.ai/` folder name is unchanged.

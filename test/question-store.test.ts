@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { acknowledgeQuestion, answerQuestion, withdrawQuestion } from "../src/domain/question-ops.js";
+import {
+  acknowledgeQuestion,
+  answerQuestion,
+  withdrawQuestion,
+} from "../src/domain/question-ops.js";
 import { askQuestionInputSchema } from "../src/domain/schemas.js";
-import { newQuestionText, parseQuestion, questionSections, serializeQuestion } from "../src/store/question.js";
+import {
+  newQuestionText,
+  parseQuestion,
+  questionSections,
+  serializeQuestion,
+} from "../src/store/question.js";
 
 const now = new Date(2026, 8, 22, 15, 2, 0);
 const later = new Date(2026, 8, 22, 16, 30, 0);
@@ -43,9 +52,16 @@ describe("question store", () => {
   it("enforces blocking:false ⇒ assumption", () => {
     const noAssumption = sample.replace("assumption: Keep Stripe webhooks\n", "");
     expect(() => parseQuestion(noAssumption)).toThrow(/assumption/);
-    expect(() => parseQuestion(noAssumption.replace("blocking: false", "blocking: true"))).not.toThrow();
-    expect(askQuestionInputSchema.safeParse({ question: "Q?", blocking: false }).success).toBe(false);
-    expect(askQuestionInputSchema.safeParse({ question: "Q?", blocking: false, assumption: "A" }).success).toBe(true);
+    expect(() =>
+      parseQuestion(noAssumption.replace("blocking: false", "blocking: true")),
+    ).not.toThrow();
+    expect(askQuestionInputSchema.safeParse({ question: "Q?", blocking: false }).success).toBe(
+      false,
+    );
+    expect(
+      askQuestionInputSchema.safeParse({ question: "Q?", blocking: false, assumption: "A" })
+        .success,
+    ).toBe(true);
     expect(askQuestionInputSchema.safeParse({ question: "Q?", blocking: true }).success).toBe(true);
   });
 
@@ -69,10 +85,20 @@ describe("question store", () => {
     const q = parseQuestion(text, { expectedId: "q-20260922-ab12" });
     expect(q.fm.options).toEqual(["Webhooks", "Polling: slow"]);
     expect(q.fm.status).toBe("open");
-    expect(questionSections(q)).toEqual({ Question: "Webhooks or polling?", Context: "Because reasons.", Answer: "" });
+    expect(questionSections(q)).toEqual({
+      Question: "Webhooks or polling?",
+      Context: "Because reasons.",
+      Answer: "",
+    });
     expect(serializeQuestion(parseQuestion(text))).toBe(text);
 
-    const minimal = newQuestionText({ id: "q-20260922-ab13", question: "Q?", blocking: true, asked_by: "x", now });
+    const minimal = newQuestionText({
+      id: "q-20260922-ab13",
+      question: "Q?",
+      blocking: true,
+      asked_by: "x",
+      now,
+    });
     expect(parseQuestion(minimal).fm.topic).toBeUndefined();
   });
 

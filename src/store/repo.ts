@@ -1,11 +1,23 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { DomainError } from "../domain/errors.js";
 import { atomicCreate, modifyFile } from "./atomic.js";
 import { uniqueQuestionId, uniqueSlug } from "./ids.js";
-import { questionsDir, questionPath, stemOf, topicPath, topicsDir } from "./paths.js";
-import { type NewQuestionInput, type Question, newQuestionText, parseQuestion, serializeQuestion } from "./question.js";
-import { type NewTopicInput, type Topic, newTopicText, parseTopic, serializeTopic } from "./topic.js";
+import { questionPath, questionsDir, stemOf, topicPath, topicsDir } from "./paths.js";
+import {
+  type NewQuestionInput,
+  newQuestionText,
+  parseQuestion,
+  type Question,
+  serializeQuestion,
+} from "./question.js";
+import {
+  type NewTopicInput,
+  newTopicText,
+  parseTopic,
+  serializeTopic,
+  type Topic,
+} from "./topic.js";
 
 /**
  * File-level access to one repository's `.ai/` folder. Every read hits disk;
@@ -25,12 +37,18 @@ export class Repo {
 
   async readTopic(id: string): Promise<Topic> {
     const file = topicPath(this.root, id);
-    return parseTopic(await readOr404(file, `topic ${id}`), { expectedId: id, file: relName(file) });
+    return parseTopic(await readOr404(file, `topic ${id}`), {
+      expectedId: id,
+      file: relName(file),
+    });
   }
 
   async readQuestion(id: string): Promise<Question> {
     const file = questionPath(this.root, id);
-    return parseQuestion(await readOr404(file, `question ${id}`), { expectedId: id, file: relName(file) });
+    return parseQuestion(await readOr404(file, `question ${id}`), {
+      expectedId: id,
+      file: relName(file),
+    });
   }
 
   /** Applies `fn` to a freshly parsed topic and writes it back atomically. */
@@ -95,14 +113,18 @@ async function listStems(dir: string): Promise<string[]> {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw err;
   }
-  return names.map(stemOf).filter((s): s is string => s !== undefined).sort();
+  return names
+    .map(stemOf)
+    .filter((s): s is string => s !== undefined)
+    .sort();
 }
 
 async function readOr404(file: string, what: string): Promise<string> {
   try {
     return await readFile(file, "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") throw new DomainError("not_found", `${what} not found`);
+    if ((err as NodeJS.ErrnoException).code === "ENOENT")
+      throw new DomainError("not_found", `${what} not found`);
     throw err;
   }
 }

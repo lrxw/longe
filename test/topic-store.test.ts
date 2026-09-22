@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { addDecision, appendLog, setPlan, transitionTopic } from "../src/domain/topic-ops.js";
 import { newTopicText, parseTopic, serializeTopic, topicSections } from "../src/store/topic.js";
 
-const fixture = (name: string) => readFile(path.join(import.meta.dirname, "fixtures", name), "utf8");
+const fixture = (name: string) =>
+  readFile(path.join(import.meta.dirname, "fixtures", name), "utf8");
 const now = new Date(2026, 8, 22, 15, 2, 0);
 
 describe("topic store", () => {
@@ -24,13 +25,19 @@ describe("topic store", () => {
     expect(() => parseTopic(text, { expectedId: "other" })).toThrow(/does not match filename/);
     expect(() => parseTopic(text.replace("status: active", "status: bogus"))).toThrow(/status/);
     expect(() => parseTopic(text.replace("## Decisions", "## Nope"))).toThrow(/## Decisions/);
-    expect(() => parseTopic(text.replace("updated: 2026-09-22T14:10:00+02:00", "updated: yesterday"))).toThrow(
-      /updated/,
-    );
+    expect(() =>
+      parseTopic(text.replace("updated: 2026-09-22T14:10:00+02:00", "updated: yesterday")),
+    ).toThrow(/updated/);
   });
 
   it("creates a new topic file that parses back", () => {
-    const text = newTopicText({ id: "new-one", title: "New: one", goal: "Do it.", plan: "- [ ] a", now });
+    const text = newTopicText({
+      id: "new-one",
+      title: "New: one",
+      goal: "Do it.",
+      plan: "- [ ] a",
+      now,
+    });
     const t = parseTopic(text, { expectedId: "new-one" });
     expect(t.fm.status).toBe("backlog");
     expect(t.fm.title).toBe("New: one");
@@ -42,7 +49,9 @@ describe("topic store", () => {
   });
 
   it("setPlan / addDecision / appendLog edit only their sections and bump updated", () => {
-    const t = parseTopic(newTopicText({ id: "t", title: "T", goal: "G", now: new Date(2026, 0, 1) }));
+    const t = parseTopic(
+      newTopicText({ id: "t", title: "T", goal: "G", now: new Date(2026, 0, 1) }),
+    );
     const before = t.fm.updated;
     setPlan(t, "- [x] one\n- [ ] two", now);
     addDecision(t, "Chose A over B.", now);
@@ -52,7 +61,9 @@ describe("topic store", () => {
     expect(s.Goal).toBe("G");
     expect(s.Plan).toBe("- [x] one\n- [ ] two");
     expect(s.Decisions).toBe("- 2026-09-22 — Chose A over B.");
-    expect(s.Log).toBe("- 2026-09-22 15:02 agent — Did one.\n- 2026-09-22 15:02 human — Looks good.");
+    expect(s.Log).toBe(
+      "- 2026-09-22 15:02 agent — Did one.\n- 2026-09-22 15:02 human — Looks good.",
+    );
     expect(t.fm.updated).not.toBe(before);
     expect(t.fm.created).toBe("2026-01-01T00:00:00" + t.fm.created.slice(19));
     // serialized output re-parses identically

@@ -12,9 +12,9 @@ export interface ParsedCli {
 export const DEFAULT_PORT = 7311;
 
 const USAGE = `Usage:
-  aiboard init   [--repo <dir>]
-  aiboard serve  [--repo <dir>] [--port <n>] [--open]
-  aiboard mcp    [--repo <dir>]
+  longe init   [--repo <dir>]
+  longe serve  [--repo <dir>] [--port <n>] [--open]
+  longe mcp    [--repo <dir>]
 
 Options:
   --repo   Repository root containing (or to receive) .ai/  (default: .)

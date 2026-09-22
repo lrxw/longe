@@ -11,7 +11,8 @@ import {
   setField,
 } from "../src/store/markdown.js";
 
-const fixture = (name: string) => readFile(path.join(import.meta.dirname, "fixtures", name), "utf8");
+const fixture = (name: string) =>
+  readFile(path.join(import.meta.dirname, "fixtures", name), "utf8");
 
 describe("markdown round-trip", () => {
   it("parse → serialize is byte-identical on the odd fixture", async () => {
@@ -104,7 +105,9 @@ describe("section editing", () => {
     const out = serializeMarkdown(doc);
     const [head] = text.split("## Log");
     expect(out.startsWith(head as string)).toBe(true);
-    expect(out.endsWith("## Log\n- 2026-09-22 14:10 agent — Implemented step one.\n- new\n")).toBe(true);
+    expect(out.endsWith("## Log\n- 2026-09-22 14:10 agent — Implemented step one.\n- new\n")).toBe(
+      true,
+    );
   });
 });
 
@@ -113,6 +116,8 @@ describe("indentation", () => {
     const doc = parseMarkdown("---\nid: x\n---\n## Plan\n\n  - [ ] indented\n\n## Log\n");
     expect(sectionText(doc, "Plan")).toBe("  - [ ] indented");
     replaceSection(doc, "Plan", "    - deep\n  - less");
-    expect(serializeMarkdown(doc)).toBe("---\nid: x\n---\n## Plan\n    - deep\n  - less\n\n## Log\n");
+    expect(serializeMarkdown(doc)).toBe(
+      "---\nid: x\n---\n## Plan\n    - deep\n  - less\n\n## Log\n",
+    );
   });
 });

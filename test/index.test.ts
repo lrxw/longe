@@ -25,7 +25,7 @@ const topicFile = (id: string) => path.join(dir, ".ai/topics", `${id}.md`);
 const questionFile = (id: string) => path.join(dir, ".ai/questions", `${id}.md`);
 
 beforeEach(async () => {
-  dir = await mkdtemp(path.join(os.tmpdir(), "aiboard-index-"));
+  dir = await mkdtemp(path.join(os.tmpdir(), "longe-index-"));
   await runInit(dir);
 });
 
@@ -36,7 +36,10 @@ afterEach(async () => {
 
 describe("AiIndex", () => {
   it("indexes existing files on start and tracks add/change/delete", async () => {
-    await writeFile(topicFile("first"), newTopicText({ id: "first", title: "First", goal: "g", now }));
+    await writeFile(
+      topicFile("first"),
+      newTopicText({ id: "first", title: "First", goal: "g", now }),
+    );
     index = new AiIndex(dir, { debounceMs: 20 });
     const topicEvents: TopicChange[] = [];
     const questionEvents: QuestionChange[] = [];
@@ -49,7 +52,15 @@ describe("AiIndex", () => {
     // add a question by hand
     await writeFile(
       questionFile("q-20260922-aaaa"),
-      newQuestionText({ id: "q-20260922-aaaa", question: "Q?", blocking: false, assumption: "x", topic: "first", asked_by: "me", now }),
+      newQuestionText({
+        id: "q-20260922-aaaa",
+        question: "Q?",
+        blocking: false,
+        assumption: "x",
+        topic: "first",
+        asked_by: "me",
+        now,
+      }),
     );
     await waitFor(() => index.questions.has("q-20260922-aaaa"));
     expect(questionEvents.at(-1)).toMatchObject({ id: "q-20260922-aaaa", type: "added" });
@@ -87,7 +98,10 @@ describe("AiIndex", () => {
     index = new AiIndex(dir, { debounceMs: 20 });
     await index.start();
     const mk = (id: string, blocking: boolean, at: Date) =>
-      writeFile(questionFile(id), newQuestionText({ id, question: id, blocking, assumption: "a", asked_by: "me", now: at }));
+      writeFile(
+        questionFile(id),
+        newQuestionText({ id, question: id, blocking, assumption: "a", asked_by: "me", now: at }),
+      );
     await mk("q-20260922-nb01", false, new Date(2026, 8, 22, 9));
     await mk("q-20260922-bl02", true, new Date(2026, 8, 22, 10));
     await mk("q-20260922-bl01", true, new Date(2026, 8, 22, 8));
@@ -111,10 +125,15 @@ describe("EffectRunner (§7.4 external changes)", () => {
     notifications.length = 0;
     await writeFile(
       topicFile("t"),
-      newTopicText({ id: "t", title: "Topic T", goal: "g", now }).replace("status: backlog", "status: active"),
+      newTopicText({ id: "t", title: "Topic T", goal: "g", now }).replace(
+        "status: backlog",
+        "status: active",
+      ),
     );
     index = new AiIndex(dir, { debounceMs: 20 });
-    runner = new EffectRunner(index, new Repo(dir), (title, body) => notifications.push(`${title}: ${body}`));
+    runner = new EffectRunner(index, new Repo(dir), (title, body) =>
+      notifications.push(`${title}: ${body}`),
+    );
     runner.attach();
     await index.start();
   });
@@ -122,7 +141,14 @@ describe("EffectRunner (§7.4 external changes)", () => {
   it("hand-written blocking question moves the topic to needs-decision and notifies", async () => {
     await writeFile(
       questionFile("q-20260922-bbbb"),
-      newQuestionText({ id: "q-20260922-bbbb", question: "Which DB?", blocking: true, topic: "t", asked_by: "me", now }),
+      newQuestionText({
+        id: "q-20260922-bbbb",
+        question: "Which DB?",
+        blocking: true,
+        topic: "t",
+        asked_by: "me",
+        now,
+      }),
     );
     await waitFor(() => index.topics.get("t")?.fm.status === "needs-decision");
     const text = await readFile(topicFile("t"), "utf8");
@@ -134,7 +160,9 @@ describe("EffectRunner (§7.4 external changes)", () => {
     const q = await readFile(questionFile("q-20260922-bbbb"), "utf8");
     await writeFile(questionFile("q-20260922-bbbb"), q.replace("status: open", "status: answered"));
     await waitFor(() => index.topics.get("t")?.fm.status === "active");
-    expect(await readFile(topicFile("t"), "utf8")).toMatch(/system — q-20260922-bbbb answered, unblocked/);
+    expect(await readFile(topicFile("t"), "utf8")).toMatch(
+      /system — q-20260922-bbbb answered, unblocked/,
+    );
     expect(notifications).toHaveLength(1);
   });
 

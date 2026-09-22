@@ -40,7 +40,7 @@ export function effectsForQuestionCreated(
   }
   effects.push({
     kind: "notify",
-    title: topic ? topic.fm.title : "aiboard",
+    title: topic ? topic.fm.title : "longe",
     body: truncate(questionText),
   });
   return effects;

@@ -8,14 +8,14 @@ import { AGENT_INSTRUCTIONS } from "../src/domain/agent-instructions.js";
 let dir: string;
 
 beforeEach(async () => {
-  dir = await mkdtemp(path.join(os.tmpdir(), "aiboard-init-"));
+  dir = await mkdtemp(path.join(os.tmpdir(), "longe-init-"));
 });
 
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe("aiboard init", () => {
+describe("longe init", () => {
   it("creates the .ai layout", async () => {
     const result = await runInit(dir);
 

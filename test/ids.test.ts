@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { QUESTION_ID_RE, newQuestionId, slugify, uniqueQuestionId, uniqueSlug } from "../src/store/ids.js";
+import {
+  newQuestionId,
+  QUESTION_ID_RE,
+  slugify,
+  uniqueQuestionId,
+  uniqueSlug,
+} from "../src/store/ids.js";
 
 describe("slugify", () => {
   it("normalizes titles", () => {

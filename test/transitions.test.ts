@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { allowedTargets, checkTransition } from "../src/domain/transitions.js";
-import { TOPIC_STATUSES, type Actor, type TopicStatus, ballHolder } from "../src/domain/types.js";
+import { type Actor, ballHolder, TOPIC_STATUSES, type TopicStatus } from "../src/domain/types.js";
 
 const ACTORS: Actor[] = ["human", "agent", "system"];
 

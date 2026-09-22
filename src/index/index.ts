@@ -3,7 +3,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 import { ParseError } from "../domain/errors.js";
-import type { QuestionFrontmatter, QuestionStatus, TopicFrontmatter, TopicStatus } from "../domain/types.js";
+import type {
+  QuestionFrontmatter,
+  QuestionStatus,
+  TopicFrontmatter,
+  TopicStatus,
+} from "../domain/types.js";
 import { questionsDir, stemOf, topicsDir } from "../store/paths.js";
 import { parseQuestion, questionSections } from "../store/question.js";
 import { parseTopic, topicSections } from "../store/topic.js";
@@ -75,7 +80,10 @@ export class AiIndex extends EventEmitter<IndexEvents> {
   private readonly debounceMs: number;
   private readonly usePolling: boolean;
 
-  constructor(public readonly root: string, opts: IndexOptions = {}) {
+  constructor(
+    public readonly root: string,
+    opts: IndexOptions = {},
+  ) {
     super();
     this.debounceMs = opts.debounceMs ?? 100;
     this.usePolling = opts.usePolling ?? false;
@@ -194,7 +202,13 @@ export class AiIndex extends EventEmitter<IndexEvents> {
     }
     try {
       const t = parseTopic(text, { expectedId: id, file: path.relative(this.root, file) });
-      const current: IndexedTopic = { kind: "topic", id, file, fm: t.fm, sections: topicSections(t) };
+      const current: IndexedTopic = {
+        kind: "topic",
+        id,
+        file,
+        fm: t.fm,
+        sections: topicSections(t),
+      };
       this.topics.set(id, current);
       this.setError(file, undefined);
       return { id, type: previous ? "changed" : "added", previous, current };
@@ -217,7 +231,13 @@ export class AiIndex extends EventEmitter<IndexEvents> {
     }
     try {
       const q = parseQuestion(text, { expectedId: id, file: path.relative(this.root, file) });
-      const current: IndexedQuestion = { kind: "question", id, file, fm: q.fm, sections: questionSections(q) };
+      const current: IndexedQuestion = {
+        kind: "question",
+        id,
+        file,
+        fm: q.fm,
+        sections: questionSections(q),
+      };
       this.questions.set(id, current);
       this.setError(file, undefined);
       return { id, type: previous ? "changed" : "added", previous, current };
@@ -226,6 +246,27 @@ export class AiIndex extends EventEmitter<IndexEvents> {
       if (!previous) return undefined;
       this.questions.delete(id);
       return { id, type: "removed", previous };
+    }
+  }
+
+  /**
+   * Re-reads one file right now, ahead of the watcher, so callers that just
+   * wrote it can render fresh state. The watcher's later event is harmless.
+   */
+  async refresh(kind: "topic" | "question", id: string): Promise<void> {
+    const file =
+      kind === "topic"
+        ? path.join(topicsDir(this.root), `${id}.md`)
+        : path.join(questionsDir(this.root), `${id}.md`);
+    const change =
+      kind === "topic" ? await this.reindexTopic(id, file) : await this.reindexQuestion(id, file);
+    if (!change) return;
+    if (kind === "topic") {
+      this.emit("topic:changed", change as TopicChange);
+      this.emit("batch", { topics: [change as TopicChange], questions: [] });
+    } else {
+      this.emit("question:changed", change as QuestionChange);
+      this.emit("batch", { topics: [], questions: [change as QuestionChange] });
     }
   }
 
@@ -240,7 +281,8 @@ export class AiIndex extends EventEmitter<IndexEvents> {
   }
 
   openBlockingCount(topicId: string): number {
-    return this.questionsForTopic(topicId).filter((q) => q.fm.status === "open" && q.fm.blocking).length;
+    return this.questionsForTopic(topicId).filter((q) => q.fm.status === "open" && q.fm.blocking)
+      .length;
   }
 
   /** All open questions: blocking first, then oldest first (§8). */
@@ -255,7 +297,8 @@ export class AiIndex extends EventEmitter<IndexEvents> {
 
   /** Number of open blocking questions, project-wide (title badge). */
   blockingCount(): number {
-    return [...this.questions.values()].filter((q) => q.fm.status === "open" && q.fm.blocking).length;
+    return [...this.questions.values()].filter((q) => q.fm.status === "open" && q.fm.blocking)
+      .length;
   }
 
   topicsByStatus(status: TopicStatus): IndexedTopic[] {

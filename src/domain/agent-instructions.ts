@@ -1,7 +1,7 @@
-/** Verbatim agent protocol from spec §9. Written by `aiboard init`. */
+/** Verbatim agent protocol from spec §9. Written by `longe init`. */
 export const AGENT_INSTRUCTIONS = `## Working with the .ai board
 
-You track your work in this repository's \`.ai/\` folder, via the aiboard MCP tools
+You track your work in this repository's \`.ai/\` folder, via the longe MCP tools
 (or REST at http://127.0.0.1:7311/api/v1, or by editing the files directly).
 
 At the start of every session:

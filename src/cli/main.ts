@@ -15,11 +15,9 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "serve": {
-      // Phase 3/4: start Hono HTTP server + Streamable HTTP MCP at /mcp.
-      process.stdout.write(
-        `[not yet implemented] serve: repo=${repo} port=${cli.port} open=${cli.open}\n`,
-      );
-      return 0;
+      const { runServe } = await import("./serve.js");
+      await runServe({ repo, port: cli.port, open: cli.open });
+      return new Promise(() => {}); // runs until SIGINT
     }
     case "mcp": {
       // Phase 4: MCP over stdio.

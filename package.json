@@ -1,11 +1,11 @@
 {
-  "name": "aiboard",
+  "name": "longe",
   "version": "0.1.0",
   "description": "Local-first board for tracking work done by AI coding agents in one repository",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "aiboard": "./bin/aiboard.js"
+    "longe": "./bin/longe.js"
   },
   "files": [
     "bin",
@@ -26,6 +26,7 @@
   },
   "packageManager": "pnpm@8.15.9",
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "chokidar": "^5.0.0",
     "hono": "^4.13.8",

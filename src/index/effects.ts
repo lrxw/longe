@@ -1,4 +1,9 @@
-import { type Effect, effectsForQuestionClosed, effectsForQuestionCreated, effectsForTopicStatus } from "../domain/side-effects.js";
+import {
+  type Effect,
+  effectsForQuestionClosed,
+  effectsForQuestionCreated,
+  effectsForTopicStatus,
+} from "../domain/side-effects.js";
 import { transitionTopic } from "../domain/topic-ops.js";
 import type { Repo } from "../store/repo.js";
 import type { AiIndex, QuestionChange, TopicChange } from "./index.js";
@@ -14,6 +19,7 @@ export async function applyEffects(
   repo: Repo,
   notify: Notifier,
   now: () => Date = () => new Date(),
+  index?: AiIndex,
 ): Promise<void> {
   for (const e of effects) {
     switch (e.kind) {
@@ -24,6 +30,7 @@ export async function applyEffects(
             if (topic.fm.status !== e.from) return;
             transitionTopic(topic, e.to, "system", now(), e.note);
           });
+          await index?.refresh("topic", e.topic);
         } catch {
           // topic vanished or is unparsable — the index will surface that
         }
@@ -86,7 +93,9 @@ export class EffectRunner {
       if (before === state) continue; // body edit only
       if (this.consume(cur.id, state)) continue; // tool did this and already applied effects
       const topic = cur.fm.topic ? this.index.topics.get(cur.fm.topic) : undefined;
-      const view = topic ? { fm: topic.fm, openBlockingCount: this.index.openBlockingCount(topic.id) } : undefined;
+      const view = topic
+        ? { fm: topic.fm, openBlockingCount: this.index.openBlockingCount(topic.id) }
+        : undefined;
       if (state === "open" && before === undefined) {
         effects.push(...effectsForQuestionCreated(cur.fm, cur.sections.Question, view));
       } else if (before === "open" && (state === "answered" || state === "withdrawn")) {
@@ -106,6 +115,6 @@ export class EffectRunner {
 
     // a system status change we are about to write will show up in the next batch: expect it
     for (const e of effects) if (e.kind === "set_topic_status") this.expect(e.topic, e.to);
-    await applyEffects(effects, this.repo, this.notify);
+    await applyEffects(effects, this.repo, this.notify, () => new Date(), this.index);
   }
 }
