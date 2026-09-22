@@ -49,7 +49,7 @@ Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
 ## Connect an agent (MCP)
 
 Two transports. **stdio** spawns `longe mcp` per agent session and needs no server.
-**HTTP** talks to a running `longe serve` at `http://127.0.0.1:7311/mcp` (Streamable HTTP).
+**HTTP** talks to a running `longe serve` at `http://127.0.0.1:7311/r/<name>/mcp` (Streamable HTTP; `/mcp` serves all repos and needs a `repo` argument).
 
 ### Claude Code
 
@@ -73,7 +73,7 @@ args = ["mcp", "--repo", "."]
 { "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
 ```
 
-HTTP variant: `{ "mcpServers": { "longe": { "httpUrl": "http://127.0.0.1:7311/mcp" } } }`
+HTTP variant: `{ "mcpServers": { "longe": { "httpUrl": "http://127.0.0.1:7311/r/<name>/mcp" } } }`
 
 ### Cursor (`.cursor/mcp.json`)
 
@@ -81,7 +81,7 @@ HTTP variant: `{ "mcpServers": { "longe": { "httpUrl": "http://127.0.0.1:7311/mc
 { "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
 ```
 
-HTTP variant: `{ "mcpServers": { "longe": { "url": "http://127.0.0.1:7311/mcp" } } }`
+HTTP variant: `{ "mcpServers": { "longe": { "url": "http://127.0.0.1:7311/r/<name>/mcp" } } }`
 
 ### Cline (MCP settings)
 
