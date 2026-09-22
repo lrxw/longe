@@ -20,6 +20,17 @@ export async function runServe(opts: ServeOptions): Promise<void> {
     );
     if (opts.open) openBrowser(url);
   });
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      process.stderr.write(
+        `Port ${opts.port} is already in use on 127.0.0.1.\n` +
+          `Another longe serve (or something else) is listening there. Stop it or pick a port:\n` +
+          `  longe serve --port ${opts.port + 1}\n`,
+      );
+      process.exit(1);
+    }
+    throw err;
+  });
   const shutdown = async () => {
     server.close();
     await closeAppContext(ctx);
