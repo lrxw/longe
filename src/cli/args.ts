@@ -1,12 +1,13 @@
 import { parseArgs } from "node:util";
 
-export type Command = "init" | "serve" | "mcp";
+export type Command = "init" | "serve" | "mcp" | "answers";
 
 export interface ParsedCli {
   command: Command;
   repo: string;
   port: number;
   open: boolean;
+  json: boolean;
 }
 
 export const DEFAULT_PORT = 7311;
@@ -45,6 +46,7 @@ export function parseCli(argv: string[]): ParsedCli {
       repo: { type: "string", default: "." },
       port: { type: "string", default: String(DEFAULT_PORT) },
       open: { type: "boolean", default: false },
+      json: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -52,7 +54,7 @@ export function parseCli(argv: string[]): ParsedCli {
   if (values.help) throw new CliError(USAGE, 0);
 
   const command = positionals[0];
-  if (command !== "init" && command !== "serve" && command !== "mcp") {
+  if (command !== "init" && command !== "serve" && command !== "mcp" && command !== "answers") {
     throw new CliError(`Unknown or missing command: ${command ?? "(none)"}\n\n${USAGE}`);
   }
   if (positionals.length > 1) {
@@ -64,5 +66,5 @@ export function parseCli(argv: string[]): ParsedCli {
     throw new CliError(`Invalid --port: ${values.port}`);
   }
 
-  return { command, repo: values.repo, port, open: values.open };
+  return { command, repo: values.repo, port, open: values.open, json: values.json };
 }

@@ -51,7 +51,12 @@ export function createHttpApp(ctx: AppContext, opts: HttpOptions = {}): Hono {
   app.get("/", (c) =>
     c.html(
       <Layout title="Inbox" project={project()} blocking={ctx.index.blockingCount()} active="inbox">
-        <InboxFragment questions={ctx.index.inbox()} now={ctx.now()} errors={errors()} />
+        <InboxFragment
+          questions={ctx.index.inbox()}
+          now={ctx.now()}
+          errors={errors()}
+          hooks={ctx.hooks.status()}
+        />
       </Layout>,
     ),
   );
@@ -82,7 +87,14 @@ export function createHttpApp(ctx: AppContext, opts: HttpOptions = {}): Hono {
   // ---- fragments (SSE-triggered refresh) -----------------------------------
   app.get("/fragments/badge", (c) => c.html(<Badge blocking={ctx.index.blockingCount()} />));
   app.get("/fragments/inbox", (c) =>
-    c.html(<InboxFragment questions={ctx.index.inbox()} now={ctx.now()} errors={errors()} />),
+    c.html(
+      <InboxFragment
+        questions={ctx.index.inbox()}
+        now={ctx.now()}
+        errors={errors()}
+        hooks={ctx.hooks.status()}
+      />,
+    ),
   );
   app.get("/fragments/board", (c) => c.html(<BoardFragment index={ctx.index} now={ctx.now()} />));
   app.get("/fragments/topics/:id", (c) => {
@@ -160,13 +172,18 @@ export function createHttpApp(ctx: AppContext, opts: HttpOptions = {}): Hono {
       const onError = (ch: { file: string }) => {
         void send("changed", ch.file);
       };
+      const onHook = () => {
+        void send("changed", "hook");
+      };
       ctx.index.on("topic:changed", onTopic);
       ctx.index.on("question:changed", onQuestion);
       ctx.index.on("error:changed", onError);
+      ctx.hooks.on("hook:changed", onHook);
       stream.onAbort(() => {
         ctx.index.off("topic:changed", onTopic);
         ctx.index.off("question:changed", onQuestion);
         ctx.index.off("error:changed", onError);
+        ctx.hooks.off("hook:changed", onHook);
       });
       await send("hello", "longe");
       while (!stream.aborted) {

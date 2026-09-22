@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { EffectRunner, type Notifier, type EffectRunner as Runner } from "../index/effects.js";
 import { AiIndex, type IndexOptions } from "../index/index.js";
 import { type Config, parseConfig } from "../store/config.js";
 import { configPath } from "../store/paths.js";
 import { Repo } from "../store/repo.js";
+import { HookRunner } from "./hooks.js";
 
 export interface AppContext {
   root: string;
@@ -13,6 +15,7 @@ export interface AppContext {
   runner: Runner;
   notify: Notifier;
   now: () => Date;
+  hooks: HookRunner;
 }
 
 export interface AppOptions {
@@ -32,10 +35,11 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
   const notify = opts.notify ?? (() => {});
   const repo = new Repo(root);
   const index = new AiIndex(root, opts.index ?? {});
-  const runner = new EffectRunner(index, repo, notify);
+  const hooks = new HookRunner(root, config.hooks ?? {}, config.project ?? path.basename(root));
+  const runner = new EffectRunner(index, repo, notify, (name, vars) => hooks.trigger(name, vars));
   runner.attach();
   await index.start();
-  return { root, config, repo, index, runner, notify, now: opts.now ?? (() => new Date()) };
+  return { root, config, repo, index, runner, notify, now: opts.now ?? (() => new Date()), hooks };
 }
 
 export async function closeAppContext(ctx: AppContext): Promise<void> {

@@ -15,7 +15,8 @@ While working on a topic:
   \`blocking: false\` and state your \`assumption\`, then continue on that assumption.
 - When you cannot proceed without an answer: \`ask_question\` with \`blocking: true\`,
   write a Log entry saying you stopped, and stop working on that topic. Move on to
-  another active topic or end the session.
+  another active topic or end the session. If the human is likely nearby you may
+  first call \`wait_for_answer\` (up to 300 seconds per call, at most a few calls).
 - Prefer giving 2–4 \`options\` so the human can answer with one click.
 
 Before you stop, for every topic you touched: \`append_log\` with what is done,

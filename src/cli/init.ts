@@ -1,6 +1,7 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
+import { defaultConfigText } from "../store/config.js";
 
 export const AI_DIR = ".ai";
 
@@ -16,10 +17,6 @@ async function exists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function defaultConfig(projectName: string): string {
-  return `version: 1\nproject: ${JSON.stringify(projectName)}\n`;
 }
 
 /**
@@ -42,7 +39,7 @@ export async function runInit(repoRoot: string): Promise<InitResult> {
   }
 
   const files: Array<[string, string]> = [
-    [path.join(root, "config.yml"), defaultConfig(path.basename(repoRoot))],
+    [path.join(root, "config.yml"), defaultConfigText(path.basename(repoRoot))],
     [path.join(root, "AGENT-INSTRUCTIONS.md"), AGENT_INSTRUCTIONS],
   ];
   for (const [file, content] of files) {

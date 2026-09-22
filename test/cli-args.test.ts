@@ -8,6 +8,7 @@ describe("parseCli", () => {
       repo: ".",
       port: DEFAULT_PORT,
       open: false,
+      json: false,
     });
   });
 
@@ -17,11 +18,13 @@ describe("parseCli", () => {
       repo: "/tmp/x",
       port: 8080,
       open: true,
+      json: false,
     });
   });
 
-  it("parses mcp", () => {
+  it("parses mcp and answers", () => {
     expect(parseCli(["mcp"]).command).toBe("mcp");
+    expect(parseCli(["answers", "--json"])).toMatchObject({ command: "answers", json: true });
   });
 
   it("rejects unknown command", () => {

@@ -19,6 +19,14 @@ async function main(argv: string[]): Promise<number> {
       await runServe({ repo, port: cli.port, open: cli.open });
       return new Promise(() => {}); // runs until SIGINT
     }
+    case "answers": {
+      const { collectAnswers, formatAnswersForAgent } = await import("./answers.js");
+      const answers = await collectAnswers(repo);
+      process.stdout.write(
+        cli.json ? `${JSON.stringify(answers, null, 2)}\n` : formatAnswersForAgent(answers),
+      );
+      return 0;
+    }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");
       await runMcpStdio(repo);

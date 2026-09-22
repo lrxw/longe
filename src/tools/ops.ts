@@ -73,6 +73,8 @@ export async function answerQuestion(
   }
   await ctx.index.refresh("question", id);
   await runEffects(ctx, effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id)));
+  const indexed = ctx.index.questions.get(id);
+  if (indexed) ctx.runner.fireAnswerHook(indexed);
   return q;
 }
 

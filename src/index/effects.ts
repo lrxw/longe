@@ -9,6 +9,10 @@ import type { Repo } from "../store/repo.js";
 import type { AiIndex, QuestionChange, TopicChange } from "./index.js";
 
 export type Notifier = (title: string, body: string) => void;
+export type HookTrigger = (
+  hook: "on_answer",
+  vars: { question_id: string; topic_id?: string; answer: string; question: string },
+) => void;
 
 /**
  * Executes effects. Topic status changes go through the normal read–modify–write
@@ -61,6 +65,7 @@ export class EffectRunner {
     private readonly index: AiIndex,
     private readonly repo: Repo,
     private readonly notify: Notifier,
+    private readonly hook: HookTrigger = () => {},
   ) {}
 
   /** Declares that `id` is about to reach `state` because of a tool call. */
@@ -82,6 +87,21 @@ export class EffectRunner {
     });
   }
 
+  /** Wakes the configured agent hook for an answered question (tool-driven or hand-edited). */
+  fireAnswerHook(q: {
+    id: string;
+    fm: { topic?: string | null | undefined };
+    sections: { Question: string; Answer: string };
+  }): void {
+    const vars: Parameters<HookTrigger>[1] = {
+      question_id: q.id,
+      answer: q.sections.Answer,
+      question: q.sections.Question,
+    };
+    if (q.fm.topic) vars.topic_id = q.fm.topic;
+    this.hook("on_answer", vars);
+  }
+
   async handle(topics: TopicChange[], questions: QuestionChange[]): Promise<void> {
     const effects: import("../domain/side-effects.js").Effect[] = [];
 
@@ -100,6 +120,7 @@ export class EffectRunner {
         effects.push(...effectsForQuestionCreated(cur.fm, cur.sections.Question, view));
       } else if (before === "open" && (state === "answered" || state === "withdrawn")) {
         effects.push(...effectsForQuestionClosed(cur.fm, view));
+        if (state === "answered") this.fireAnswerHook(cur);
       }
     }
 
