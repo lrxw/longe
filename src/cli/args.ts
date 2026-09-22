@@ -38,6 +38,17 @@ Options:
   -h, --help
 `;
 
+const OPTIONS = {
+  repo: { type: "string", default: "." },
+  port: { type: "string", default: String(DEFAULT_PORT) },
+  open: { type: "boolean", default: false },
+  json: { type: "boolean", default: false },
+  daemon: { type: "boolean", short: "d", default: false },
+  all: { type: "boolean", default: false },
+  name: { type: "string" },
+  help: { type: "boolean", short: "h", default: false },
+} as const;
+
 export class CliError extends Error {
   constructor(
     message: string,
@@ -52,21 +63,18 @@ export function usage(): string {
 }
 
 export function parseCli(argv: string[]): ParsedCli {
-  const { values, positionals } = parseArgs({
-    args: argv,
-    allowPositionals: true,
-    strict: true,
-    options: {
-      repo: { type: "string", default: "." },
-      port: { type: "string", default: String(DEFAULT_PORT) },
-      open: { type: "boolean", default: false },
-      json: { type: "boolean", default: false },
-      daemon: { type: "boolean", short: "d", default: false },
-      all: { type: "boolean", default: false },
-      name: { type: "string" },
-      help: { type: "boolean", short: "h", default: false },
-    },
-  });
+  let parsed: ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      strict: true,
+      options: OPTIONS,
+    });
+  } catch (err) {
+    throw new CliError(`${err instanceof Error ? err.message : String(err)}\n\n${USAGE}`);
+  }
+  const { values, positionals } = parsed;
 
   if (values.help) throw new CliError(USAGE, 0);
 

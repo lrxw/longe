@@ -43,6 +43,11 @@ describe("parseCli", () => {
     });
   });
 
+  it("reports missing option values and unknown flags with usage", () => {
+    expect(() => parseCli(["serve", "--repo"])).toThrow(/argument missing[\s\S]*Usage:/);
+    expect(() => parseCli(["serve", "--bogus"])).toThrow(/Unknown option[\s\S]*Usage:/);
+  });
+
   it("rejects unknown command", () => {
     expect(() => parseCli(["frobnicate"])).toThrow(CliError);
   });
