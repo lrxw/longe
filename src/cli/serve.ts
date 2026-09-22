@@ -12,10 +12,12 @@ export interface ServeOptions {
 
 export async function runServe(opts: ServeOptions): Promise<void> {
   const ctx = await createAppContext(opts.repo, { notify: desktopNotifier });
-  const app = createHttpApp(ctx);
+  const app = createHttpApp(ctx, { port: opts.port });
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: opts.port }, (info) => {
     const url = `http://127.0.0.1:${info.port}`;
-    process.stdout.write(`longe serving ${ctx.root}\n  UI   ${url}\n`);
+    process.stdout.write(
+      `longe serving ${ctx.root}\n  UI    ${url}\n  REST  ${url}/api/v1  (docs: ${url}/api/docs)\n  MCP   ${url}/mcp\n`,
+    );
     if (opts.open) openBrowser(url);
   });
   const shutdown = async () => {

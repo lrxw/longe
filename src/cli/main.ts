@@ -20,9 +20,9 @@ async function main(argv: string[]): Promise<number> {
       return new Promise(() => {}); // runs until SIGINT
     }
     case "mcp": {
-      // Phase 4: MCP over stdio.
-      process.stdout.write(`[not yet implemented] mcp: repo=${repo}\n`);
-      return 0;
+      const { runMcpStdio } = await import("../mcp/stdio.js");
+      await runMcpStdio(repo);
+      return new Promise(() => {}); // runs until stdin closes
     }
   }
 }

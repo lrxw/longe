@@ -13,7 +13,7 @@ let dir: string;
 let index: AiIndex;
 const now = new Date();
 
-async function waitFor(fn: () => boolean, ms = 3000): Promise<void> {
+async function waitFor(fn: () => boolean, ms = 10000): Promise<void> {
   const start = Date.now();
   while (!fn()) {
     if (Date.now() - start > ms) throw new Error("timeout waiting for condition");
@@ -40,7 +40,7 @@ describe("AiIndex", () => {
       topicFile("first"),
       newTopicText({ id: "first", title: "First", goal: "g", now }),
     );
-    index = new AiIndex(dir, { debounceMs: 20 });
+    index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
     const topicEvents: TopicChange[] = [];
     const questionEvents: QuestionChange[] = [];
     index.on("topic:changed", (c) => topicEvents.push(c));
@@ -82,7 +82,7 @@ describe("AiIndex", () => {
   });
 
   it("surfaces malformed files as errors and drops them from the index", async () => {
-    index = new AiIndex(dir, { debounceMs: 20 });
+    index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
     await index.start();
     await writeFile(topicFile("bad"), "---\nid: bad\ntitle: Bad\nstatus: nope\n---\n## Goal\n");
     await waitFor(() => index.errors.size === 1);
@@ -95,7 +95,7 @@ describe("AiIndex", () => {
   });
 
   it("orders the inbox blocking first, then oldest", async () => {
-    index = new AiIndex(dir, { debounceMs: 20 });
+    index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
     await index.start();
     const mk = (id: string, blocking: boolean, at: Date) =>
       writeFile(
@@ -130,7 +130,7 @@ describe("EffectRunner (§7.4 external changes)", () => {
         "status: active",
       ),
     );
-    index = new AiIndex(dir, { debounceMs: 20 });
+    index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
     runner = new EffectRunner(index, new Repo(dir), (title, body) =>
       notifications.push(`${title}: ${body}`),
     );

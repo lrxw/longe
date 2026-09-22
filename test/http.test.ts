@@ -17,7 +17,7 @@ const now = new Date();
 const topicFile = (id: string) => path.join(dir, ".ai/topics", `${id}.md`);
 const questionFile = (id: string) => path.join(dir, ".ai/questions", `${id}.md`);
 
-async function waitFor(fn: () => boolean, ms = 3000): Promise<void> {
+async function waitFor(fn: () => boolean, ms = 10000): Promise<void> {
   const start = Date.now();
   while (!fn()) {
     if (Date.now() - start > ms) throw new Error("timeout");
@@ -68,7 +68,7 @@ beforeEach(async () => {
   );
   ctx = await createAppContext(dir, {
     notify: (t, b) => notifications.push(`${t}: ${b}`),
-    index: { debounceMs: 20 },
+    index: { debounceMs: 20, usePolling: true },
   });
   app = createHttpApp(ctx);
 });

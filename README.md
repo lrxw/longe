@@ -10,7 +10,7 @@ Full specification: [SPEC.md](./SPEC.md).
 
 ## Status
 
-Phases 0–3 complete (scaffold, store, domain, index, HTML UI). `mcp` and REST land in Phase 4.
+Phases 0–4 complete: scaffold, store, domain, index, HTML UI, MCP (stdio + Streamable HTTP), REST + OpenAPI. Phase 5 (docs, publish) pending.
 
 ## Development
 

@@ -6,6 +6,9 @@ import type { AppContext } from "../app/context.js";
 import { DomainError } from "../domain/errors.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
 import { answerQuestion, human, setTopicStatus } from "../tools/ops.js";
+import { API_BASE, createApiApp, docsPage, openApiDocument } from "./api.js";
+import { statusFor } from "./errors.js";
+import { mountMcp } from "./mcp.js";
 import { BoardFragment } from "./views/board.js";
 import { AnsweredStub, InboxFragment, QuestionCard } from "./views/inbox.js";
 import { Badge, Layout } from "./views/layout.js";
@@ -13,22 +16,14 @@ import { StatusActions, TopicFragment } from "./views/topic.js";
 
 export const PUBLIC_DIR = path.resolve(import.meta.dirname, "../../public");
 
-export function statusFor(err: unknown): number {
-  if (!(err instanceof DomainError)) return 500;
-  switch (err.code) {
-    case "validation":
-    case "note_required":
-    case "parse_error":
-      return 400;
-    case "not_found":
-      return 404;
-    default:
-      return 409;
-  }
+export interface HttpOptions {
+  /** Port the server listens on; only used for the OpenAPI `servers` entry. */
+  port?: number;
 }
 
-export function createHttpApp(ctx: AppContext): Hono {
+export function createHttpApp(ctx: AppContext, opts: HttpOptions = {}): Hono {
   const app = new Hono();
+  const port = opts.port ?? 7311;
   const project = () => ctx.config.project ?? path.basename(ctx.root);
   const errors = () => [...ctx.index.errors.values()];
 
@@ -143,6 +138,12 @@ export function createHttpApp(ctx: AppContext): Hono {
       return c.html(<StatusActions t={t} error={msg} />, statusFor(err) as 400);
     }
   });
+
+  // ---- agent + REST surfaces ---------------------------------------------
+  app.route(API_BASE, createApiApp(ctx));
+  app.get("/openapi.json", (c) => c.json(openApiDocument(port)));
+  app.get("/api/docs", (c) => c.html(docsPage(port)));
+  mountMcp(app, ctx, "/mcp");
 
   // ---- SSE -----------------------------------------------------------------
   app.get("/events", (c) =>
