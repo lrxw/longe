@@ -372,3 +372,9 @@ Each phase ends with passing tests and a short written report (done / not done /
 1. Port default `7311` acceptable, or do you want a specific one?
 2. Should `create_topic` be allowed via MCP (agents opening their own topics), or human-only in v1? Spec currently allows agents.
 3. Should the inbox show non-blocking questions inline with blocking ones (current spec) or in a separate collapsed section?
+
+### Answers (2026-09-22)
+
+1. Port `7311` confirmed.
+2. `create_topic` stays available to agents via MCP.
+3. Inbox shows non-blocking questions in a separate, collapsed section below blocking ones.

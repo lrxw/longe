@@ -8,7 +8,7 @@ Full specification: [SPEC.md](./SPEC.md).
 
 ## Status
 
-Phase 0 (scaffold) complete. `serve` and `mcp` are stubs.
+Phases 0–1 complete (scaffold, store, domain). `serve` and `mcp` are stubs.
 
 ## Development
 
