@@ -9,6 +9,8 @@ describe("parseCli", () => {
       port: DEFAULT_PORT,
       open: false,
       json: false,
+      daemon: false,
+      all: false,
     });
   });
 
@@ -19,12 +21,17 @@ describe("parseCli", () => {
       port: 8080,
       open: true,
       json: false,
+      daemon: false,
+      all: false,
     });
   });
 
   it("parses mcp and answers", () => {
     expect(parseCli(["mcp"]).command).toBe("mcp");
     expect(parseCli(["answers", "--json"])).toMatchObject({ command: "answers", json: true });
+    expect(parseCli(["serve", "-d"])).toMatchObject({ command: "serve", daemon: true });
+    expect(parseCli(["stop", "--all"])).toMatchObject({ command: "stop", all: true });
+    expect(parseCli(["status"]).command).toBe("status");
   });
 
   it("rejects unknown command", () => {

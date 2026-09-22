@@ -47,6 +47,10 @@ export function createHttpApp(ctx: AppContext, opts: HttpOptions = {}): Hono {
     }
   });
 
+  app.get("/health", (c) =>
+    c.json({ ok: true, root: ctx.root, project: project(), pid: process.pid, port }),
+  );
+
   // ---- pages ---------------------------------------------------------------
   app.get("/", (c) =>
     c.html(

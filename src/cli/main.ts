@@ -21,8 +21,16 @@ async function main(argv: string[]): Promise<number> {
     }
     case "serve": {
       const { runServe } = await import("./serve.js");
-      await runServe({ repo, port: cli.port, open: cli.open });
+      await runServe({ repo, port: cli.port, open: cli.open, daemon: cli.daemon });
       return new Promise(() => {}); // runs until SIGINT
+    }
+    case "status": {
+      const { runStatus } = await import("./serve.js");
+      return runStatus();
+    }
+    case "stop": {
+      const { runStop } = await import("./serve.js");
+      return runStop(cli.all ? undefined : repo, cli.all);
     }
     case "answers": {
       const { collectAnswers, formatAnswersForAgent } = await import("./answers.js");

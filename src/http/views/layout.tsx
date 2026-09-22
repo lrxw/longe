@@ -40,7 +40,7 @@ export function Layout({ title, project, blocking, active, children }: LayoutPro
         </header>
         <main>{children}</main>
         <footer class="hints">
-          <kbd>i</kbd> inbox · <kbd>b</kbd> board
+          <kbd>i</kbd> inbox · <kbd>b</kbd> board · <kbd>⌘↩</kbd> send
           {active === "topic" ? (
             <>
               {" · "}

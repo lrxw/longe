@@ -161,6 +161,9 @@ Headless agents need explicit permissions (`--permission-mode acceptEdits`, an a
 `--dangerously-skip-permissions`). A hook run works in the same checkout as any interactive
 session you have open — point it at a worktree if that is a problem.
 
+Keyboard: `i` inbox, `b` board, `Esc` back from a topic, `⌘↩` / `Ctrl+Enter` sends the answer
+form you are typing in.
+
 ### 2. Claude Code prompt hook (inject answers into your next prompt)
 
 `longe answers` prints answered-but-unacknowledged questions straight from the files (no
@@ -179,6 +182,18 @@ context for the next turn:
 
 Put that in the project's `.claude/settings.json` (or `~/.claude/settings.json`).
 
+## Background server
+
+```sh
+longe serve -d --open          # detached; log in ~/.cache/longe/serve/<project>-<hash>.log
+longe status                   # every recorded server and whether it answers
+longe stop                     # stop the one for this repo (--all for every one)
+```
+
+`longe serve` is idempotent per repo and port: running it again while a server is up just prints
+the URL (and opens the browser with `--open`) instead of failing. Each repo needs its own port
+(`--port 7312` for the second one).
+
 ## Notifications
 
 Desktop notification (via `node-notifier`) on a new blocking question and on a topic entering
@@ -188,7 +203,9 @@ Desktop notification (via `node-notifier`) on a new blocking question and on a t
 
 ```
 longe init    [--repo <dir>]
-longe serve   [--repo <dir>] [--port 7311] [--open]
+longe serve   [--repo <dir>] [--port 7311] [--open] [--daemon|-d]
+longe status
+longe stop    [--repo <dir>] [--all]
 longe mcp     [--repo <dir>]
 longe answers [--repo <dir>] [--json]
 ```
