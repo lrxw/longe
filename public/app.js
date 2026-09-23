@@ -149,6 +149,113 @@
     );
   });
 
+  // Slash commands: typing `/` at the start of a prompt box lists the session's commands
+  // (from claude's init line). Arrows move, Tab or Enter picks, Escape closes. The menu
+  // lives on <body>, so the live refreshes (morph) never touch it.
+  var commands = null;
+  var menu = null;
+  var menuField = null;
+  var menuItems = [];
+  var menuPick = 0;
+  function loadCommands() {
+    if (commands?.length) return Promise.resolve(commands);
+    return fetch(`${d.base || ""}/agent/commands`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(
+        (list) => {
+          commands = Array.isArray(list) ? list : [];
+          return commands;
+        },
+        () => [],
+      );
+  }
+  function hideMenu() {
+    if (menu) menu.remove();
+    menu = null;
+    menuField = null;
+  }
+  function drawMenu() {
+    var box = menuField.getBoundingClientRect();
+    menu.innerHTML = "";
+    menuItems.forEach((name, i) => {
+      var li = document.createElement("li");
+      li.textContent = `/${name}`;
+      if (i === menuPick) li.className = "on";
+      li.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // keep the focus in the box
+        menuPick = i;
+        pickCommand();
+      });
+      menu.appendChild(li);
+    });
+    menu.style.left = `${box.left + window.scrollX}px`;
+    menu.style.top = `${box.bottom + window.scrollY + 2}px`;
+    menu.style.minWidth = `${Math.min(box.width, 320)}px`;
+    var on = menu.querySelector(".on");
+    if (on) on.scrollIntoView({ block: "nearest" });
+  }
+  function pickCommand() {
+    var f = menuField;
+    f.value = `/${menuItems[menuPick]} `;
+    f.setSelectionRange(f.value.length, f.value.length);
+    hideMenu();
+  }
+  function showMenu(f) {
+    var m = /^\/(\S*)$/.exec(f.value);
+    if (!m) {
+      hideMenu();
+      return;
+    }
+    var q = m[1].toLowerCase();
+    loadCommands().then((list) => {
+      // the box may have changed while the list loaded
+      if (document.activeElement !== f || !/^\/\S*$/.test(f.value)) return;
+      var starts = list.filter((n) => n.toLowerCase().indexOf(q) === 0);
+      var inside = list.filter((n) => n.toLowerCase().indexOf(q) > 0);
+      menuItems = starts.concat(inside);
+      if (menuItems.length === 0) {
+        hideMenu();
+        return;
+      }
+      if (!menu) {
+        menu = document.createElement("ul");
+        menu.className = "slash-menu";
+        document.body.appendChild(menu);
+      }
+      menuField = f;
+      menuPick = 0;
+      drawMenu();
+    });
+  }
+  document.addEventListener("input", (e) => {
+    var f = e.target;
+    if (f?.matches?.("form.prompt textarea")) showMenu(f);
+  });
+  document.addEventListener("focusout", (e) => {
+    if (e.target === menuField) hideMenu();
+  });
+  // capture phase: runs before the global keys above (Escape would leave the box)
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      var n = menuItems.length;
+      if (!menu || e.target !== menuField || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        menuPick = (menuPick + (e.key === "ArrowDown" ? 1 : n - 1)) % n;
+        drawMenu();
+      } else if (e.key === "Tab" || e.key === "Enter") {
+        pickCommand();
+      } else if (e.key === "Escape") {
+        hideMenu();
+      } else {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+
   // a button with data-copy puts that text on the clipboard
   document.addEventListener("click", (e) => {
     var b = e.target?.closest ? e.target.closest("button[data-copy]") : null;

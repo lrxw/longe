@@ -60,7 +60,7 @@ n=0
 while IFS= read -r line; do
   n=$((n+1))
   printf '%s\\n' "$line" >> ${JSON.stringify(inputFile)}
-  echo '{"type":"system","subtype":"init","session_id":"sess-1","model":"m"}'
+  echo '{"type":"system","subtype":"init","session_id":"sess-1","model":"m","slash_commands":["compact","__internal"]}'
   echo '{"type":"assistant","session_id":"sess-1","message":{"usage":{"input_tokens":100,"cache_creation_input_tokens":900,"cache_read_input_tokens":40000,"output_tokens":5},"content":[{"type":"text","text":"Working on it"},{"type":"tool_use","name":"Read","input":{"file_path":"a.ts"}}]}}'
   echo 'not json'
   echo "{\\"type\\":\\"result\\",\\"subtype\\":\\"success\\",\\"is_error\\":false,\\"result\\":\\"All done $n\\",\\"session_id\\":\\"sess-1\\",\\"total_cost_usd\\":0.0$n,\\"usage\\":{\\"input_tokens\\":1},\\"modelUsage\\":{\\"m\\":{\\"contextWindow\\":200000}}}"
@@ -140,6 +140,7 @@ describe("AgentRunner", () => {
     expect(s.sessionId).toBe("sess-1");
     expect(s.model).toBe("sonnet");
     expect(s.modelInUse).toBe("m"); // from the init line
+    expect(s.slashCommands).toEqual(["compact", "__internal"]); // likewise
     expect(s.contextTokens).toBe(41000);
     expect(s.contextWindow).toBe(200000);
     expect(s.costUsd).toBeCloseTo(0.02); // total_cost_usd is cumulative within a process
@@ -411,6 +412,8 @@ describe("agent over HTTP", () => {
     // hotkeys must work on arrival: the prompt is focused with `/`, not on load
     expect(chat).not.toContain("autofocus");
     expect(chat).toContain("No messages yet.");
+    // no session yet: no slash commands to offer
+    expect(await (await app.request("/agent/commands")).json()).toEqual([]);
     const topic = await (await app.request("/topics/t1")).text();
     expect(topic).toContain('action="/agent/prompt"');
     expect(topic).toContain('name="topic" value="t1"');
@@ -428,6 +431,8 @@ describe("agent over HTTP", () => {
     expect(fromTopic.status).toBe(303);
     expect(fromTopic.headers.get("location")).toBe("/chat");
     await waitFor(() => ctx.agent.status().pending === 0 && ctx.agent.status().alive);
+    // the init line's commands, internal ones left out
+    expect(await (await app.request("/agent/commands")).json()).toEqual(["compact"]);
     expect(await inputLines()).toEqual(['On topic `t1` ("Topic one"):\ndo it']);
     expect(await (await app.request("/fragments/agent-badge")).text()).toContain("idle");
 

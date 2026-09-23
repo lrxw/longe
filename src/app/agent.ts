@@ -27,6 +27,8 @@ export interface SessionInfo {
   contextWindow?: number | undefined;
   /** Cost of finished processes; the live process adds its own on top. */
   costUsd?: number | undefined;
+  /** Slash commands the last init listed (names without the `/`), for autocomplete. */
+  slashCommands?: string[] | undefined;
 }
 
 export interface AgentStatus {
@@ -56,6 +58,8 @@ export interface AgentStatus {
   defaultModel?: string | undefined;
   /** What the live (or last) process reported in its init line. */
   modelInUse?: string | undefined;
+  /** Slash commands of the session (names without the `/`); unknown before the first init. */
+  slashCommands?: string[] | undefined;
 }
 
 /** Choices offered on the chat page; the config default and a custom id are added when set. */
@@ -254,6 +258,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       modelOverride: this.modelOverride,
       defaultModel: this.config.model,
       modelInUse: this.runningModel,
+      slashCommands: this.session?.slashCommands,
     };
   }
 
@@ -548,7 +553,11 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
     const sid = typeof msg.session_id === "string" ? msg.session_id : undefined;
     if (sid && this.session?.id !== sid) {
-      this.session = { id: sid, costUsd: this.session?.costUsd };
+      this.session = {
+        id: sid,
+        costUsd: this.session?.costUsd,
+        slashCommands: this.session?.slashCommands,
+      };
       void this.saveSession();
     }
     switch (msg.type) {
@@ -557,6 +566,13 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         if (msg.subtype === "init" && !this.initSeen) {
           this.initSeen = true;
           if (typeof msg.model === "string" && msg.model) this.runningModel = msg.model;
+          const cmds = Array.isArray(msg.slash_commands)
+            ? msg.slash_commands.filter((c): c is string => typeof c === "string")
+            : undefined;
+          if (cmds && this.session) {
+            this.session.slashCommands = cmds;
+            void this.saveSession();
+          }
           this.push("system", `session ${sid ?? "?"} · model ${String(msg.model ?? "?")}`);
         } else if (msg.subtype === "compact_boundary") {
           // /compact or auto-compaction: the old context figure is stale until the next reply

@@ -441,6 +441,13 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       if (isResponse(w)) return w;
       return c.html(<AgentBadge status={w.ctx.agent.status()} base={w.view.base} />);
     });
+    // for autocomplete in the prompt boxes; internal names (`__x`) are left out
+    r.get("/agent/commands", (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const all = w.ctx.agent.status().slashCommands ?? [];
+      return c.json(all.filter((n) => !n.startsWith("_")));
+    });
     r.post("/agent/prompt", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
