@@ -199,6 +199,43 @@ describe("AgentRunner", () => {
     expect((await again.messages()).length).toBe(1); // reset keeps the files
   });
 
+  it("slash commands go out as typed, also from a topic; a compaction is shown and resets the context figure", async () => {
+    // answers a /compact line like claude does: a compact_boundary, then a result
+    // whose usage is the summary call over the old context
+    const compacting = path.join(dir, "fake-compact");
+    await writeFile(
+      compacting,
+      `#!/bin/sh
+while IFS= read -r line; do
+  printf '%s\\n' "$line" >> ${JSON.stringify(inputFile)}
+  case "$line" in
+    *'"/compact'*)
+      echo '{"type":"system","subtype":"compact_boundary","session_id":"s","compact_metadata":{"trigger":"manual","pre_tokens":41000}}'
+      echo '{"type":"result","subtype":"success","is_error":false,"result":"","session_id":"s","usage":{"input_tokens":41000}}' ;;
+    *)
+      echo '{"type":"assistant","session_id":"s","message":{"usage":{"input_tokens":41000},"content":[{"type":"text","text":"ok"}]}}'
+      echo '{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"s"}' ;;
+  esac
+done
+`,
+    );
+    await chmod(compacting, 0o755);
+    const runner = new AgentRunner(dir, { command: compacting }, "test");
+    const topic = { id: "t1", title: "Title" };
+    await runner.say("human", "hello", { topic });
+    await waitFor(() => runner.status().contextTokens === 41000 && runner.status().pending === 0);
+    await runner.say("human", "  /compact", { topic });
+    await waitFor(() => runner.status().pending === 0 && runner.status().events.length >= 3);
+    expect(await inputLines()).toEqual(['On topic `t1` ("Title"):\nhello', "/compact"]);
+    expect((await runner.messages())[1]?.fm.topic).toBe("t1"); // the topic is still recorded
+    const events = runner.status().events;
+    expect(events.find((e) => e.text.startsWith("context "))?.text).toBe(
+      "context compacted (41k tokens before)",
+    );
+    expect(runner.status().contextTokens).toBeUndefined();
+    await runner.close();
+  });
+
   it("delivers messages written while no process was open, oldest first", async () => {
     const early = await writeMessage(dir, { from: "human", text: "by hand", now: new Date(0) });
     const runner = new AgentRunner(dir, { command: fake }, "test");

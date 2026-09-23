@@ -116,15 +116,19 @@ const MAX_EVENTS = 600;
 const DEFAULT_IDLE_MINUTES = 30;
 
 const SYSTEM_PROMPT = `You are the chat of this repository's longe board: one conversation across all its topics, and the human can send you a message at any time, also while you work. A message starting with "On topic \`id\`" is about that topic; for new work create a topic with \`create_topic\` first. Track everything on the board.
-What you print is shown in the chat transcript but not stored; the board files are the record.
+Assume the human does not read what you print: it is not stored and they may never see it; the board files are the record. Put results in the topic's Log and Decisions. Anything left open for the human (uncommitted work, a suggested next step, something to check or approve) goes into \`ask_question\`, even when it is not phrased as a question.
 Whenever you want something from the human (a decision, a choice between options, a go-ahead, an opinion), call \`ask_question\` with 2-4 \`options\` and do not ask in your printed text. The human answers in the inbox with one click and the answer comes back to you here. Ending a turn with "say go" or a question in text means the human has to type; the inbox is the way. If you can proceed on a default, ask with \`blocking: false\` and an \`assumption\` and continue; if you cannot, ask with \`blocking: true\` and stop.
 When the human thinks out loud ("I wonder if…"), give your view in one short paragraph and put the choice into \`ask_question\`.
 
 ${AGENT_INSTRUCTIONS}`;
 
-/** A message sent from a topic page carries the topic. */
+/**
+ * A message sent from a topic page carries the topic. A slash command (`/compact`)
+ * goes out as typed: claude only runs it when the message starts with the `/`.
+ */
 function withTopic(text: string, opts: SayOptions): string {
-  return opts.topic ? `On topic \`${opts.topic.id}\` ("${opts.topic.title}"):\n${text}` : text;
+  if (!opts.topic || text.trimStart().startsWith("/")) return text;
+  return `On topic \`${opts.topic.id}\` ("${opts.topic.title}"):\n${text}`;
 }
 
 /**
@@ -144,6 +148,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private startedAt: string | undefined;
   private exitCode: number | null | undefined;
   private initSeen = false;
+  /** A compaction happened and no reply since: the context size is unknown. */
+  private compacted = false;
   private modelOverride: string | undefined;
   private runningModel: string | undefined;
   private loaded: Promise<void>;
@@ -552,12 +558,29 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
           this.initSeen = true;
           if (typeof msg.model === "string" && msg.model) this.runningModel = msg.model;
           this.push("system", `session ${sid ?? "?"} · model ${String(msg.model ?? "?")}`);
+        } else if (msg.subtype === "compact_boundary") {
+          // /compact or auto-compaction: the old context figure is stale until the next reply
+          const meta = msg.compact_metadata as
+            | { pre_tokens?: unknown; trigger?: unknown }
+            | undefined;
+          const pre = typeof meta?.pre_tokens === "number" ? meta.pre_tokens : undefined;
+          const how = meta?.trigger === "auto" ? "auto-compacted" : "compacted";
+          this.push(
+            "system",
+            `context ${how}${pre !== undefined ? ` (${Math.round(pre / 1000)}k tokens before)` : ""}`,
+          );
+          this.compacted = true;
+          if (this.session) {
+            this.session.contextTokens = undefined;
+            void this.saveSession();
+          }
         }
         break;
       case "assistant": {
         const m = msg.message as { content?: unknown; usage?: unknown } | undefined;
         const ctx = contextOf(m?.usage);
         if (ctx !== undefined && this.session) this.session.contextTokens = ctx;
+        this.compacted = false;
         const content = Array.isArray(m?.content) ? (m?.content as Record<string, unknown>[]) : [];
         for (const block of content) {
           if (block.type === "text" && typeof block.text === "string" && block.text.trim())
@@ -572,7 +595,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         if (this.session) {
           const win = contextWindowOf(msg.modelUsage);
           if (win !== undefined) this.session.contextWindow = win;
-          const ctx = contextOf(msg.usage);
+          // after a compaction the result's usage is the summary call over the old context
+          const ctx = this.compacted ? undefined : contextOf(msg.usage);
           if (ctx !== undefined && this.session.contextTokens === undefined)
             this.session.contextTokens = ctx;
           void this.saveSession();
