@@ -3,6 +3,7 @@ dist/
 *.log
 .DS_Store
 
-# longe's own board: only the config is shared
-.ai/messages/
-.ai/archive/
+# longe's own board: only the config and the agent instructions are shared
+.longe/*
+!.longe/config.yml
+!.longe/AGENT-INSTRUCTIONS.md
