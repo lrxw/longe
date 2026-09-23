@@ -72,7 +72,7 @@ export async function runServe(opts: ServeOptions): Promise<void> {
     process.exit(0);
   }
 
-  const hub = await createRegistryHub({ notify: desktopNotifier });
+  const hub = await createRegistryHub({ notify: desktopNotifier, drivesChat: true });
   const app = createHttpApp(hub, { port: opts.port });
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: opts.port }, (info) => {
     const lines = [

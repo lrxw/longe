@@ -134,15 +134,21 @@ export const AGENT_TOOLS: ToolDef[] = [
     name: "create_topic",
     surface: "agent",
     description:
-      "Create a new topic in backlog. Use when you start a piece of work that has no topic yet. Returns the new id; then set_status to active to pick it up.",
+      "Create a new topic in todo (ready to work on; the backlog is the human's parking lot and agents never put topics there). Use when you start a piece of work that has no topic yet. Returns the new id; then set_status to active to pick it up now, or leave it in todo for the queue.",
     input: z.object({
       title: z.string().trim().min(1).max(200),
       goal: z.string().trim().min(1).describe("One or two paragraphs: what and why"),
       plan: z.string().optional().describe("Markdown checklist, e.g. '- [ ] step one'"),
     }),
     handler: async (ctx, { title, goal, plan }) => {
-      const id = await ctx.repo.createTopic(slugify(title), { title, goal, plan, now: ctx.now() });
-      ctx.runner.expect(id, "backlog");
+      const id = await ctx.repo.createTopic(slugify(title), {
+        title,
+        goal,
+        plan,
+        status: "todo",
+        now: ctx.now(),
+      });
+      ctx.runner.expect(id, "todo");
       await ctx.index.refresh("topic", id);
       return { id };
     },

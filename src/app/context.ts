@@ -25,6 +25,12 @@ export interface AppOptions {
   notify?: Notifier;
   now?: () => Date;
   index?: IndexOptions;
+  /**
+   * This process owns the repo's chat: it tells the chat about answers and hands it
+   * the todo queue. Only the server (`longe serve`) does; a `longe mcp` process next
+   * to it must not start a second chat.
+   */
+  drivesChat?: boolean;
 }
 
 /** Loads config, starts the index and wires external-change side effects. */
@@ -47,13 +53,14 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
   // An answered question is told to the board's chat (if one exists) unless the
   // repo configured its own on_answer hook, which then owns that job.
   const runner = new EffectRunner(index, repo, notify, (name, vars) => {
-    if (name === "on_answer" && !config.hooks?.on_answer) void agent.notifyAnswer(vars);
+    if (name === "on_answer" && opts.drivesChat && !config.hooks?.on_answer)
+      void agent.notifyAnswer(vars);
     return hooks.trigger(name, vars);
   });
   runner.attach();
-  const nextTodo = attachTodoQueue(index, agent);
+  const nextTodo = opts.drivesChat ? attachTodoQueue(index, agent) : undefined;
   await index.start();
-  nextTodo(); // topics queued while the server was down
+  nextTodo?.(); // topics queued while the server was down
   return {
     root,
     config,

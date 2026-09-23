@@ -10,7 +10,8 @@ At the start of every session:
 
 \`todo\` is the human's queue: when no topic is active, pick up the oldest todo topic
 (\`set_status\` active). Never pick up a \`backlog\` topic on your own: the backlog is
-parked, and the human moves what should be done to todo or active.
+parked, and the human moves what should be done to todo or active. Topics you create
+land in todo.
 
 While working on a topic:
 - Keep \`## Plan\` current with \`set_plan\`. Tick steps as you finish them.

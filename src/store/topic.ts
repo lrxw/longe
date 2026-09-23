@@ -66,10 +66,12 @@ export interface NewTopicInput {
   title: string;
   goal: string;
   plan?: string | undefined;
+  /** Default `backlog`; `create_topic` uses `todo` (ready to work on). */
+  status?: "backlog" | "todo" | undefined;
   now: Date;
 }
 
-/** Builds the text of a fresh topic file in `backlog` (§7.1 create_topic). */
+/** Builds the text of a fresh topic file (§7.1 create_topic). */
 export function newTopicText(input: NewTopicInput): string {
   const ts = toLocalIso(input.now);
   const plan = (input.plan ?? "").trim();
@@ -77,7 +79,7 @@ export function newTopicText(input: NewTopicInput): string {
     "---",
     `id: ${input.id}`,
     `title: ${yamlString(input.title)}`,
-    "status: backlog",
+    `status: ${input.status ?? "backlog"}`,
     `created: ${ts}`,
     `updated: ${ts}`,
     "links: []",

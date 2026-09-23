@@ -52,6 +52,8 @@ describe("REST /api/v1", () => {
     expect(r.body.id).toBe("billing-refactor");
     r = await json(await post("create_topic", { title: "Billing refactor", goal: "again" }));
     expect(r.body.id).toBe("billing-refactor-2");
+    // agents create ready work: todo, never the human's backlog
+    expect(ctx.index.topics.get("billing-refactor")?.fm.status).toBe("todo");
     r = await json(await post("set_status", { id: "billing-refactor", status: "active" }));
     expect(r.body).toEqual({ id: "billing-refactor", status: "active" });
 

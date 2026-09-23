@@ -221,7 +221,7 @@ Agent-facing:
 |---|---|---|
 | `list_topics` | `status?` | Summaries: id, title, status, updated, open question count. |
 | `get_topic` | `id` | Frontmatter, the four sections as text, and the topic's questions (all statuses). |
-| `create_topic` | `title`, `goal`, `plan?` (markdown list) | Creates file in `backlog`. Returns id. Slug from title; suffix on collision. |
+| `create_topic` | `title`, `goal`, `plan?` (markdown list) | Creates the file in `todo`: ready work, which the todo queue picks up if the agent does not start it right away. The backlog is the human's parking lot; agents never put topics there. Returns id. Slug from title; suffix on collision. |
 | `set_plan` | `id`, `plan` (markdown) | Replaces the `## Plan` section. |
 | `set_status` | `id`, `status`, `note?` | Enforces §4. Appends Log entry if `note` given. |
 | `add_decision` | `id`, `text` | Appends dated line to `## Decisions`. |
@@ -289,7 +289,8 @@ At the start of every session:
 
 `todo` is the human's queue: when no topic is active, pick up the oldest todo topic
 (`set_status` active). Never pick up a `backlog` topic on your own: the backlog is
-parked, and the human moves what should be done to todo or active.
+parked, and the human moves what should be done to todo or active. Topics you create
+land in todo.
 
 While working on a topic:
 - Keep `## Plan` current with `set_plan`. Tick steps as you finish them.

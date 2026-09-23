@@ -421,7 +421,10 @@ describe("agent over HTTP", () => {
     await topic("second", "todo", "2026-09-23T10:00:00Z");
     await topic("first", "todo", "2026-09-23T09:00:00Z");
     await topic("parked", "backlog", "2026-09-23T07:00:00Z");
-    ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
+    ctx = await createAppContext(dir, {
+      index: { debounceMs: 20, usePolling: true },
+      drivesChat: true,
+    });
     // a topic is active: the queue waits
     await new Promise((r) => setTimeout(r, 150));
     expect(await inputLines()).toEqual([]);
@@ -563,7 +566,10 @@ describe("agent over HTTP", () => {
       path.join(dir, ".ai/questions/q-20260922-aaaa.md"),
       q("q-20260922-aaaa", "Which?"),
     );
-    ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
+    ctx = await createAppContext(dir, {
+      index: { debounceMs: 20, usePolling: true },
+      drivesChat: true,
+    });
     createHttpApp(ctx, { port: 1 });
     // no session yet: nothing happens
     await answerQuestion(ctx, "q-20260922-aaaa", { answer: "the first" });
@@ -584,5 +590,20 @@ describe("agent over HTTP", () => {
     expect(msgs[1]?.text).toContain(
       "Question q-20260922-bbbb on topic `t1` was answered: that one",
     );
+  });
+
+  it("a process that does not drive the chat (longe mcp) never wakes it", async () => {
+    await writeFile(
+      path.join(dir, ".ai/config.yml"),
+      `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
+    );
+    await writeFile(
+      path.join(dir, ".ai/topics/t1.md"),
+      newTopicText({ id: "t1", title: "T", goal: "g", status: "todo", now: new Date() }),
+    );
+    ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(await inputLines()).toEqual([]);
+    expect(ctx.agent.status().alive).toBe(false);
   });
 });
