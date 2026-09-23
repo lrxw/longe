@@ -1,5 +1,7 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseConfig } from "../store/config.js";
+import { configPath } from "../store/paths.js";
 import { Repo } from "../store/repo.js";
 
 /**
@@ -75,6 +77,15 @@ export async function removeHook(repo: string): Promise<boolean> {
   return true;
 }
 
+/** `ask_in_inbox` from the repo's config.yml; on unless it says false (or is unreadable). */
+export async function askInInboxEnabled(root: string): Promise<boolean> {
+  try {
+    return parseConfig(await readFile(configPath(root), "utf8")).ask_in_inbox !== false;
+  } catch {
+    return true;
+  }
+}
+
 /** The nearest folder at or above `dir` that has `.ai/`. */
 async function findRepo(dir: string): Promise<string | undefined> {
   let cur = path.resolve(dir);
@@ -115,6 +126,7 @@ export async function askToInbox(input: AskInput, now = new Date()): Promise<str
   if (questions.length === 0) return undefined;
   const root = await findRepo(input.cwd ?? process.cwd());
   if (!root) return undefined;
+  if (!(await askInInboxEnabled(root))) return undefined; // turned off in config.yml
   const repo = new Repo(root);
   const ids: string[] = [];
   for (const q of questions) {

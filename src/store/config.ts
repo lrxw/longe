@@ -40,6 +40,13 @@ export const configSchema = z.looseObject({
   color: z.string().trim().min(1).optional(),
   hooks: hooksSchema.optional(),
   agent: agentSchema.optional(),
+  /**
+   * Agents' questions go to the inbox (default true): the chat may not use Claude
+   * Code's AskUserQuestion and is reminded when it leaves a question in its reply
+   * text, `longe init` installs the terminal hook, and that hook sends AskUserQuestion
+   * to the inbox. `false` turns all of it off.
+   */
+  ask_in_inbox: z.boolean().optional(),
 });
 export type Config = z.infer<typeof configSchema>;
 export type HookName = keyof z.infer<typeof hooksSchema>;
@@ -54,6 +61,12 @@ export function parseConfig(text: string, file?: string): Config {
 export function defaultConfigText(projectName: string): string {
   return `version: 1
 project: ${JSON.stringify(projectName)}
+
+# Agents' questions go to the inbox (default: true). The chat may not use Claude
+# Code's own question prompt and is reminded when it leaves a question in its reply;
+# terminal sessions get a hook (in .claude/settings.json, see \`longe hooks\`) that
+# sends their AskUserQuestion calls to the inbox. Set to false to turn this off.
+# ask_in_inbox: true
 
 # Optional: wake an agent when you answer a question on the board.
 # Runs once per answer (coalesced while a run is in progress), cwd = this repo.

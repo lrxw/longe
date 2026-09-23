@@ -53,6 +53,7 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
   const agent = new AgentRunner(root, config.agent ?? {}, logName, undefined, [
     path.basename(root),
   ]);
+  agent.askInInbox = config.ask_in_inbox !== false;
   // An answered question is told to the board's chat (if one exists) unless the
   // repo configured its own on_answer hook, which then owns that job.
   const runner = new EffectRunner(index, repo, notify, (name, vars) => {

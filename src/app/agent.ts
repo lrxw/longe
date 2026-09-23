@@ -211,6 +211,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   readonly idleMinutes: number;
   /** Longe MCP endpoint for this repo, set by the HTTP layer once it knows its port. */
   mcpUrl: string | undefined;
+  /** config `ask_in_inbox`: no AskUserQuestion, and a reminder for questions left in text. */
+  askInInbox = true;
 
   /**
    * `logName` names the log and the sessions file (the repo's `project:`, else its
@@ -477,8 +479,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       ...mcp,
       ...(allowed.length > 0 ? ["--allowedTools", ...allowed] : []),
       // questions go to the inbox (ask_question), never to a prompt nobody sees
-      "--disallowedTools",
-      "AskUserQuestion",
+      ...(this.askInInbox ? ["--disallowedTools", "AskUserQuestion"] : []),
       "--append-system-prompt",
       SYSTEM_PROMPT,
       ...(this.config.args ?? []),
@@ -698,6 +699,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         // a question left in the reply text never reaches the human: remind the chat
         // once to use the inbox; the reminder's own turn is never reminded again
         const remind =
+          this.askInInbox &&
           !msg.is_error &&
           !this.askedThisTurn &&
           !this.remindedLastTurn &&

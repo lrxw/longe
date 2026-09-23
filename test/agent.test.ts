@@ -274,6 +274,15 @@ done
     await new Promise((r) => setTimeout(r, 150));
     expect((await inputLines()).length).toBe(3);
     await runner.close();
+
+    // ask_in_inbox: false → no reminder
+    const off = new AgentRunner(dir, { command: asking }, "off");
+    off.askInInbox = false;
+    await off.say("human", "hello again");
+    await waitFor(() => off.status().events.filter((e) => e.kind === "result").length >= 1);
+    await new Promise((r) => setTimeout(r, 150));
+    expect((await inputLines()).length).toBe(4);
+    await off.close();
   });
 
   it("endsWithQuestion: the last paragraph asks, code does not count", () => {

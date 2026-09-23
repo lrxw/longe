@@ -13,6 +13,15 @@ async function main(argv: string[]): Promise<number> {
       await registerRepo(repo).catch(() => undefined);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
+      // ask_in_inbox (default on): terminal sessions send their questions to the inbox
+      const { askInInboxEnabled, installHook } = await import("./hooks.js");
+      if (await askInInboxEnabled(repo)) {
+        const added = await installHook(repo).catch(() => false);
+        if (added)
+          process.stdout.write(
+            "hook     .claude/settings.json: Claude Code questions go to the inbox (ask_in_inbox; `longe hooks remove` undoes it)\n",
+          );
+      }
       process.stdout.write(
         `\n.ai/ ready in ${repo}\n\nNext:\n` +
           "  1. Add to CLAUDE.md / AGENTS.md:  Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.\n" +

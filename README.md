@@ -123,17 +123,23 @@ HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, with the addres
 
 The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
-**Questions go to the inbox, also from the terminal.** Claude Code has its own way to ask
-you (the AskUserQuestion tool). The chat in the web UI never uses it. For terminal sessions,
-run once per repository:
+**Questions go to the inbox, also from the terminal** (`ask_in_inbox`, on by default).
+Claude Code has its own way to ask you, the AskUserQuestion tool. With the option on:
 
-```sh
-longe hooks install   # adds a PreToolUse hook to .claude/settings.json; `longe hooks remove` undoes it
+- The chat in the web UI may not use AskUserQuestion. When it leaves a question in its
+  reply text, longe reminds it once to use the inbox.
+- `longe init` adds a PreToolUse hook to the repository's `.claude/settings.json`. For
+  repositories set up before this, run `longe hooks install`; `longe hooks remove`
+  takes the hook out again. When a terminal session wants to ask you something, the
+  question lands in the inbox (blocking, with its options) instead of the terminal. The
+  agent is told the question id, so it can wait for the answer or continue on an
+  assumption. The hook calls `longe`, so it must be on your PATH.
+
+To turn it all off, set this in `.ai/config.yml`; the hook then lets questions through:
+
+```yaml
+ask_in_inbox: false
 ```
-
-When a session in that repository wants to ask you something, the question lands in the
-inbox (blocking, with its options) instead of the terminal. The agent is told the
-question id, so it can wait for the answer or continue on an assumption.
 
 ## How it works
 
@@ -210,7 +216,8 @@ commits, under `agent.allowed_tools`.
 ```yaml
 version: 1
 project: "My project"            # display name; default: the folder name
-color: "#2563eb"                 # optional; default: derived from the name
+color: "#2563eb"                 # optional; default: by registry order
+ask_in_inbox: true               # default; agents' questions go to the inbox (see above)
 
 hooks:
   on_answer: >-                  # optional; runs when you answer a question
