@@ -2,6 +2,15 @@ import MarkdownIt from "markdown-it";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: false });
 
+// every code block gets a copy button (app.js: button[data-copy-code] copies the <pre>).
+// Rendered here, not added in the browser, so live refreshes (morph) keep it.
+for (const rule of ["fence", "code_block"] as const) {
+  const render = md.renderer.rules[rule];
+  if (!render) continue;
+  md.renderer.rules[rule] = (tokens, idx, options, env, self) =>
+    `<div class="codeblock"><button type="button" class="copy small" data-copy-code title="Copy to clipboard">Copy</button>${render(tokens, idx, options, env, self)}</div>`;
+}
+
 /** Renders markdown to HTML with raw HTML disabled (§6.2). `- [ ]` / `- [x]` become checkboxes. */
 export function renderMarkdown(text: string): string {
   return md

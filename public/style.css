@@ -87,6 +87,29 @@ pre {
   overflow-x: auto;
   line-height: 1.45;
 }
+/* code block with its copy button in the top-right corner, shown on hover and focus */
+.codeblock {
+  position: relative;
+}
+.codeblock > button.copy {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--card);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.codeblock:hover > button.copy,
+.codeblock > button.copy:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .codeblock > button.copy {
+    opacity: 1;
+  }
+}
 pre code {
   background: none;
   padding: 0;

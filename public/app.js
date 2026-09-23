@@ -262,16 +262,21 @@
     true,
   );
 
-  // a button with data-copy puts that text on the clipboard
+  // a button with data-copy puts that text on the clipboard; data-copy-code (on code
+  // blocks, see format.ts) copies the block next to it
   document.addEventListener("click", (e) => {
-    var b = e.target?.closest ? e.target.closest("button[data-copy]") : null;
+    var b = e.target?.closest
+      ? e.target.closest("button[data-copy], button[data-copy-code]")
+      : null;
     if (!b) return;
     e.preventDefault();
+    var pre = b.hasAttribute("data-copy-code") ? b.parentNode.querySelector("pre") : null;
+    var text = pre ? pre.textContent.replace(/\n$/, "") : b.dataset.copy;
     if (!navigator.clipboard) {
-      window.prompt("Copy this:", b.dataset.copy);
+      window.prompt("Copy this:", text);
       return;
     }
-    navigator.clipboard.writeText(b.dataset.copy).then(() => {
+    navigator.clipboard.writeText(text).then(() => {
       var label = b.textContent;
       b.textContent = "Copied";
       setTimeout(() => {
