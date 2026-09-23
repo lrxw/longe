@@ -55,6 +55,7 @@ export function questionView(q: IndexedQuestion) {
     blocking: q.fm.blocking,
     options: q.fm.options ?? null,
     reject_options: q.fm.reject_options ?? null,
+    approve_options: q.fm.approve_options ?? null,
     assumption: q.fm.assumption ?? null,
     answered_at: q.fm.answered_at ?? null,
     acknowledged_at: q.fm.acknowledged_at ?? null,
@@ -212,7 +213,7 @@ export const AGENT_TOOLS: ToolDef[] = [
     name: "ask_question",
     surface: "agent",
     description:
-      "Ask the human a question. RULE: if a reasonable default exists, set blocking=false, state your `assumption`, and keep working on that assumption (assumption is REQUIRED when blocking is false). If you cannot proceed without the answer, set blocking=true, append_log that you stopped, and stop working on that topic — a blocking question moves the topic to needs-decision. Offer 2–4 `options` when you can so the human can answer with one click. When you ask the human to verify a topic you put into review, list the options that mean 'it does not work' in `reject_options`: picking one moves the topic back to active. `question` and `context` are markdown: show code in ``` fences with a language (```ts), it renders as a code block in the inbox; options are plain text.",
+      "Ask the human a question. RULE: if a reasonable default exists, set blocking=false, state your `assumption`, and keep working on that assumption (assumption is REQUIRED when blocking is false). If you cannot proceed without the answer, set blocking=true, append_log that you stopped, and stop working on that topic — a blocking question moves the topic to needs-decision. Offer 2–4 `options` when you can so the human can answer with one click. When you ask the human to verify a topic you put into review, list the options that mean 'it does not work' in `reject_options` (picking one moves the topic back to active) and the ones that mean 'good, done' in `approve_options` (picking one moves it to done). `question` and `context` are markdown: show code in ``` fences with a language (```ts), it renders as a code block in the inbox; options are plain text.",
     input: z.object({
       question: z.string().trim().min(1).describe("Markdown; code in ``` fences"),
       context: z
@@ -227,6 +228,13 @@ export const AGENT_TOOLS: ToolDef[] = [
         .optional()
         .describe(
           "Options (copied exactly) that reject the topic's reviewed work; picking one while the topic is in review moves it back to active",
+        ),
+      approve_options: z
+        .array(z.string().trim().min(1))
+        .min(1)
+        .optional()
+        .describe(
+          "Options (copied exactly) that approve the topic's reviewed work; picking one while the topic is in review moves it to done",
         ),
       assumption: z.string().trim().min(1).optional().describe("Required when blocking=false"),
       blocking: z.boolean(),

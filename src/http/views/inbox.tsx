@@ -61,24 +61,29 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
       >
         {options.length > 0 ? (
           <div class="options">
-            {options.map((o, i) =>
-              // a reject option sends the topic back from review to active
-              q.fm.reject_options?.includes(o) ? (
+            {options.map((o, i) => {
+              // a reject option sends the topic back from review to active; an approve
+              // option moves it to done
+              const reject = q.fm.reject_options?.includes(o);
+              const approve = q.fm.approve_options?.includes(o);
+              return (
                 <button
                   type="submit"
                   name="option_index"
                   value={String(i)}
-                  class="reject"
-                  title="Rejects the work: the topic goes back to active"
+                  class={reject ? "reject" : approve ? "approve" : undefined}
+                  title={
+                    reject
+                      ? "Rejects the work: the topic goes back to active"
+                      : approve
+                        ? "Approves the work: the topic moves to done"
+                        : undefined
+                  }
                 >
                   {o}
                 </button>
-              ) : (
-                <button type="submit" name="option_index" value={String(i)}>
-                  {o}
-                </button>
-              ),
-            )}
+              );
+            })}
           </div>
         ) : null}
         <textarea

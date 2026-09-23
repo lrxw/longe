@@ -31,7 +31,8 @@ describe("§4 transition table", () => {
     expectCode("review", "done", "agent", "human_only");
     const r = checkTransition("review", "done", "agent");
     if (!r.ok) expect(r.error.message).toMatch(/never approve their own work/);
-    expectCode("review", "done", "system", "human_only");
+    // the human's approve option in the inbox, applied by the system
+    expectOk("review", "done", "system");
   });
 
   it("review → active: human, note required", () => {

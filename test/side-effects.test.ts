@@ -129,4 +129,26 @@ describe("§5 side effects", () => {
       [],
     );
   });
+
+  it("picking an approve option moves a review topic to done", () => {
+    const verify = {
+      ...q(false, "answered"),
+      options: ["Good", "Broken"],
+      approve_options: ["Good"],
+      reject_options: ["Broken"],
+    };
+    const review = { fm: topic("review"), openBlockingCount: 0 };
+    expect(effectsForQuestionClosed(verify, review, "Good")).toEqual([
+      {
+        kind: "set_topic_status",
+        topic: "t1",
+        from: "review",
+        to: "done",
+        note: "approved in q-20260922-aaaa: Good",
+      },
+    ]);
+    expect(
+      effectsForQuestionClosed(verify, { fm: topic("active"), openBlockingCount: 0 }, "Good"),
+    ).toEqual([]);
+  });
 });

@@ -132,7 +132,7 @@ Rules:
 - `blocking: false` **requires** `assumption`. The tool rejects the write otherwise.
 - The `## Answer` section is written by the human (via UI or REST). If an option was chosen, the answer body is the option text, optionally followed by a note.
 - `asked_by` is whatever the agent supplies. The tool does not verify identity.
-- `reject_options` (optional, needs a topic) lists options, copied exactly, that reject the topic's reviewed work. If the human picks one while the topic is in `review`, the system moves it back to `active` (§4). The inbox shows these options in red.
+- `reject_options` (optional, needs a topic) lists options, copied exactly, that reject the topic's reviewed work. If the human picks one while the topic is in `review`, the system moves it back to `active` (§4). The inbox shows these options in red. `approve_options` works the same way and moves the topic to `done`; those options are shown in green. An option cannot be in both.
 
 ## 4. Statuses and transitions
 
@@ -150,6 +150,7 @@ Who has the ball: `backlog`, `needs-decision`, `review` → human. `todo`, `acti
 | todo | active | human, agent | Agent picks up the next queued topic. |
 | active | review | human, agent | Agent submits work. Should be preceded by a Log entry. |
 | review | done | **human only** | Agents may never approve their own work. |
+| review | done | **system** | Set automatically when the human answers a question on the topic with one of its `approve_options`. The note is `approved in <question id>: <answer>`. |
 | review | active | human | Reject. Requires a note; written to Log as `human — rejected: <note>`. |
 | review | active | **system** | Set automatically when the human answers a question on the topic with one of its `reject_options`. The note is `rejected in <question id>: <answer>`. |
 | any non-terminal | cancelled | **human only** | |
@@ -312,8 +313,9 @@ phrased as a question.
 
 When a topic is finished: `set_status` to `review`. Never set `done` or `cancelled`;
 only the human does that. When you ask the human to verify the work in review, put the
-options that mean "it does not work" into `reject_options`: picking one moves the
-topic back to active, and you continue there.
+options that mean "it does not work" into `reject_options` (picking one moves the
+topic back to active, and you continue there) and the ones that mean "good, done" into
+`approve_options` (picking one moves it to done).
 ```
 
 ## 10. Notifications

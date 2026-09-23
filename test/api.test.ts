@@ -214,6 +214,37 @@ describe("REST /api/v1", () => {
     expect(await readFile(path.join(dir, ".ai/topics/t.md"), "utf8")).toMatch(
       /system — rejected in q-.*: Broken menu never opens/,
     );
+
+    // approve options: the same option cannot do both; picking one moves review → done
+    await post("set_status", { id: "t", status: "review" });
+    const both = await json(
+      await post("ask_question", {
+        question: "Good now?",
+        topic: "t",
+        options: ["Good", "Broken"],
+        approve_options: ["Good"],
+        reject_options: ["Good"],
+        blocking: false,
+        assumption: "x",
+      }),
+    );
+    expect(both.status).toBe(400);
+    r = await json(
+      await post("ask_question", {
+        question: "Good now?",
+        topic: "t",
+        options: ["Good", "Broken"],
+        approve_options: ["Good"],
+        reject_options: ["Broken"],
+        blocking: false,
+        assumption: "x",
+      }),
+    );
+    await post("answer_question", { id: r.body.id, option_index: 0 });
+    expect(ctx.index.topics.get("t")?.fm.status).toBe("done");
+    expect(await readFile(path.join(dir, ".ai/topics/t.md"), "utf8")).toMatch(
+      /system — approved in q-.*: Good/,
+    );
   });
 
   it("errors: 404 unknown id, 400 bad json, 404 unknown route", async () => {

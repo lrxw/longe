@@ -549,6 +549,15 @@ form.answer {
   background: var(--danger);
   color: #fff;
 }
+/* picking it approves the work: the topic moves to done */
+.options button.approve {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.options button.approve:hover {
+  background: var(--ok);
+  color: #fff;
+}
 .row {
   display: flex;
   gap: 0.5rem;

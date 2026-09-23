@@ -41,6 +41,8 @@ export interface QuestionFrontmatter {
   options?: string[] | null;
   /** Options that reject the topic's reviewed work: picking one moves it review → active. */
   reject_options?: string[] | null;
+  /** Options that approve the topic's reviewed work: picking one moves it review → done. */
+  approve_options?: string[] | null;
   assumption?: string | null;
   answered_at?: string | null;
   acknowledged_at?: string | null;

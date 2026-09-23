@@ -40,7 +40,8 @@ export const TRANSITION_RULES: readonly Rule[] = [
   {
     from: "review",
     to: "done",
-    actors: ["human"],
+    // system: the human picked one of a question's approve_options in the inbox
+    actors: ["human", "system"],
     rule: "review → done is human-only: agents may never approve their own work",
   },
   {
