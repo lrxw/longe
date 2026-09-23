@@ -95,7 +95,10 @@ function Cleanup({ count, base }: { count: number; base: string }) {
  */
 function NewTopic({ base, error }: { base: string; error?: string | undefined }) {
   return (
-    <details class="new-topic" data-key="board:new-topic" open={error ? true : undefined}>
+    // no data-key: its open state is not remembered, so the board that comes back after
+    // an add has it closed again (open only to show an error); live refreshes (morph)
+    // keep it open while you type
+    <details class="new-topic" open={error ? true : undefined}>
       <summary>+ New topic</summary>
       <form
         hx-post={`${base}/topics/new`}
