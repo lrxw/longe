@@ -55,7 +55,6 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
       ) : null}
       <form
         class="answer"
-        data-base={base}
         hx-post={`${base}/questions/${q.id}/answer`}
         hx-target={`#q-${q.id}`}
         hx-swap="outerHTML"
