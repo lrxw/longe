@@ -96,7 +96,10 @@ describe("pages", () => {
     );
     expect(html).toContain('hx-get="/fragments/board-badge" hx-trigger="sse:changed"');
     expect(html.indexOf("Webhooks or polling?")).toBeLessThan(html.indexOf("Tabs or spaces?"));
-    expect(html).toContain('<details class="nonblocking"');
+    // the key names the newest non-blocking question: a new one reopens a closed box
+    expect(html).toContain(
+      '<details class="nonblocking" data-key="inbox:nonblocking:q-20260922-nb0k" data-default-open',
+    );
     expect(html).toContain("Assumption: <em>spaces</em>");
     expect(html).toContain('href="/topics/billing"');
     expect(html).toContain('name="option_index" value="1"');

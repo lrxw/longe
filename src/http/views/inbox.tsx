@@ -140,6 +140,11 @@ export function HookStatusLine({
   );
 }
 
+/** Id of the most recently asked question. */
+function newest(items: InboxItem[]): string {
+  return items.reduce((a, b) => (b.q.fm.asked_at > a.q.fm.asked_at ? b : a)).q.id;
+}
+
 export function InboxFragment({
   items,
   now,
@@ -188,7 +193,14 @@ export function InboxFragment({
         <QuestionCard {...i} now={now} />
       ))}
       {other.length > 0 ? (
-        <details class="nonblocking" data-key="inbox:nonblocking" open={blocking.length === 0}>
+        // closing the box only hides the questions there were at that moment: the key
+        // names the newest one, so a new question gets a fresh key and the box opens
+        <details
+          class="nonblocking"
+          data-key={`inbox:nonblocking:${newest(other)}`}
+          data-default-open
+          open
+        >
           <summary>
             {other.length} non-blocking {other.length === 1 ? "question" : "questions"} (agent
             continues on its assumption)

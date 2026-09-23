@@ -316,6 +316,8 @@
     var state = openState();
     root.querySelectorAll("details[data-key]").forEach((d) => {
       var o = state[d.dataset.key];
+      // a key never toggled takes its default: a morph keeps `open` from the old key
+      if (o === undefined && d.dataset.defaultOpen !== undefined) o = true;
       if (o !== undefined && d.open !== o) d.open = o;
     });
   }
