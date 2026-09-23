@@ -1,7 +1,8 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseConfig } from "../store/config.js";
-import { configPath } from "../store/paths.js";
+import { migrateBoardDir } from "../store/migrate.js";
+import { BOARD_DIR, configPath } from "../store/paths.js";
 import { Repo } from "../store/repo.js";
 
 /**
@@ -9,7 +10,7 @@ import { Repo } from "../store/repo.js";
  *
  * `longe hooks install` adds a PreToolUse hook for AskUserQuestion to the repo's
  * `.claude/settings.json`. When an interactive Claude Code session wants to ask the
- * user, the hook (`longe hooks ask`) writes the question into `.ai/questions/`
+ * user, the hook (`longe hooks ask`) writes the question into `.longe/questions/`
  * instead and denies the tool with a reason that tells the agent where the question
  * went and how to get the answer. The web chat does not need it: it runs claude
  * with `--disallowedTools AskUserQuestion`.
@@ -86,12 +87,13 @@ export async function askInInboxEnabled(root: string): Promise<boolean> {
   }
 }
 
-/** The nearest folder at or above `dir` that has `.ai/`. */
+/** The nearest folder at or above `dir` that has `.longe/` (or an old `.ai/` board, moved now). */
 async function findRepo(dir: string): Promise<string | undefined> {
   let cur = path.resolve(dir);
   for (;;) {
+    await migrateBoardDir(cur).catch(() => false);
     try {
-      if ((await stat(path.join(cur, ".ai"))).isDirectory()) return cur;
+      if ((await stat(path.join(cur, BOARD_DIR))).isDirectory()) return cur;
     } catch {
       // not here: go up
     }
@@ -118,7 +120,7 @@ interface AskInput {
 /**
  * The hook itself: turns an AskUserQuestion call into inbox questions. Returns the
  * JSON Claude Code expects on stdout, or undefined to let the tool run as usual
- * (not our tool, no questions, or no `.ai/` above the session's folder).
+ * (not our tool, no questions, or no `.longe/` above the session's folder).
  */
 export async function askToInbox(input: AskInput, now = new Date()): Promise<string | undefined> {
   if (input.tool_name !== MATCHER) return undefined;

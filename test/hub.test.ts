@@ -23,9 +23,9 @@ const now = new Date();
 async function mkRepo(name: string, project: string): Promise<string> {
   const dir = path.join(base, name);
   await runInit(dir);
-  await writeFile(path.join(dir, ".ai/config.yml"), `version: 1\nproject: ${project}\n`);
+  await writeFile(path.join(dir, ".longe/config.yml"), `version: 1\nproject: ${project}\n`);
   await writeFile(
-    path.join(dir, ".ai/topics/t1.md"),
+    path.join(dir, ".longe/topics/t1.md"),
     newTopicText({ id: "t1", title: `${project} topic`, goal: "g", now }).replace(
       "status: backlog",
       "status: active",
@@ -41,7 +41,7 @@ beforeEach(async () => {
   shop = await mkRepo("shop", "Shop");
   blog = await mkRepo("blog", "Blog");
   await writeFile(
-    path.join(blog, ".ai/questions/q-20260922-blog.md"),
+    path.join(blog, ".longe/questions/q-20260922-blog.md"),
     newQuestionText({
       id: "q-20260922-blog",
       question: "Blog Q?",
@@ -151,7 +151,7 @@ describe("hub mode", () => {
     expect((await app.request("/r/shop/inbox")).status).toBe(404);
 
     // a topic page keeps the repo prefix: live refresh and the Reject form
-    const t1 = path.join(shop, ".ai/topics/t1.md");
+    const t1 = path.join(shop, ".longe/topics/t1.md");
     await writeFile(t1, (await readFile(t1, "utf8")).replace("status: active", "status: review"));
     let topicPage = "";
     for (let i = 0; i < 80 && !topicPage.includes('class="reject"'); i++) {
@@ -188,7 +188,7 @@ describe("hub mode", () => {
 
     r = await post("/api/v1/create_topic", { repo: "shop", title: "Via hub", goal: "g" });
     expect((await json(r)).id).toBe("via-hub");
-    expect(await readFile(path.join(shop, ".ai/topics/via-hub.md"), "utf8")).toContain(
+    expect(await readFile(path.join(shop, ".longe/topics/via-hub.md"), "utf8")).toContain(
       "title: Via hub",
     );
 
@@ -289,7 +289,7 @@ describe("registry hub", () => {
     expect(hub.get("shop")).toBeUndefined();
   }, 20000);
 
-  it("New project: creates the folder with .ai/, registers it, opens its board", async () => {
+  it("New project: creates the folder with .longe/, registers it, opens its board", async () => {
     await registerRepo(shop);
     hub = await createRegistryHub({ index: { debounceMs: 20, usePolling: true } });
     const home = path.join(base, "home");
@@ -321,13 +321,13 @@ describe("registry hub", () => {
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/r/fresh-idea/board");
     const root = path.join(home, "code/fresh");
-    expect(await readFile(path.join(root, ".ai/config.yml"), "utf8")).toContain(
+    expect(await readFile(path.join(root, ".longe/config.yml"), "utf8")).toContain(
       'project: "Fresh Idea"',
     );
     expect((await readRegistry()).map((r) => r.name)).toContain("fresh-idea");
     expect(hub.get("fresh-idea")?.ctx).toBeDefined();
     expect((await app.request("/r/fresh-idea/board")).status).toBe(200);
-    // an existing folder with .ai/ already: kept, same entry
+    // an existing folder with .longe/ already: kept, same entry
     expect((await post({ path: "~/code/fresh" })).status).toBe(303);
     expect(hub.list().filter((r) => r.root.endsWith("fresh"))).toHaveLength(1);
   }, 20000);

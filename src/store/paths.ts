@@ -1,15 +1,15 @@
 import path from "node:path";
 
-export const AI_DIR = ".ai";
+export const BOARD_DIR = ".longe";
 
-export function aiDir(root: string): string {
-  return path.join(root, AI_DIR);
+export function boardDir(root: string): string {
+  return path.join(root, BOARD_DIR);
 }
 export function topicsDir(root: string): string {
-  return path.join(root, AI_DIR, "topics");
+  return path.join(root, BOARD_DIR, "topics");
 }
 export function questionsDir(root: string): string {
-  return path.join(root, AI_DIR, "questions");
+  return path.join(root, BOARD_DIR, "questions");
 }
 export function topicPath(root: string, id: string): string {
   return path.join(topicsDir(root), `${id}.md`);
@@ -19,13 +19,13 @@ export function questionPath(root: string, id: string): string {
 }
 /** Cleaned-up topics and their questions; outside the watched folders, so off the board. */
 export function archiveDir(root: string, kind: "topics" | "questions"): string {
-  return path.join(root, AI_DIR, "archive", kind);
+  return path.join(root, BOARD_DIR, "archive", kind);
 }
 export function configPath(root: string): string {
-  return path.join(root, AI_DIR, "config.yml");
+  return path.join(root, BOARD_DIR, "config.yml");
 }
 export function instructionsPath(root: string): string {
-  return path.join(root, AI_DIR, "AGENT-INSTRUCTIONS.md");
+  return path.join(root, BOARD_DIR, "AGENT-INSTRUCTIONS.md");
 }
 
 /** Filename stem of a `.md` file, or undefined for anything else. */

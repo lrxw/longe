@@ -283,7 +283,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     );
   });
 
-  // ---- new project (hub mode): folder + .ai/ + registry, then its board ---------
+  // ---- new project (hub mode): folder + .longe/ + registry, then its board ---------
   const home = opts.home ?? os.homedir();
   const newProjectPage = (
     c: Context,

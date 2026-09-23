@@ -71,7 +71,7 @@ async function scenario(client: Client, root: string) {
   });
   const qid = r.body.id as string;
   expect(r.body.topic_status).toBe("needs-decision");
-  expect(await readFile(path.join(root, ".ai/topics/mcp-topic.md"), "utf8")).toContain(
+  expect(await readFile(path.join(root, ".longe/topics/mcp-topic.md"), "utf8")).toContain(
     "status: needs-decision",
   );
 

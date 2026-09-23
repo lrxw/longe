@@ -1,10 +1,10 @@
 import { EventEmitter } from "node:events";
 import { watch } from "node:fs";
 import path from "node:path";
-import { hasAiDir, readRegistry, registryPath } from "../store/registry.js";
+import { hasBoardDir, readRegistry, registryPath } from "../store/registry.js";
 import { type AppContext, type AppOptions, closeAppContext, createAppContext } from "./context.js";
 
-/** One repo as the hub sees it. `ctx` is undefined when the path is gone or has no .ai/. */
+/** One repo as the hub sees it. `ctx` is undefined when the path is gone or has no .longe/. */
 export interface HubRepo {
   name: string;
   root: string;
@@ -82,7 +82,7 @@ export class Hub extends EventEmitter<HubEvents> {
       if (!have) {
         await this.add(name, root, this.opts);
         changed = true;
-      } else if (have.missing && (await hasAiDir(root))) {
+      } else if (have.missing && (await hasBoardDir(root))) {
         await this.add(name, root, this.opts); // came back
         changed = true;
       }
@@ -129,8 +129,8 @@ export class Hub extends EventEmitter<HubEvents> {
 
   async add(name: string, root: string, opts: AppOptions): Promise<HubRepo> {
     const entry: HubRepo = { name, root, title: path.basename(root) };
-    if (!(await hasAiDir(root))) {
-      entry.missing = `no .ai/ folder at ${root}`;
+    if (!(await hasBoardDir(root))) {
+      entry.missing = `no .longe/ folder at ${root}`;
       this.repos.set(name, entry);
       return entry;
     }

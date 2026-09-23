@@ -3,7 +3,7 @@ import { serve } from "@hono/node-server";
 import { createRegistryHub } from "../app/hub.js";
 import { createHttpApp } from "../http/app.js";
 import { coalescing, desktopNotifier } from "../notify/notifier.js";
-import { hasAiDir, registerRepo } from "../store/registry.js";
+import { hasBoardDir, registerRepo } from "../store/registry.js";
 import {
   isAlive,
   listRecords,
@@ -15,7 +15,7 @@ import {
 } from "./daemon.js";
 
 export interface ServeOptions {
-  /** Repo to register before starting (cwd by default); ignored when it has no .ai/. */
+  /** Repo to register before starting (cwd by default); ignored when it has no .longe/. */
   repo: string;
   port: number;
   open: boolean;
@@ -43,7 +43,7 @@ export async function runServe(opts: ServeOptions): Promise<void> {
   const url = `http://127.0.0.1:${opts.port}`;
 
   let entry: { name: string } | undefined;
-  if (await hasAiDir(opts.repo)) entry = await registerRepo(opts.repo).catch(() => undefined);
+  if (await hasBoardDir(opts.repo)) entry = await registerRepo(opts.repo).catch(() => undefined);
   const landing = entry ? `${url}/r/${entry.name}/board` : url;
 
   // Already running? Reuse it instead of failing with EADDRINUSE.

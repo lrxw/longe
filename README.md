@@ -14,7 +14,7 @@ what they are waiting on. longe gives every repository a small board that agents
 themselves:
 
 - **Topics** hold the work: a goal, a plan, the decisions taken and a log. Each one is a markdown
-  file in `.ai/topics/`, committed together with the code it describes.
+  file in `.longe/topics/`, committed together with the code it describes.
 - **The inbox** collects the questions agents ask you, with blocking ones first. You answer with
   one click, and the answer goes back to the agent.
 - **The chat** lets you talk to Claude Code from the board and send it through the open work.
@@ -37,7 +37,7 @@ The files are the source of truth.
   then the todo queue.
 - **One server, many repositories.** A single `longe serve` shows every registered repository:
   one shared inbox, one board and chat per repository. "+ New project" on the inbox creates a
-  folder under your home folder (or takes an existing one), adds `.ai/` and opens its board.
+  folder under your home folder (or takes an existing one), adds `.longe/` and opens its board.
 - **Any agent.** A standard MCP server (stdio and Streamable HTTP) plus a REST API with an
   OpenAPI document. Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline and others.
 - **Wake-up hooks.** Run a command when you answer a question, or feed new answers into the
@@ -68,17 +68,17 @@ npm link
 
 ```sh
 cd /path/to/your/project
-longe init                     # creates .ai/ with config, topics/, questions/ and the agent protocol
+longe init                     # creates .longe/ with config, topics/, questions/ and the agent protocol
 longe serve -d --open          # starts the server in the background and opens the board
 ```
 
-The board runs at <http://127.0.0.1:7311>. Commit `.ai/` with your code.
+The board runs at <http://127.0.0.1:7311>. Commit `.longe/` with your code.
 
 Then point your agent at the protocol. Add this line to `CLAUDE.md`, `AGENTS.md`, `.cursorrules`
 or your agent's equivalent:
 
 ```
-Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
+Follow .longe/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
 ```
 
 `longe init` is idempotent and never overwrites existing files.
@@ -135,7 +135,7 @@ Claude Code has its own way to ask you, the AskUserQuestion tool. With the optio
   agent is told the question id, so it can wait for the answer or continue on an
   assumption. The hook calls `longe`, so it must be on your PATH.
 
-To turn it all off, set this in `.ai/config.yml`; the hook then lets questions through:
+To turn it all off, set this in `.longe/config.yml`; the hook then lets questions through:
 
 ```yaml
 ask_in_inbox: false
@@ -143,10 +143,10 @@ ask_in_inbox: false
 
 ## How it works
 
-Everything lives in the repository's `.ai/` folder:
+Everything lives in the repository's `.longe/` folder:
 
 ```
-.ai/
+.longe/
   config.yml                     # project name, color, hooks, chat settings
   AGENT-INSTRUCTIONS.md          # the protocol agents follow (written by longe init)
   topics/<slug>.md               # one topic: frontmatter + Goal, Plan, Decisions, Log
@@ -202,7 +202,7 @@ setup. You can send messages at any time, also while it works.
 - The process closes after a period without work and resumes the session with the next message.
   **New session** starts fresh, **Clear history** empties the page, **Copy resume command**
   continues the same session in a terminal.
-- Messages are stored as files in `.ai/messages/`, so the chat survives restarts.
+- Messages are stored as files in `.longe/messages/`, so the chat survives restarts.
 - A small prompt box on each topic page sends a message about that topic.
 
 Headless runs cannot answer permission prompts. Edits are allowed by default
@@ -211,7 +211,7 @@ commits, under `agent.allowed_tools`.
 
 ## Configuration
 
-`.ai/config.yml`:
+`.longe/config.yml`:
 
 ```yaml
 version: 1
@@ -268,7 +268,7 @@ document is at `/openapi.json`, a try-it page at `/api/docs`.
 ## CLI
 
 ```
-longe init    [--repo <dir>]                         set up .ai/ in a repository
+longe init    [--repo <dir>]                         set up .longe/ in a repository
 longe serve   [--repo <dir>] [--port 7311] [--open] [-d]   start the server (one per machine)
 longe status                                         is it running, which repositories
 longe stop                                           stop the background server

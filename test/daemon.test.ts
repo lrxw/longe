@@ -40,20 +40,22 @@ describe("serve --daemon", () => {
   it("starts detached, answers /health, is listed, and stops", async () => {
     const port = await freePort();
     await registerRepo(dir);
+    // run inside the temp repo: `serve` registers (and migrates) the folder it runs in,
+    // and that must never be this checkout
     const rec = await startDaemon({
       root: "*",
       port,
       script: path.resolve("src/cli/main.ts"),
-      execArgv: ["--import", "tsx"],
+      execArgv: ["--import", import.meta.resolve("tsx")],
+      cwd: dir,
     });
     await writeRecord(rec);
     expect(isAlive(rec.pid)).toBe(true);
     const h = await probeHealth(port);
     expect(h?.root).toBe("*");
     expect(h?.pid).toBe(rec.pid);
-    // `serve` run inside a project registers that project too, so when this checkout
-    // has its own .ai/ the hub lists it as well; the temp repo must be there in any case
-    expect(h?.repos?.map((r) => r.root)).toContain(await realpath(dir));
+    // `serve` run inside a project registers that project: here the temp repo, and only it
+    expect(h?.repos?.map((r) => r.root)).toEqual([await realpath(dir)]);
     expect((await listRecords()).map((r) => r.root)).toEqual(["*"]);
     expect(await readFile(rec.log, "utf8")).toContain("longe serving");
 

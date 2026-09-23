@@ -14,8 +14,8 @@ let app: ReturnType<typeof createHttpApp>;
 const notifications: string[] = [];
 const now = new Date();
 
-const topicFile = (id: string) => path.join(dir, ".ai/topics", `${id}.md`);
-const questionFile = (id: string) => path.join(dir, ".ai/questions", `${id}.md`);
+const topicFile = (id: string) => path.join(dir, ".longe/topics", `${id}.md`);
+const questionFile = (id: string) => path.join(dir, ".longe/questions", `${id}.md`);
 
 // below vitest's 5s test timeout, so a hang names the condition instead of the whole test
 async function waitFor(fn: () => boolean, ms = 4000): Promise<void> {
@@ -297,7 +297,7 @@ describe("actions", () => {
 
     expect((await app.request("/board/cleanup", form({ mode: "nope" }))).status).toBe(400);
 
-    // archive: the files move to .ai/archive/, the topic in progress stays
+    // archive: the files move to .longe/archive/, the topic in progress stays
     const res = await app.request("/board/cleanup", form({ mode: "archive" }));
     expect(res.status).toBe(200);
     const after = await res.text();
@@ -306,7 +306,7 @@ describe("actions", () => {
     expect(ctx.index.topics.has("dropped")).toBe(false);
     expect(ctx.index.questions.has("q-20260922-dn0q")).toBe(false);
     expect(ctx.index.topics.has("billing")).toBe(true);
-    const archive = path.join(dir, ".ai/archive");
+    const archive = path.join(dir, ".longe/archive");
     expect(await readFile(path.join(archive, "topics/shipped.md"), "utf8")).toContain(
       "status: done",
     );

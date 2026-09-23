@@ -28,8 +28,8 @@ export function AboutPage({
           board.
         </li>
         <li>
-          Everything is markdown under <code>.ai/</code> in your repository; agents use it over MCP
-          or REST.
+          Everything is markdown under <code>.longe/</code> in your repository; agents use it over
+          MCP or REST.
         </li>
       </ul>
       <p class="about-links">

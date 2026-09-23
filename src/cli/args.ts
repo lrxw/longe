@@ -9,7 +9,7 @@ export interface ParsedCli {
   open: boolean;
   json: boolean;
   daemon: boolean;
-  /** `--repo` was given explicitly (serve: single mode even without .ai/ in cwd). */
+  /** `--repo` was given explicitly (serve: single mode even without .longe/ in cwd). */
   repoGiven: boolean;
   /** Positional arguments after the command (repos add <path> …). */
   rest: string[];
@@ -30,7 +30,7 @@ const USAGE = `Usage:
                # Claude Code sessions in the repo ask through the longe inbox
 
 Options:
-  --repo   Repository root containing (or to receive) .ai/  (default: .)
+  --repo   Repository root containing (or to receive) .longe/  (default: .)
   --port   HTTP port for serve                                (default: ${DEFAULT_PORT})
   --open   Open the browser after serve starts
   --daemon, -d   Run serve in the background (log in ~/.cache/longe/serve/)

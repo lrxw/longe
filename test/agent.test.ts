@@ -83,12 +83,12 @@ describe("message store", () => {
     const m = await writeMessage(dir, { from: "human", text: "hi there", topic: "t1", now });
     expect(m.fm.id).toMatch(/^m-20260922-[0-9a-z]{4}$/);
     expect(m.text).toBe("hi there");
-    const text = await readFile(path.join(dir, ".ai/messages", `${m.fm.id}.md`), "utf8");
+    const text = await readFile(path.join(dir, ".longe/messages", `${m.fm.id}.md`), "utf8");
     expect(text).toContain("from: human");
     expect(text).toContain("topic: t1");
     expect(text).toContain("## Message\nhi there");
     expect(parseMessage(text).fm.delivered_at).toBeUndefined();
-    await writeFile(path.join(dir, ".ai/messages/m-20260922-zzzz.md"), "garbage");
+    await writeFile(path.join(dir, ".longe/messages/m-20260922-zzzz.md"), "garbage");
     await writeMessage(dir, { from: "board", text: "later", now: new Date(now.getTime() + 1000) });
     const all = await listMessages(dir);
     expect(all.map((x) => x.text)).toEqual(["hi there", "later"]);
@@ -414,7 +414,7 @@ while IFS= read -r line; do :; done
     await new Promise((r) => setTimeout(r, 20));
     const vars = { question_id: "q-20260922-aaaa", topic_id: "t1", answer: "yes", question: "?" };
     expect(await runner.notifyAnswer(vars)).toBe(false); // no session yet
-    expect(await readdir(path.join(dir, ".ai")).then((f) => f.includes("messages"))).toBe(false);
+    expect(await readdir(path.join(dir, ".longe")).then((f) => f.includes("messages"))).toBe(false);
     await runner.say("human", "start");
     expect(await runner.notifyAnswer(vars)).toBe(true); // also while working
     await waitFor(() => runner.status().pending === 0 && (runner.status().events.length ?? 0) >= 8);
@@ -460,12 +460,12 @@ describe("agent over HTTP", () => {
 
   it("todo is a queue: the free chat gets the oldest todo topic, each once, never while one is active", async () => {
     await writeFile(
-      path.join(dir, ".ai/config.yml"),
+      path.join(dir, ".longe/config.yml"),
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     const topic = (id: string, status: string, at: string) =>
       writeFile(
-        path.join(dir, `.ai/topics/${id}.md`),
+        path.join(dir, `.longe/topics/${id}.md`),
         newTopicText({ id, title: id.toUpperCase(), goal: "g", now: new Date(at) }).replace(
           "status: backlog",
           `status: ${status}`,
@@ -495,11 +495,11 @@ describe("agent over HTTP", () => {
 
   it("chat page has the prompt box; board and topic pages link to it; topic prompt lands in the chat", async () => {
     await writeFile(
-      path.join(dir, ".ai/config.yml"),
+      path.join(dir, ".longe/config.yml"),
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     await writeFile(
-      path.join(dir, ".ai/topics/t1.md"),
+      path.join(dir, ".longe/topics/t1.md"),
       newTopicText({ id: "t1", title: "Topic one", goal: "g", now: new Date() }),
     );
     ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
@@ -599,11 +599,11 @@ describe("agent over HTTP", () => {
 
   it("answering a question is told to the chat", async () => {
     await writeFile(
-      path.join(dir, ".ai/config.yml"),
+      path.join(dir, ".longe/config.yml"),
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     await writeFile(
-      path.join(dir, ".ai/topics/t1.md"),
+      path.join(dir, ".longe/topics/t1.md"),
       newTopicText({ id: "t1", title: "Topic one", goal: "g", now: new Date() }),
     );
     const q = (id: string, question: string) =>
@@ -617,7 +617,7 @@ describe("agent over HTTP", () => {
         now: new Date(),
       });
     await writeFile(
-      path.join(dir, ".ai/questions/q-20260922-aaaa.md"),
+      path.join(dir, ".longe/questions/q-20260922-aaaa.md"),
       q("q-20260922-aaaa", "Which?"),
     );
     ctx = await createAppContext(dir, {
@@ -633,7 +633,7 @@ describe("agent over HTTP", () => {
     await ctx.agent.say("human", "hi");
     await waitFor(() => ctx.agent.status().pending === 0 && ctx.agent.status().alive);
     await writeFile(
-      path.join(dir, ".ai/questions/q-20260922-bbbb.md"),
+      path.join(dir, ".longe/questions/q-20260922-bbbb.md"),
       q("q-20260922-bbbb", "And?"),
     );
     await ctx.index.refresh("question", "q-20260922-bbbb");
@@ -648,11 +648,11 @@ describe("agent over HTTP", () => {
 
   it("a process that does not drive the chat (longe mcp) never wakes it", async () => {
     await writeFile(
-      path.join(dir, ".ai/config.yml"),
+      path.join(dir, ".longe/config.yml"),
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     await writeFile(
-      path.join(dir, ".ai/topics/t1.md"),
+      path.join(dir, ".longe/topics/t1.md"),
       newTopicText({ id: "t1", title: "T", goal: "g", status: "todo", now: new Date() }),
     );
     ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });

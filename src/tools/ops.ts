@@ -114,7 +114,7 @@ export const human = {
 /** Statuses the board's cleanup clears away. */
 export const FINISHED: readonly TopicStatus[] = ["done", "cancelled"];
 
-/** `archive` moves the files to `.ai/archive/`; `delete` removes them. */
+/** `archive` moves the files to `.longe/archive/`; `delete` removes them. */
 export type CleanupMode = "archive" | "delete";
 
 /**

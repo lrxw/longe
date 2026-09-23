@@ -55,10 +55,10 @@ describe("AskUserQuestion → inbox hook", () => {
         ],
       },
     });
-    const files = await readdir(path.join(dir, ".ai/questions"));
+    const files = await readdir(path.join(dir, ".longe/questions"));
     expect(files).toHaveLength(1);
     const q = parseQuestion(
-      await readFile(path.join(dir, ".ai/questions", files[0] as string), "utf8"),
+      await readFile(path.join(dir, ".longe/questions", files[0] as string), "utf8"),
     );
     expect(q.fm.blocking).toBe(true);
     expect(q.fm.options).toEqual(["Postgres", "SQLite"]);
@@ -70,17 +70,17 @@ describe("AskUserQuestion → inbox hook", () => {
   });
 
   it("does nothing when ask_in_inbox is false in config.yml", async () => {
-    await writeFile(path.join(dir, ".ai/config.yml"), "version: 1\nask_in_inbox: false\n");
+    await writeFile(path.join(dir, ".longe/config.yml"), "version: 1\nask_in_inbox: false\n");
     const out = await askToInbox({
       cwd: dir,
       tool_name: "AskUserQuestion",
       tool_input: { questions: [{ question: "Q?" }] },
     });
     expect(out).toBeUndefined();
-    expect(await readdir(path.join(dir, ".ai/questions"))).toEqual([]);
+    expect(await readdir(path.join(dir, ".longe/questions"))).toEqual([]);
   });
 
-  it("lets the tool run when it is another tool, has no question, or no .ai/ is found", async () => {
+  it("lets the tool run when it is another tool, has no question, or no .longe/ is found", async () => {
     expect(await askToInbox({ cwd: dir, tool_name: "Bash" })).toBeUndefined();
     expect(
       await askToInbox({ cwd: dir, tool_name: "AskUserQuestion", tool_input: { questions: [] } }),

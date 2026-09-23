@@ -6,7 +6,8 @@ import { z } from "zod";
 import { atomicWrite } from "./atomic.js";
 import { parseConfig } from "./config.js";
 import { slugify, uniqueSlug } from "./ids.js";
-import { aiDir, configPath } from "./paths.js";
+import { migrateBoardDir } from "./migrate.js";
+import { boardDir, configPath } from "./paths.js";
 
 /**
  * `~/.config/longe/repos.yml` — every repo longe has seen on this machine.
@@ -59,7 +60,7 @@ async function canonical(root: string): Promise<string> {
   }
 }
 
-/** Display name from .ai/config.yml `project`, falling back to the folder name. */
+/** Display name from .longe/config.yml `project`, falling back to the folder name. */
 export async function projectNameOf(root: string): Promise<string> {
   try {
     const cfg = parseConfig(await readFile(configPath(root), "utf8"));
@@ -70,9 +71,11 @@ export async function projectNameOf(root: string): Promise<string> {
   return path.basename(root);
 }
 
-export async function hasAiDir(root: string): Promise<boolean> {
+/** The repo has a board; an old `.ai/` board is moved to `.longe/` on the way. */
+export async function hasBoardDir(root: string): Promise<boolean> {
+  await migrateBoardDir(root).catch(() => false);
   try {
-    return (await stat(aiDir(root))).isDirectory();
+    return (await stat(boardDir(root))).isDirectory();
   } catch {
     return false;
   }
@@ -129,12 +132,12 @@ export async function renameRepo(root: string, name: string): Promise<RepoEntry 
   return entry;
 }
 
-/** Drops entries whose path no longer has an .ai/ folder. Returns the removed entries. */
+/** Drops entries whose path no longer has a .longe/ folder. Returns the removed entries. */
 export async function pruneRegistry(): Promise<RepoEntry[]> {
   const repos = await readRegistry();
   const gone: RepoEntry[] = [];
   const keep: RepoEntry[] = [];
-  for (const r of repos) (await hasAiDir(r.path)) ? keep.push(r) : gone.push(r);
+  for (const r of repos) (await hasBoardDir(r.path)) ? keep.push(r) : gone.push(r);
   if (gone.length > 0) await writeRegistry(keep);
   return gone;
 }

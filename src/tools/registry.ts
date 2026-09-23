@@ -28,7 +28,7 @@ export interface ToolDef<S extends z.ZodObject = z.ZodObject> {
 const topicId = z
   .string()
   .regex(SLUG_RE)
-  .describe("Topic id (the filename stem under .ai/topics/)");
+  .describe("Topic id (the filename stem under .longe/topics/)");
 const questionId = z.string().regex(QUESTION_ID_RE).describe("Question id, e.g. q-20260922-3f9a");
 const status = z.enum(TOPIC_STATUSES);
 

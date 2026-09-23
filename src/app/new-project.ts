@@ -44,7 +44,7 @@ async function realOrAncestor(p: string): Promise<string> {
 }
 
 /**
- * Creates the folder if missing, adds `.ai/` (like `longe init`), registers the
+ * Creates the folder if missing, adds `.longe/` (like `longe init`), registers the
  * repo and has the hub serve it. The home check is repeated on the real path
  * before anything is created, so a symlink cannot lead outside.
  */

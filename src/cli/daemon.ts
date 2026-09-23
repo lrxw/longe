@@ -101,6 +101,8 @@ export interface StartDaemonOptions {
   script?: string;
   execArgv?: string[];
   extraArgs?: string[];
+  /** Working directory of the server (default: this process's). `serve` registers it when it is a repo. */
+  cwd?: string;
 }
 
 /** Spawns a detached `longe serve` and waits until it answers /health. */
@@ -120,7 +122,12 @@ export async function startDaemon(opts: StartDaemonOptions): Promise<DaemonRecor
       "--port",
       String(opts.port),
     ],
-    { detached: true, stdio: ["ignore", fd.fd, fd.fd], env: { ...process.env, LONGE_DAEMON: "1" } },
+    {
+      detached: true,
+      stdio: ["ignore", fd.fd, fd.fd],
+      env: { ...process.env, LONGE_DAEMON: "1" },
+      ...(opts.cwd ? { cwd: opts.cwd } : {}),
+    },
   );
   child.unref();
   await fd.close();

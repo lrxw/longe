@@ -54,7 +54,7 @@ export interface AgentStatus {
   model?: string | undefined;
   /** Chosen on the chat page (remembered across processes and restarts). */
   modelOverride?: string | undefined;
-  /** `agent.model` from .ai/config.yml. */
+  /** `agent.model` from .longe/config.yml. */
   defaultModel?: string | undefined;
   /** What the live (or last) process reported in its init line. */
   modelInUse?: string | undefined;
@@ -180,7 +180,7 @@ function withTopic(text: string, opts: SayOptions): string {
  * `claude -p --input-format stream-json` process takes messages on stdin at any
  * time, also mid-turn; its session id is stored and the next process after an
  * idle close, a stop or a server restart `--resume`s it. Messages are files under
- * `.ai/messages/` (see store/messages.ts), so the chat outlives the process.
+ * `.longe/messages/` (see store/messages.ts), so the chat outlives the process.
  */
 export class AgentRunner extends EventEmitter<AgentEvents> {
   private child: ChildProcess | undefined;

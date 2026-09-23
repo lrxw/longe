@@ -9,7 +9,7 @@ export const MCP_SERVER_NAME = "longe";
 export const INSTRUCTIONS_URI = "longe://agent-instructions";
 
 const INSTRUCTIONS =
-  "longe tracks your work in this repository's .ai/ folder. Start every session with check_answers then list_topics(status=active). Read the resource longe://agent-instructions for the full protocol.";
+  "longe tracks your work in this repository's .longe/ folder. Start every session with check_answers then list_topics(status=active). Read the resource longe://agent-instructions for the full protocol.";
 
 function toolResult(result: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -30,7 +30,8 @@ function registerInstructions(server: McpServer, read: () => Promise<string>): v
     INSTRUCTIONS_URI,
     {
       title: "Agent instructions",
-      description: "How to work with the .ai board (generated into .ai/AGENT-INSTRUCTIONS.md).",
+      description:
+        "How to work with the .longe board (generated into .longe/AGENT-INSTRUCTIONS.md).",
       mimeType: "text/markdown",
     },
     async (uri) => ({

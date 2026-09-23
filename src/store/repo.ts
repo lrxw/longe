@@ -20,7 +20,7 @@ import {
 } from "./topic.js";
 
 /**
- * File-level access to one repository's `.ai/` folder. Every read hits disk;
+ * File-level access to one repository's `.longe/` folder. Every read hits disk;
  * every write is read–modify–write with atomic replace (§6.2). No caching here —
  * that is the index's job.
  */
@@ -77,7 +77,7 @@ export class Repo {
   }
 
   /**
-   * Moves a topic or question file into `.ai/archive/<kind>/`. An id archived before
+   * Moves a topic or question file into `.longe/archive/<kind>/`. An id archived before
    * (a slug can be reused once its topic is gone) gets a `-2`, `-3`, … suffix.
    * Returns the archive path.
    */

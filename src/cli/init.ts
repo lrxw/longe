@@ -2,8 +2,8 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
 import { defaultConfigText } from "../store/config.js";
-
-export const AI_DIR = ".ai";
+import { migrateBoardDir } from "../store/migrate.js";
+import { BOARD_DIR } from "../store/paths.js";
 
 export interface InitResult {
   created: string[];
@@ -20,12 +20,13 @@ async function exists(p: string): Promise<boolean> {
 }
 
 /**
- * Creates the .ai/ layout (§3.1). Idempotent: existing files and folders are
+ * Creates the .longe/ layout (§3.1). Idempotent: existing files and folders are
  * left untouched and reported under `skipped`. `projectName` goes into a new
  * config.yml (default: the folder name).
  */
 export async function runInit(repoRoot: string, projectName?: string): Promise<InitResult> {
-  const root = path.join(repoRoot, AI_DIR);
+  await migrateBoardDir(repoRoot); // an old .ai/ board is moved, not started over
+  const root = path.join(repoRoot, BOARD_DIR);
   const result: InitResult = { created: [], skipped: [] };
 
   const dirs = [root, path.join(root, "topics"), path.join(root, "questions")];

@@ -23,8 +23,8 @@ async function main(argv: string[]): Promise<number> {
           );
       }
       process.stdout.write(
-        `\n.ai/ ready in ${repo}\n\nNext:\n` +
-          "  1. Add to CLAUDE.md / AGENTS.md:  Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.\n" +
+        `\n.longe/ ready in ${repo}\n\nNext:\n` +
+          "  1. Add to CLAUDE.md / AGENTS.md:  Follow .longe/AGENT-INSTRUCTIONS.md for tracking work and asking questions.\n" +
           "  2. Connect your agent, e.g.:      claude mcp add longe -- longe mcp --repo .\n" +
           "  3. Open the board:                 longe serve --open\n",
       );

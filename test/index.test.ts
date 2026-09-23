@@ -21,8 +21,8 @@ async function waitFor(fn: () => boolean, ms = 10000): Promise<void> {
   }
 }
 
-const topicFile = (id: string) => path.join(dir, ".ai/topics", `${id}.md`);
-const questionFile = (id: string) => path.join(dir, ".ai/questions", `${id}.md`);
+const topicFile = (id: string) => path.join(dir, ".longe/topics", `${id}.md`);
+const questionFile = (id: string) => path.join(dir, ".longe/questions", `${id}.md`);
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "longe-index-"));

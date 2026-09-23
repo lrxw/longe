@@ -68,7 +68,7 @@ export interface IndexOptions {
 }
 
 /**
- * In-memory view of `.ai/topics` and `.ai/questions` kept fresh by chokidar (§6.2).
+ * In-memory view of `.longe/topics` and `.longe/questions` kept fresh by chokidar (§6.2).
  * Ids are namespaced by repo root in `key()` so a later multi-repo index can merge (§12).
  */
 export class AiIndex extends EventEmitter<IndexEvents> {

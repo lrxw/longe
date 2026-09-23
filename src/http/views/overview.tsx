@@ -57,10 +57,10 @@ export function OverviewStrip({ repos }: { repos: RepoOverview[] }) {
       <a
         class="tile new"
         href="/repos/new"
-        title="Create a folder (or use an existing one) with .ai/"
+        title="Create a folder (or use an existing one) with .longe/"
       >
         <strong>+ New project</strong>
-        <span class="meta">folder, .ai/, board</span>
+        <span class="meta">folder, .longe/, board</span>
       </a>
     </section>
   );
@@ -82,7 +82,8 @@ export function NewProjectForm({
     <section class="card new-project">
       <h1>New project</h1>
       <p class="meta">
-        Creates the folder if it is missing and adds <code>.ai/</code> (like <code>longe init</code>
+        Creates the folder if it is missing and adds <code>.longe/</code> (like{" "}
+        <code>longe init</code>
         ), then opens its board. An existing folder works too. Only folders inside {home}.
       </p>
       <form method="post" action="/repos/new">

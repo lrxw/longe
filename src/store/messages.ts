@@ -13,11 +13,11 @@ import {
   serializeMarkdown,
   setField,
 } from "./markdown.js";
-import { AI_DIR, stemOf } from "./paths.js";
+import { BOARD_DIR, stemOf } from "./paths.js";
 import { yamlString } from "./topic.js";
 
 /**
- * Chat messages to the agent, one file each under `.ai/messages/`. The chat
+ * Chat messages to the agent, one file each under `.longe/messages/`. The chat
  * page is a view over these files plus the live transcript, so the
  * conversation survives a server restart and is committed with the code.
  * Only what the human (or the board on their behalf) says is stored; what the
@@ -41,7 +41,7 @@ export interface Message {
 }
 
 export function messagesDir(root: string): string {
-  return path.join(root, AI_DIR, "messages");
+  return path.join(root, BOARD_DIR, "messages");
 }
 export function messagePath(root: string, id: string): string {
   return path.join(messagesDir(root), `${id}.md`);

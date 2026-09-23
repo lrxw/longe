@@ -16,19 +16,19 @@ afterEach(async () => {
 });
 
 describe("longe init", () => {
-  it("creates the .ai layout", async () => {
+  it("creates the .longe layout", async () => {
     const result = await runInit(dir);
 
-    expect((await stat(path.join(dir, ".ai/topics"))).isDirectory()).toBe(true);
-    expect((await stat(path.join(dir, ".ai/questions"))).isDirectory()).toBe(true);
-    expect(await readdir(path.join(dir, ".ai/topics"))).toEqual([]);
-    expect(await readdir(path.join(dir, ".ai/questions"))).toEqual([]);
+    expect((await stat(path.join(dir, ".longe/topics"))).isDirectory()).toBe(true);
+    expect((await stat(path.join(dir, ".longe/questions"))).isDirectory()).toBe(true);
+    expect(await readdir(path.join(dir, ".longe/topics"))).toEqual([]);
+    expect(await readdir(path.join(dir, ".longe/questions"))).toEqual([]);
 
-    const config = await readFile(path.join(dir, ".ai/config.yml"), "utf8");
+    const config = await readFile(path.join(dir, ".longe/config.yml"), "utf8");
     expect(config).toMatch(/^version: 1\n/);
     expect(config).toContain(`project: "${path.basename(dir)}"`);
 
-    const instructions = await readFile(path.join(dir, ".ai/AGENT-INSTRUCTIONS.md"), "utf8");
+    const instructions = await readFile(path.join(dir, ".longe/AGENT-INSTRUCTIONS.md"), "utf8");
     expect(instructions).toBe(AGENT_INSTRUCTIONS);
     expect(instructions).toContain("blocking: true");
 
@@ -38,7 +38,7 @@ describe("longe init", () => {
 
   it("is idempotent and never overwrites", async () => {
     await runInit(dir);
-    const configPath = path.join(dir, ".ai/config.yml");
+    const configPath = path.join(dir, ".longe/config.yml");
     const custom = "version: 1\nproject: Custom Name\n";
     await (await import("node:fs/promises")).writeFile(configPath, custom);
 

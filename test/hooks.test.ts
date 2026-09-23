@@ -39,7 +39,7 @@ describe("hook command expansion", () => {
   });
 
   it("config accepts hooks and the init template parses", async () => {
-    const text = await readFile(path.join(dir, ".ai/config.yml"), "utf8");
+    const text = await readFile(path.join(dir, ".longe/config.yml"), "utf8");
     expect(parseConfig(text).hooks).toBeUndefined();
     expect(parseConfig("version: 1\nhooks:\n  on_answer: echo hi\n").hooks?.on_answer).toBe(
       "echo hi",
@@ -90,16 +90,16 @@ describe("on_answer end to end", () => {
   it("fires on a REST answer and on a hand-edited answer", async () => {
     const marker = path.join(dir, "hook.txt");
     await writeFile(
-      path.join(dir, ".ai/config.yml"),
+      path.join(dir, ".longe/config.yml"),
       `version: 1\nhooks:\n  on_answer: echo "{question_id}|{topic_id}|{answer}" >> ${shellQuote(marker)}\n`,
     );
     await writeFile(
-      path.join(dir, ".ai/topics/t.md"),
+      path.join(dir, ".longe/topics/t.md"),
       newTopicText({ id: "t", title: "T", goal: "g", now: new Date() }),
     );
     for (const id of ["q-20260922-aaaa", "q-20260922-bbbb"]) {
       await writeFile(
-        path.join(dir, ".ai/questions", `${id}.md`),
+        path.join(dir, ".longe/questions", `${id}.md`),
         newQuestionText({
           id,
           question: `Q ${id}?`,
@@ -123,7 +123,7 @@ describe("on_answer end to end", () => {
     expect(await readFile(marker, "utf8")).toBe("q-20260922-aaaa|t|Yes.\n");
 
     // hand edit the second one
-    const f = path.join(dir, ".ai/questions/q-20260922-bbbb.md");
+    const f = path.join(dir, ".longe/questions/q-20260922-bbbb.md");
     const text = await readFile(f, "utf8");
     await writeFile(
       f,

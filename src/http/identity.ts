@@ -2,7 +2,7 @@
  * Visual identity of a repo: a stable color and a short monogram, used the same
  * way everywhere (header switcher, overview tiles, inbox cards) so the eye learns
  * it once. Color comes from the repo's place in the registry (repoColors) unless
- * `.ai/config.yml` sets `color:`; the monogram from the title's initials.
+ * `.longe/config.yml` sets `color:`; the monogram from the title's initials.
  */
 
 /**

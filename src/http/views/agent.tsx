@@ -317,7 +317,7 @@ export function AgentPanel({
             hx-post={`${base}/agent/clear`}
             hx-target="#agent"
             hx-swap="outerHTML"
-            hx-confirm="Clear the chat history? Delivered message files under .ai/messages/ are deleted; messages still waiting stay. The session stays."
+            hx-confirm="Clear the chat history? Delivered message files under .longe/messages/ are deleted; messages still waiting stay. The session stays."
             title="Empty this page; the agent keeps its memory"
             disabled={list.length === 0}
           >
@@ -329,7 +329,7 @@ export function AgentPanel({
             hx-post={`${base}/agent/reset`}
             hx-target="#agent"
             hx-swap="outerHTML"
-            hx-confirm="Forget this session? The next message starts a fresh conversation. Stored messages stay in .ai/messages/."
+            hx-confirm="Forget this session? The next message starts a fresh conversation. Stored messages stay in .longe/messages/."
             title={
               status.sessionId
                 ? "Forget the session; the next message starts fresh"

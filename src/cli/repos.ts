@@ -1,6 +1,6 @@
 import path from "node:path";
 import {
-  hasAiDir,
+  hasBoardDir,
   pruneRegistry,
   readRegistry,
   registerRepo,
@@ -23,7 +23,7 @@ export async function runRepos(args: string[], name?: string): Promise<number> {
         return 0;
       }
       for (const r of repos) {
-        const ok = await hasAiDir(r.path);
+        const ok = await hasBoardDir(r.path);
         process.stdout.write(
           `${(ok ? "ok" : "missing").padEnd(8)} ${r.name.padEnd(24)} ${r.path}\n`,
         );
@@ -33,8 +33,10 @@ export async function runRepos(args: string[], name?: string): Promise<number> {
     case "add": {
       if (!a) throw new CliError("usage: longe repos add <dir> [--name <name>]");
       const root = path.resolve(a);
-      if (!(await hasAiDir(root)))
-        throw new CliError(`${root} has no .ai/ folder. Run \`longe init --repo ${root}\` first.`);
+      if (!(await hasBoardDir(root)))
+        throw new CliError(
+          `${root} has no .longe/ folder. Run \`longe init --repo ${root}\` first.`,
+        );
       const entry = await registerRepo(root, name);
       process.stdout.write(`registered ${entry.name}  ${entry.path}\n`);
       return 0;

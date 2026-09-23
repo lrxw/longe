@@ -68,8 +68,8 @@ function Cleanup({ count, base }: { count: number; base: string }) {
         hx-vals='{"mode":"archive"}'
         hx-target="#board"
         hx-swap="outerHTML"
-        hx-confirm={`Archive ${what} with their questions? The files move to .ai/archive/.`}
-        title="Move them and their questions to .ai/archive/; nothing is lost"
+        hx-confirm={`Archive ${what} with their questions? The files move to .longe/archive/.`}
+        title="Move them and their questions to .longe/archive/; nothing is lost"
       >
         Archive
       </button>
