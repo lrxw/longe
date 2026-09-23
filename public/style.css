@@ -549,6 +549,19 @@ form.answer {
   background: var(--danger);
   color: #fff;
 }
+/* delete a question: quiet until you point at it */
+.card.question header button.delete {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+.card.question header button.delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 /* picking it approves the work: the topic moves to done */
 .options button.approve {
   border-color: var(--ok);

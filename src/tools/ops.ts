@@ -1,6 +1,10 @@
 import type { AppContext } from "../app/context.js";
 import { DomainError } from "../domain/errors.js";
-import { type AnswerInput, answerQuestion as answerOp } from "../domain/question-ops.js";
+import {
+  type AnswerInput,
+  answerQuestion as answerOp,
+  withdrawQuestion,
+} from "../domain/question-ops.js";
 import { type Effect, effectsForQuestionClosed } from "../domain/side-effects.js";
 import { transitionTopic } from "../domain/topic-ops.js";
 import type { Actor, TopicStatus } from "../domain/types.js";
@@ -72,6 +76,25 @@ export async function answerQuestion(
   const indexed = ctx.index.questions.get(id);
   if (indexed) ctx.runner.fireAnswerHook(indexed);
   return q;
+}
+
+/**
+ * The human throws a question away (test or junk questions). An open one is closed
+ * first like a withdrawal, so a topic it blocked is unblocked; then the file goes.
+ */
+export async function deleteQuestion(ctx: AppContext, id: string): Promise<void> {
+  const indexed = ctx.index.questions.get(id);
+  if (!indexed) throw new DomainError("not_found", `question ${id} not found`);
+  if (indexed.fm.status === "open") {
+    ctx.runner.expect(id, "withdrawn");
+    const q = await ctx.repo.modifyQuestion(id, (question) =>
+      withdrawQuestion(question, "deleted by the human", ctx.now()),
+    );
+    await ctx.index.refresh("question", id);
+    await runEffects(ctx, effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id)));
+  }
+  await ctx.repo.remove("question", id);
+  await ctx.index.refresh("question", id);
 }
 
 /** Human-facing status operations (§7.1). */

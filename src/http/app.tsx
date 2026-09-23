@@ -10,7 +10,7 @@ import { Hub, type HubRepo } from "../app/hub.js";
 import { createProject } from "../app/new-project.js";
 import { DomainError } from "../domain/errors.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
-import { answerQuestion, human, setTopicStatus } from "../tools/ops.js";
+import { answerQuestion, deleteQuestion, human, setTopicStatus } from "../tools/ops.js";
 import { API_BASE, createApiApp, docsPage, openApiDocument } from "./api.js";
 import { statusFor } from "./errors.js";
 import { monogram, repoColor, repoColors } from "./identity.js";
@@ -454,6 +454,18 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
           </>,
           statusFor(err) as 400,
         );
+      }
+    });
+    // the card is replaced by nothing: the question is gone
+    r.post("/questions/:id/delete", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      try {
+        await deleteQuestion(w.ctx, c.req.param("id"));
+        return c.html("");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return c.html(<p class="error">{msg}</p>, statusFor(err) as 400);
       }
     });
 

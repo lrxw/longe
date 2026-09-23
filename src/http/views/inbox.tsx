@@ -39,6 +39,17 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
         <span class="meta">
           {q.fm.asked_by} · {ago(q.fm.asked_at, now)} ago · <code>{q.id}</code>
         </span>
+        <button
+          type="button"
+          class="delete small"
+          hx-post={`${base}/questions/${q.id}/delete`}
+          hx-target={`#q-${q.id}`}
+          hx-swap="outerHTML"
+          hx-confirm="Delete this question? The agent is not told."
+          title="Delete this question (for test or junk questions)"
+        >
+          Delete
+        </button>
       </header>
       <div class="body md">{raw(renderMarkdown(q.sections.Question))}</div>
       {q.sections.Context ? (

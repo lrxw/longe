@@ -247,6 +247,37 @@ describe("REST /api/v1", () => {
     );
   });
 
+  it("deleting an open blocking question unblocks its topic and removes the file", async () => {
+    await post("create_topic", { title: "T", goal: "g" });
+    await post("set_status", { id: "t", status: "active" });
+    const qid = (
+      (await (
+        await post("ask_question", { question: "A?", blocking: true, topic: "t" })
+      ).json()) as {
+        id: string;
+      }
+    ).id;
+    expect(ctx.index.topics.get("t")?.fm.status).toBe("needs-decision");
+    const r = await json(await post("delete_question", { id: qid }));
+    expect(r.body).toEqual({ id: qid, deleted: true });
+    expect(ctx.index.topics.get("t")?.fm.status).toBe("active");
+    expect(ctx.index.questions.has(qid)).toBe(false);
+    await expect(readFile(path.join(dir, ".ai/questions", `${qid}.md`), "utf8")).rejects.toThrow();
+    expect((await post("delete_question", { id: qid })).status).toBe(404);
+    // the UI route answers with nothing, so the card disappears
+    const q2 = (
+      (await (
+        await post("ask_question", { question: "B?", blocking: false, assumption: "x" })
+      ).json()) as {
+        id: string;
+      }
+    ).id;
+    const ui = await app.request(`/questions/${q2}/delete`, { method: "POST" });
+    expect(ui.status).toBe(200);
+    expect(await ui.text()).toBe("");
+    expect(ctx.index.questions.has(q2)).toBe(false);
+  });
+
   it("errors: 404 unknown id, 400 bad json, 404 unknown route", async () => {
     let r = await json(await post("get_topic", { id: "nope" }));
     expect(r).toMatchObject({ status: 404, body: { code: "not_found" } });

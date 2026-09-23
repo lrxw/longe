@@ -11,7 +11,7 @@ import { applyEffects } from "../index/effects.js";
 import type { IndexedQuestion, IndexedTopic } from "../index/index.js";
 import { QUESTION_ID_RE, SLUG_RE, slugify } from "../store/ids.js";
 import { instructionsPath } from "../store/paths.js";
-import { answerQuestion, human, setTopicStatus } from "./ops.js";
+import { answerQuestion, deleteQuestion, human, setTopicStatus } from "./ops.js";
 
 /**
  * The single registry of operations (§7.1). MCP exposes `surface: "agent"`
@@ -364,6 +364,17 @@ export const HUMAN_TOOLS: ToolDef[] = [
       requireQuestion(ctx, id);
       const q = await answerQuestion(ctx, id, input);
       return { id, status: q.fm.status };
+    },
+  }),
+  def({
+    name: "delete_question",
+    surface: "human",
+    description:
+      "Delete a question (for test or junk questions). An open blocking one unblocks its topic first, like a withdrawal.",
+    input: z.object({ id: questionId }),
+    handler: async (ctx, { id }) => {
+      await deleteQuestion(ctx, id);
+      return { id, deleted: true };
     },
   }),
   def({
