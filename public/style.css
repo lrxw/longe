@@ -973,17 +973,20 @@ form.prompt.compact {
   margin: 0;
 }
 .column .card {
-  margin: 0 0 0.6rem;
-  padding: 0.7rem 0.85rem;
+  margin: 0 0 0.5rem;
+  padding: 0.55rem 0.75rem;
 }
 .card.topic:hover {
   box-shadow: var(--shadow-lg);
   transform: translateY(-1px);
   text-decoration: none;
 }
+/* smaller card titles so more cards fit on the board */
 .card.topic strong {
   display: block;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.88em;
+  line-height: 1.3;
 }
 .card.topic .meta {
   display: flex;
