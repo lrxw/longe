@@ -154,22 +154,24 @@
     );
   });
 
-  // Slash commands: typing `/` at the start of a prompt box lists the session's commands
-  // (from claude's init line). Arrows move, Tab or Enter picks, Escape closes. The menu
-  // lives on <body>, so the live refreshes (morph) never touch it.
-  var commands = null;
+  // Slash commands: typing `/` at the start of a prompt box or an inbox answer box lists
+  // the session's commands (from claude's init line). Arrows move, Tab or Enter picks,
+  // Escape closes. The menu lives on <body>, so the live refreshes (morph) never touch it.
+  var SLASH_FIELDS = "form.prompt textarea, form.answer textarea";
+  var commands = {}; // per repo base: the inbox mixes questions from several repos
   var menu = null;
   var menuField = null;
   var menuItems = [];
   var menuPick = 0;
-  function loadCommands() {
-    if (commands?.length) return Promise.resolve(commands);
-    return fetch(`${d.base || ""}/agent/commands`)
+  function loadCommands(f) {
+    var base = f.form?.dataset.base ?? d.base ?? "";
+    if (commands[base]?.length) return Promise.resolve(commands[base]);
+    return fetch(`${base}/agent/commands`)
       .then((r) => (r.ok ? r.json() : []))
       .then(
         (list) => {
-          commands = Array.isArray(list) ? list : [];
-          return commands;
+          commands[base] = Array.isArray(list) ? list : [];
+          return commands[base];
         },
         () => [],
       );
@@ -212,7 +214,7 @@
       return;
     }
     var q = m[1].toLowerCase();
-    loadCommands().then((list) => {
+    loadCommands(f).then((list) => {
       // the box may have changed while the list loaded
       if (document.activeElement !== f || !/^\/\S*$/.test(f.value)) return;
       var starts = list.filter((n) => n.toLowerCase().indexOf(q) === 0);
@@ -234,7 +236,7 @@
   }
   document.addEventListener("input", (e) => {
     var f = e.target;
-    if (f?.matches?.("form.prompt textarea")) showMenu(f);
+    if (f?.matches?.(SLASH_FIELDS)) showMenu(f);
   });
   document.addEventListener("focusout", (e) => {
     if (e.target === menuField) hideMenu();
