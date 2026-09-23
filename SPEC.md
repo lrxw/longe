@@ -136,13 +136,18 @@ Rules:
 
 ## 4. Statuses and transitions
 
-Statuses: `backlog | active | needs-decision | review | done | cancelled`
+Statuses: `backlog | todo | active | needs-decision | review | done | cancelled`
 
-Who has the ball: `backlog`, `needs-decision`, `review` → human. `active` → agent. `done`, `cancelled` → nobody.
+Who has the ball: `backlog`, `needs-decision`, `review` → human. `todo`, `active` → agent. `done`, `cancelled` → nobody.
+
+`backlog` is parked: agents never pick it up on their own. `todo` is the human's queue. Whenever the repo's chat is free (no turn running) and no topic is `active`, the server tells the chat to work on the oldest todo topic, the one queued first. The agent then moves it `todo → active`. Each topic is offered once per stay in todo, so an agent that does not pick it up is not asked again in a loop.
 
 | From | To | Allowed actor | Notes |
 |---|---|---|---|
-| backlog | active | human, agent | Agent "picks up" a topic. |
+| backlog | active | human, agent | Human starts it now, or the agent picks up a topic it just created (or was asked to). A human move to active through the web UI (this row, reject, reopen) also wakes the chat. |
+| backlog | todo | **human only** | Queue it. |
+| todo | backlog | **human only** | Take it out of the queue. |
+| todo | active | human, agent | Agent picks up the next queued topic. |
 | active | review | human, agent | Agent submits work. Should be preceded by a Log entry. |
 | review | done | **human only** | Agents may never approve their own work. |
 | review | active | human | Reject. Requires a note; written to Log as `human — rejected: <note>`. |
@@ -282,8 +287,9 @@ At the start of every session:
 1. Call `check_answers` and read every answer. Call `acknowledge_answers` for what you read.
 2. Call `list_topics` (status: active) to see what you own.
 
-Never pick up a topic whose title starts with `[on hold]`: it is a parked idea, and
-only the human lifts the hold (by removing the prefix).
+`todo` is the human's queue: when no topic is active, pick up the oldest todo topic
+(`set_status` active). Never pick up a `backlog` topic on your own: the backlog is
+parked, and the human moves what should be done to todo or active.
 
 While working on a topic:
 - Keep `## Plan` current with `set_plan`. Tick steps as you finish them.

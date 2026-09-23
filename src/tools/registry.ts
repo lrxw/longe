@@ -164,7 +164,7 @@ export const AGENT_TOOLS: ToolDef[] = [
     name: "set_status",
     surface: "agent",
     description:
-      "Move a topic between statuses as the agent. Allowed for agents: backlog→active (pick up), active→review (submit finished work). done, cancelled, needs-decision and reopening are human- or system-only and are rejected with an explanation. Pass a note to add a Log entry.",
+      "Move a topic between statuses as the agent. Allowed for agents: todo→active (pick up the human's queue, oldest first), backlog→active (only a topic you just created, or when the human asks), active→review (submit finished work). done, cancelled, needs-decision and reopening are human- or system-only and are rejected with an explanation. Pass a note to add a Log entry.",
     input: z.object({ id: topicId, status, note: z.string().optional() }),
     handler: async (ctx, { id, status, note }) => {
       requireTopic(ctx, id);

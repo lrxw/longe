@@ -8,6 +8,7 @@ import {
   answeredPrompt,
   CONTINUE_PROMPT,
   resumeCommand,
+  todoPrompt,
   WORK_PROMPT,
 } from "../src/app/agent.js";
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
@@ -22,7 +23,7 @@ import {
 } from "../src/store/messages.js";
 import { newQuestionText } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
-import { answerQuestion } from "../src/tools/ops.js";
+import { answerQuestion, setTopicStatus } from "../src/tools/ops.js";
 
 let dir: string;
 let fake: string;
@@ -401,6 +402,38 @@ describe("agent over HTTP", () => {
   let ctx: AppContext;
   afterEach(async () => {
     await closeAppContext(ctx);
+  });
+
+  it("todo is a queue: the free chat gets the oldest todo topic, each once, never while one is active", async () => {
+    await writeFile(
+      path.join(dir, ".ai/config.yml"),
+      `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
+    );
+    const topic = (id: string, status: string, at: string) =>
+      writeFile(
+        path.join(dir, `.ai/topics/${id}.md`),
+        newTopicText({ id, title: id.toUpperCase(), goal: "g", now: new Date(at) }).replace(
+          "status: backlog",
+          `status: ${status}`,
+        ),
+      );
+    await topic("busy", "active", "2026-09-23T08:00:00Z");
+    await topic("second", "todo", "2026-09-23T10:00:00Z");
+    await topic("first", "todo", "2026-09-23T09:00:00Z");
+    await topic("parked", "backlog", "2026-09-23T07:00:00Z");
+    ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
+    // a topic is active: the queue waits
+    await new Promise((r) => setTimeout(r, 150));
+    expect(await inputLines()).toEqual([]);
+
+    await setTopicStatus(ctx, "busy", "review", "agent");
+    // the fake agent never picks the topic up; once idle, it gets the next one, then stops
+    await waitFor(() => ctx.agent.status().events.filter((e) => e.kind === "result").length >= 2);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(await inputLines()).toEqual([
+      todoPrompt({ id: "first", title: "FIRST" }),
+      todoPrompt({ id: "second", title: "SECOND" }),
+    ]);
   });
 
   it("chat page has the prompt box; board and topic pages link to it; topic prompt lands in the chat", async () => {

@@ -68,6 +68,17 @@ describe("§4 transition table", () => {
     expectCode("needs-decision", "active", "agent", "system_only");
   });
 
+  it("todo: the human queues, agent or human picks up", () => {
+    expectOk("backlog", "todo", "human");
+    expectCode("backlog", "todo", "agent", "human_only");
+    expectOk("todo", "backlog", "human");
+    expectCode("todo", "backlog", "agent", "human_only");
+    expectOk("todo", "active", "agent");
+    expectOk("todo", "active", "human");
+    expectOk("todo", "cancelled", "human");
+    expect(ballHolder("todo")).toBe("agent");
+  });
+
   it("same status is rejected", () => {
     for (const s of TOPIC_STATUSES) expectCode(s, s, "human", "same_status");
   });
@@ -75,6 +86,10 @@ describe("§4 transition table", () => {
   it("every pair not in the table is rejected for every actor", () => {
     const allowed = new Set([
       "backlog>active",
+      "backlog>todo",
+      "todo>backlog",
+      "todo>active",
+      "todo>cancelled",
       "active>review",
       "review>done",
       "review>active",

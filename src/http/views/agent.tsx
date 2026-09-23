@@ -293,8 +293,8 @@ export function AgentPanel({
               status.working
                 ? "The agent is working; wait or Stop"
                 : status.sessionId
-                  ? "Send: work through the active topics, then the backlog"
-                  : "Start a session that works through the active topics, then the backlog"
+                  ? "Send: work through the active topics, then the todo queue"
+                  : "Start a session that works through the active topics, then the todo queue"
             }
             disabled={status.working}
           >

@@ -7,6 +7,7 @@ import { configPath } from "../store/paths.js";
 import { Repo } from "../store/repo.js";
 import { AgentRunner } from "./agent.js";
 import { HookRunner } from "./hooks.js";
+import { attachTodoQueue } from "./todo-queue.js";
 
 export interface AppContext {
   root: string;
@@ -50,7 +51,9 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
     return hooks.trigger(name, vars);
   });
   runner.attach();
+  const nextTodo = attachTodoQueue(index, agent);
   await index.start();
+  nextTodo(); // topics queued while the server was down
   return {
     root,
     config,

@@ -1,5 +1,6 @@
 export const TOPIC_STATUSES = [
   "backlog",
+  "todo",
   "active",
   "needs-decision",
   "review",
@@ -53,6 +54,7 @@ export function ballHolder(status: TopicStatus): BallHolder {
     case "needs-decision":
     case "review":
       return "human";
+    case "todo": // queued: the chat picks it up when it is free
     case "active":
       return "agent";
     case "done":

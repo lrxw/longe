@@ -25,7 +25,7 @@ The files are the source of truth.
 
 ## Features
 
-- **Live board.** Columns for backlog, active, needs-decision, review, done and cancelled. It
+- **Live board.** Columns for backlog, todo, active, needs-decision, review, done and cancelled. It
   updates as agents write, and you move cards by drag and drop.
 - **Question inbox.** Agents ask with options you can pick in one click. Blocking questions stop
   the topic until you answer; non-blocking ones state the assumption the agent works on
@@ -34,7 +34,7 @@ The files are the source of truth.
   cancel or reopen.
 - **Chat with Claude Code.** One conversation per repository, with streaming output, model
   choice, context and cost display. "Work on board" sends the agent through the active topics,
-  then the backlog.
+  then the todo queue.
 - **One server, many repositories.** A single `longe serve` shows every registered repository:
   one shared inbox, one board and chat per repository.
 - **Any agent.** A standard MCP server (stdio and Streamable HTTP) plus a REST API with an
@@ -139,13 +139,15 @@ Everything lives in the repository's `.ai/` folder:
 You and your agents may edit these files directly. longe watches them, validates them, shows
 errors in the UI and applies the rules below.
 
-**Statuses.** `backlog → active → review → done`, plus `needs-decision` and `cancelled`.
+**Statuses.** `backlog → todo → active → review → done`, plus `needs-decision` and `cancelled`.
+The backlog is parked; agents never pick it up on their own. Todo is your queue: whenever the
+chat is free and no topic is active, longe hands it the oldest todo topic.
 
 | Who | May do |
 |---|---|
-| Agent | pick up (`backlog → active`), submit (`active → review`) |
-| Human | approve, reject with a note, cancel, reopen |
-| longe | `active → needs-decision` while a blocking question is open, and back when it is answered |
+| Agent | pick up (`todo → active`, or `backlog → active` for a topic it just created), submit (`active → review`) |
+| Human | queue (`backlog ↔ todo`), approve, reject with a note, cancel, reopen |
+| longe | `active → needs-decision` while a blocking question is open, and back when it is answered; `review → active` when you pick a reject option |
 
 **Tools.** Agents use `list_topics`, `get_topic`, `create_topic`, `set_plan`, `set_status`,
 `add_decision`, `append_log`, `ask_question`, `check_answers`, `acknowledge_answers`,
@@ -174,8 +176,10 @@ stream-JSON mode and hands it longe's MCP endpoint, so the agent can use the boa
 setup. You can send messages at any time, also while it works.
 
 - **Continue** resumes the conversation where it stopped. **Work on board** sends the agent
-  through the active topics, then the backlog, until each is in review or waiting on you.
+  through the active topics, then the todo queue, until each is in review or waiting on you.
 - When you answer a question, the answer goes into the chat and the agent continues.
+- When you move a topic to active on the board, the chat is told to work on it, and starts if
+  needed. A topic you queue as todo starts once the chat is free and nothing is active.
 - The process closes after a period without work and resumes the session with the next message.
   **New session** starts fresh, **Clear history** empties the page, **Copy resume command**
   continues the same session in a terminal.

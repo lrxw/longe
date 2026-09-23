@@ -8,6 +8,7 @@ import type { RepoNav } from "./layout.js";
 
 const LABELS: Record<TopicStatus, string> = {
   backlog: "Move to backlog",
+  todo: "Queue as todo",
   active: "Activate",
   "needs-decision": "Needs decision",
   review: "Send to review",

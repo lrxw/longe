@@ -76,6 +76,8 @@ export function resumeCommand(root: string, sessionId: string, command = "claude
 
 export interface AgentEvents {
   "agent:changed": [];
+  /** The last turn finished (or the process ended) and nothing is waiting to go out. */
+  "agent:idle": [];
 }
 
 export interface SayOptions {
@@ -113,12 +115,17 @@ export function activatedPrompt(v: ActivatedVars): string {
 Call check_answers, then get_topic and work on it. Report on the board when you stop.`;
 }
 
+/** What the chat is told when it is free and the todo queue has a topic for it. */
+export function todoPrompt(v: { id: string; title: string }): string {
+  return `Next in the todo queue: topic \`${v.id}\` ("${v.title}"). Call check_answers, then set_status active on it, get_topic and work on it until it is in review or blocked on a question. Report on the board when you stop.`;
+}
+
 /** What the Continue button sends: pick the conversation up where it stopped (needs a session). */
 export const CONTINUE_PROMPT = "Continue where you left off. Report on the board when you stop.";
 
 /** What the Work on board button sends: the board is the task list, with or without a session. */
 export const WORK_PROMPT =
-  "Work through the board: call check_answers and acknowledge_answers, then list_topics with status active and keep working on those topics until each is in review or blocked on a question. When no active topic is left to work on, pick up backlog topics one at a time (set_status active) and work them the same way; skip topics whose title starts with [on hold]. Report on the board when you stop.";
+  "Work through the board: call check_answers and acknowledge_answers, then list_topics with status active and keep working on those topics until each is in review or blocked on a question. When no active topic is left to work on, pick up todo topics one at a time, oldest first (set_status active), and work them the same way. Never pick up backlog topics: the backlog is parked. Report on the board when you stop.";
 
 /** While the agent works: silence this long is shown as a stall hint. */
 export const STALL_AFTER_MS = 120_000;
@@ -162,6 +169,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private session: SessionInfo | undefined;
   private events: AgentEvent[] = [];
   private pending = 0;
+  /** Messages `say` accepted that `deliver` has not written yet. */
+  private queued = 0;
   /** `total_cost_usd` of the live process (cumulative within a process). */
   private processCost = 0;
   private startedAt: string | undefined;
@@ -309,8 +318,19 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       now: new Date(),
     });
     this.emit("agent:changed");
-    this.sending = this.sending.then(() => this.deliver([m])).catch(() => {});
+    this.queued++;
+    this.sending = this.sending
+      .then(() => this.deliver([m]))
+      .catch(() => {})
+      .finally(() => {
+        this.queued--;
+      });
     return m;
+  }
+
+  /** A turn is running or a message is on its way to one. */
+  busy(): boolean {
+    return this.pending > 0 || this.queued > 0;
   }
 
   /**
@@ -514,6 +534,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
     await this.log(`=== exit ${code ?? "?"} ===\n`);
     this.flushNotify();
+    if (!this.busy()) this.emit("agent:idle");
   }
 
   /** After `idle_minutes` without pending work the process is closed; the next message resumes the session. */
@@ -649,6 +670,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         this.pending = Math.max(0, this.pending - 1);
         this.armIdle();
         this.flushNotify();
+        if (!this.busy()) this.emit("agent:idle");
         break;
       }
       default:

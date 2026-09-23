@@ -8,8 +8,9 @@ At the start of every session:
 1. Call \`check_answers\` and read every answer. Call \`acknowledge_answers\` for what you read.
 2. Call \`list_topics\` (status: active) to see what you own.
 
-Never pick up a topic whose title starts with \`[on hold]\`: it is a parked idea, and
-only the human lifts the hold (by removing the prefix).
+\`todo\` is the human's queue: when no topic is active, pick up the oldest todo topic
+(\`set_status\` active). Never pick up a \`backlog\` topic on your own: the backlog is
+parked, and the human moves what should be done to todo or active.
 
 While working on a topic:
 - Keep \`## Plan\` current with \`set_plan\`. Tick steps as you finish them.

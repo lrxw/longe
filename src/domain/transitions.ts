@@ -18,6 +18,24 @@ export const TRANSITION_RULES: readonly Rule[] = [
     actors: ["human", "agent"],
     rule: "agent or human picks up a topic",
   },
+  {
+    from: "backlog",
+    to: "todo",
+    actors: ["human"],
+    rule: "queueing a topic as todo is human-only",
+  },
+  {
+    from: "todo",
+    to: "backlog",
+    actors: ["human"],
+    rule: "moving a todo topic back to the backlog is human-only",
+  },
+  {
+    from: "todo",
+    to: "active",
+    actors: ["human", "agent"],
+    rule: "agent or human picks up a queued topic",
+  },
   { from: "active", to: "review", actors: ["human", "agent"], rule: "agent or human submits work" },
   {
     from: "review",
