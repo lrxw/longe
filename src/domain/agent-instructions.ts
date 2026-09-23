@@ -23,6 +23,13 @@ While working on a topic:
   another active topic or end the session. If the human is likely nearby you may
   first call \`wait_for_answer\` (up to 300 seconds per call, at most a few calls).
 - Prefer giving 2–4 \`options\` so the human can answer with one click.
+- A new request that arrives while you work on something else gets its own topic at
+  once (\`create_topic\`, quoting the request), before you continue; otherwise it is lost.
+- "Continue where you left off" means: resume the open work on the board. It never
+  means there is nothing to do.
+- Do not break the running longe server: never move or rename the board folder, or
+  change files the server reads, in a way it cannot follow. If a change needs a server
+  restart, ask for it with \`ask_question\`.
 
 Before you stop, for every topic you touched: \`append_log\` with what is done,
 what is not, and anything blocked.
