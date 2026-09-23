@@ -563,37 +563,41 @@
       return; // held long enough: refresh anyway
     }
     e.preventDefault();
-    showHeld(el);
+    showHeld();
     if (!retry)
       retry = setTimeout(() => {
         retry = null;
         htmx.trigger(el, "sse:changed");
       }, 700);
   });
-  // While a refresh is held, a small pill says so. It floats (no layout shift) and a
-  // click on it shows the new state right away.
-  var pill = null;
-  function showHeld(inbox) {
-    if (pill) return;
-    pill = document.createElement("button");
-    pill.type = "button";
-    pill.className = "held-pill";
-    pill.textContent = "↑ New in the inbox, click to show";
-    pill.addEventListener("click", () => {
-      hideHeld();
-      heldSince = 0;
-      forceNext = true; // this refresh goes through, even while typing
-      htmx.trigger(inbox, "sse:changed");
-    });
-    document.body.appendChild(pill);
+  // While a refresh is held, the Inbox badge in the header pulses gently: something new
+  // is waiting. Nothing on the page moves; a click on the badge shows it right away.
+  var holding = false;
+  function markBadge() {
+    var b = document.getElementById("inbox-badge");
+    if (b) b.classList.toggle("held", holding);
+  }
+  function showHeld() {
+    holding = true;
+    markBadge();
   }
   function hideHeld() {
-    if (pill) pill.remove();
-    pill = null;
+    holding = false;
+    markBadge();
   }
+  document.addEventListener("click", (e) => {
+    var inbox = document.getElementById("inbox");
+    if (!holding || !inbox || !e.target?.closest?.("#inbox-badge")) return;
+    e.preventDefault(); // the badge sits in the Inbox link: stay here, just show what is new
+    hideHeld();
+    heldSince = 0;
+    forceNext = true; // this refresh goes through, even while typing
+    htmx.trigger(inbox, "sse:changed");
+  });
   document.body.addEventListener("htmx:afterSwap", (e) => {
-    if (e.detail?.target?.id === "inbox" || document.getElementById("inbox") === e.detail?.target)
-      hideHeld();
+    var id = e.detail?.target?.id;
+    if (id === "inbox") hideHeld();
+    else if (id === "inbox-badge") markBadge(); // the badge was replaced: keep its pulse
   });
   document.body.addEventListener("htmx:afterSwap", (e) => {
     var el = e.detail?.target;

@@ -1023,26 +1023,17 @@ ul.commits {
 ul.commits li {
   margin: 0.2rem 0;
 }
-/* the inbox holds its refresh while you use it: this says new things are waiting */
-.held-pill {
-  position: fixed;
-  top: 4.2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  padding: 0.3rem 0.9rem;
-  border-radius: 999px;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.85rem;
-  box-shadow: var(--shadow-lg);
-  animation: held-in 0.25s ease-out;
+/* the inbox holds its refresh while you use it: the header's Inbox badge pulses */
+.state-badge.held {
+  animation: held-pulse 1.6s ease-in-out infinite;
 }
-@keyframes held-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -6px);
+@keyframes held-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent);
   }
 }
 /* reordering todo: a line where the dragged card would land */
