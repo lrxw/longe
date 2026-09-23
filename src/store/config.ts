@@ -84,7 +84,8 @@ project: ${JSON.stringify(projectName)}
 # allowed_tools, no extra args, idle_minutes 30.
 # One session per repo: a process stays open while you chat, closes after idle_minutes,
 # and the next message resumes the session. longe's MCP endpoint is passed in.
-# Answers you give on the board are fed into the chat unless hooks.on_answer is set.
+# Answers you give on the board go to the chat once it is free (never mid-turn),
+# unless hooks.on_answer is set.
 # Headless runs cannot answer permission prompts: list what the chat may run in
 # allowed_tools (Claude Code permission rules), or allow it in .claude/settings.json.
 #

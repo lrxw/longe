@@ -390,6 +390,14 @@ describe("actions", () => {
     expect((await app.request("/topics/nope/status", form({ status: "active" }))).status).toBe(404);
   });
 
+  it("a card shows answers the agent has not read yet", async () => {
+    await app.request("/questions/q-20260922-bl0k/answer", form({ option_index: "0" }));
+    await waitFor(() => ctx.index.questions.get("q-20260922-bl0k")?.fm.status === "answered");
+    const board = await (await app.request("/fragments/board")).text();
+    expect(board).toContain('class="tag unread"');
+    expect(board).toContain("1 answer waiting");
+  });
+
   it("the human adds a topic from the board, into backlog or todo, without the chat", async () => {
     const board = await (await app.request("/board")).text();
     expect(board).toContain('hx-post="/topics/new"');

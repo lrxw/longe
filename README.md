@@ -196,7 +196,9 @@ setup. You can send messages at any time, also while it works.
 
 - **Continue** resumes the conversation where it stopped. **Work on board** sends the agent
   through the active topics, then the todo queue, until each is in review or waiting on you.
-- When you answer a question, the answer goes into the chat and the agent continues.
+- When you answer a question, the answer waits until the chat is free, never cutting into a
+  running turn, and then goes to the agent (several at once in one message). The board
+  marks answers the agent has not read yet with "answer waiting".
 - When you move a topic to active on the board, the chat is told to work on it, and starts if
   needed. A topic you queue as todo starts once the chat is free and nothing is active.
 - The process closes after a period without work and resumes the session with the next message.

@@ -100,6 +100,21 @@ export function answeredPrompt(v: AnsweredVars): string {
 Call check_answers and acknowledge_answers, then continue that topic.`;
 }
 
+/**
+ * The answers that came in while the chat was busy, as one message once it is free.
+ * One answer reads like answeredPrompt; several are listed.
+ */
+export function answersPrompt(list: AnsweredVars[]): string {
+  const [only] = list;
+  if (list.length === 1 && only) return answeredPrompt(only);
+  const lines = list.map((v) => {
+    const where = v.topic_id ? ` on topic \`${v.topic_id}\`` : "";
+    const answer = (v.answer ?? "").trim().replace(/\s*\n\s*/g, " / ");
+    return `- ${v.question_id ?? "?"}${where}: ${answer}`;
+  });
+  return `${list.length} questions were answered:\n${lines.join("\n")}\nCall check_answers and acknowledge_answers, then continue those topics.`;
+}
+
 /** A topic the human moved to active on the board (drag or topic-page button). */
 export interface ActivatedVars {
   id: string;
@@ -350,6 +365,11 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         this.queued--;
       });
     return m;
+  }
+
+  /** The repo has a chat: a stored session or a live process. */
+  hasChat(): boolean {
+    return this.session !== undefined || this.child !== undefined;
   }
 
   /** A turn is running or a message is on its way to one. */

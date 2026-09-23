@@ -18,6 +18,8 @@ export function TopicCard({
 }) {
   const open = index.openQuestionCount(t.id);
   const blocking = index.openBlockingCount(t.id);
+  // answered, but the agent has not read them yet (the chat gets them when it is free)
+  const unread = index.questionsForTopic(t.id).filter((q) => q.fm.status === "answered").length;
   const last = lastLine(t.sections.Log);
   const p = planProgress(t.sections.Plan);
   // drag to another column: the columns a human may move it to (§4)
@@ -46,6 +48,11 @@ export function TopicCard({
           </span>
         ) : null}
         {open > 0 ? <span class={`tag ${blocking > 0 ? "block" : ""}`}>{open} open</span> : null}
+        {unread > 0 ? (
+          <span class="tag unread" title="Answered, not read by the agent yet">
+            {unread} {unread === 1 ? "answer" : "answers"} waiting
+          </span>
+        ) : null}
       </span>
       {last ? <span class="last">{last}</span> : null}
     </a>

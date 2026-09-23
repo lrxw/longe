@@ -9,7 +9,7 @@ import { configPath } from "../store/paths.js";
 import { Repo } from "../store/repo.js";
 import { AgentRunner } from "./agent.js";
 import { HookRunner } from "./hooks.js";
-import { attachTodoQueue } from "./todo-queue.js";
+import { attachChatQueue } from "./todo-queue.js";
 
 export interface AppContext {
   root: string;
@@ -59,17 +59,15 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
     path.basename(root),
   ]);
   agent.askInInbox = config.ask_in_inbox !== false;
-  // An answered question is told to the board's chat (if one exists) unless the
-  // repo configured its own on_answer hook, which then owns that job.
-  const runner = new EffectRunner(index, repo, notify, (name, vars) => {
-    if (name === "on_answer" && opts.drivesChat && !config.hooks?.on_answer)
-      void agent.notifyAnswer(vars);
-    return hooks.trigger(name, vars);
-  });
+  const runner = new EffectRunner(index, repo, notify, (name, vars) => hooks.trigger(name, vars));
   runner.attach();
-  const nextTodo = opts.drivesChat ? attachTodoQueue(index, agent) : undefined;
+  // answers (unless the repo's own on_answer hook owns that job), then todo topics,
+  // each handed to the chat only when it is free (see todo-queue.ts)
+  const nextForChat = opts.drivesChat
+    ? attachChatQueue(index, agent, { answers: !config.hooks?.on_answer })
+    : undefined;
   await index.start();
-  nextTodo?.(); // topics queued while the server was down
+  nextForChat?.(); // what came in while the server was down
   return {
     root,
     config,

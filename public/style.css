@@ -981,6 +981,11 @@ form.prompt.compact {
   transform: translateY(-1px);
   text-decoration: none;
 }
+/* answers the agent has not read yet: it gets them when the chat is free */
+.tag.unread {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
 /* smaller card titles so more cards fit on the board */
 .card.topic strong {
   display: block;

@@ -7,6 +7,7 @@ import {
   ASK_IN_INBOX_PROMPT,
   activatedPrompt,
   answeredPrompt,
+  answersPrompt,
   CONTINUE_PROMPT,
   endsWithQuestion,
   resumeCommand,
@@ -625,25 +626,40 @@ describe("agent over HTTP", () => {
       drivesChat: true,
     });
     createHttpApp(ctx, { port: 1 });
-    // no session yet: nothing happens
+    // no session yet: nothing happens; the answer waits (the question stays `answered`)
     await answerQuestion(ctx, "q-20260922-aaaa", { answer: "the first" });
     await new Promise((r) => setTimeout(r, 50));
     expect(await ctx.agent.messages()).toEqual([]);
-    // with a session: the answer is a board message in the chat
+    // once the chat exists and its turn is over, the waiting answer is handed over
     await ctx.agent.say("human", "hi");
-    await waitFor(() => ctx.agent.status().pending === 0 && ctx.agent.status().alive);
+    await waitFor(() => ctx.agent.status().events.filter((e) => e.kind === "result").length === 2);
+    let msgs = await ctx.agent.messages();
+    expect(msgs[1]?.fm.from).toBe("board");
+    expect(msgs[1]?.text).toContain(
+      "Question q-20260922-aaaa on topic `t1` was answered: the first",
+    );
+    // a later answer is announced once; the one already told is not repeated
     await writeFile(
       path.join(dir, ".longe/questions/q-20260922-bbbb.md"),
       q("q-20260922-bbbb", "And?"),
     );
     await ctx.index.refresh("question", "q-20260922-bbbb");
     await answerQuestion(ctx, "q-20260922-bbbb", { answer: "that one" });
-    await waitFor(() => ctx.agent.status().events.filter((e) => e.kind === "result").length === 2);
-    const msgs = await ctx.agent.messages();
-    expect(msgs[1]?.fm.from).toBe("board");
-    expect(msgs[1]?.text).toContain(
-      "Question q-20260922-bbbb on topic `t1` was answered: that one",
-    );
+    await waitFor(() => ctx.agent.status().events.filter((e) => e.kind === "result").length === 3);
+    await new Promise((r) => setTimeout(r, 150));
+    msgs = await ctx.agent.messages();
+    expect(msgs).toHaveLength(3);
+    expect(msgs[2]?.text).toContain("q-20260922-bbbb");
+    expect(msgs[2]?.text).not.toContain("q-20260922-aaaa");
+  });
+
+  it("answersPrompt: one answer reads like before, several are listed", () => {
+    const one = { question_id: "q-1", topic_id: "t", answer: "yes" };
+    expect(answersPrompt([one])).toBe(answeredPrompt(one));
+    const two = answersPrompt([one, { question_id: "q-2", answer: "Tea\n\nwith milk" }]);
+    expect(two).toContain("2 questions were answered:");
+    expect(two).toContain("- q-1 on topic `t`: yes");
+    expect(two).toContain("- q-2: Tea / with milk");
   });
 
   it("a process that does not drive the chat (longe mcp) never wakes it", async () => {
