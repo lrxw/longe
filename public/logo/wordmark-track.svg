@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 64" role="img" aria-label="longe">
+  <!--
+    Candidate (see preview.html): "track and run". The original idea kept, but the
+    track is a solid light ring instead of dashes, so the "o" stays whole; the stretch
+    just run (upper left to the runner) is drawn full strength on top.
+  -->
+  <style>
+    .ink { stroke: #1c1f24; }
+    .accent { stroke: #2563eb; fill: #2563eb; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e5e7eb; }
+      .accent { stroke: #60a5fa; fill: #60a5fa; }
+    }
+  </style>
+  <g class="ink" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 8 V48"/>
+    <path d="M52 48 V24 M52 34 A10 10 0 0 1 72 34 V48"/>
+    <circle cx="96" cy="36" r="12"/>
+    <path d="M108 24 V50 A10 10 0 0 1 98 60 H91"/>
+    <path d="M120 36 H144 A12 12 0 1 0 140.49 44.49"/>
+  </g>
+  <g class="accent" transform="translate(5.96 12.96) scale(0.72)">
+    <circle cx="32" cy="32" r="19" fill="none" stroke-width="5" stroke-opacity=".38"/>
+    <path d="M15.546 22.5 A19 19 0 0 1 45.435 18.565" fill="none" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M32 32 L45.435 18.565" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="4" stroke="none"/>
+    <circle cx="45.435" cy="18.565" r="6.5" stroke="none"/>
+  </g>
+</svg>

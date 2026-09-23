@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 64" role="img" aria-label="longe">
+  <!--
+    Candidate (see preview.html): the fading trail, softer and thinner. It fades only
+    down to 35% (not 13%), so the "o" stays closed at header size.
+  -->
+  <style>
+    .ink { stroke: #1c1f24; }
+    .accent { stroke: #2563eb; fill: #2563eb; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e5e7eb; }
+      .accent { stroke: #60a5fa; fill: #60a5fa; }
+    }
+  </style>
+  <g class="ink" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 8 V48"/>
+    <path d="M52 48 V24 M52 34 A10 10 0 0 1 72 34 V48"/>
+    <circle cx="96" cy="36" r="12"/>
+    <path d="M108 24 V50 A10 10 0 0 1 98 60 H91"/>
+    <path d="M120 36 H144 A12 12 0 1 0 140.49 44.49"/>
+  </g>
+  <g class="accent" transform="translate(5.96 12.96) scale(0.72)">
+    <g fill="none" stroke-width="5">
+      <path d="M45.435 18.565 A19 19 0 0 0 36.918 13.648" stroke-opacity="1"/>
+      <path d="M36.918 13.648 A19 19 0 0 0 27.082 13.648" stroke-opacity=".94"/>
+      <path d="M27.082 13.648 A19 19 0 0 0 18.565 18.565" stroke-opacity=".88"/>
+      <path d="M18.565 18.565 A19 19 0 0 0 13.648 27.082" stroke-opacity=".82"/>
+      <path d="M13.648 27.082 A19 19 0 0 0 13.648 36.918" stroke-opacity=".76"/>
+      <path d="M13.648 36.918 A19 19 0 0 0 18.565 45.435" stroke-opacity=".7"/>
+      <path d="M18.565 45.435 A19 19 0 0 0 27.082 50.352" stroke-opacity=".64"/>
+      <path d="M27.082 50.352 A19 19 0 0 0 36.918 50.352" stroke-opacity=".58"/>
+      <path d="M36.918 50.352 A19 19 0 0 0 45.435 45.435" stroke-opacity=".52"/>
+      <path d="M45.435 45.435 A19 19 0 0 0 50.352 36.918" stroke-opacity=".46"/>
+      <path d="M50.352 36.918 A19 19 0 0 0 50.352 27.082" stroke-opacity=".4"/>
+      <path d="M50.352 27.082 A19 19 0 0 0 45.435 18.565" stroke-opacity=".35"/>
+    </g>
+    <path d="M32 32 L45.435 18.565" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="4" stroke="none"/>
+    <circle cx="45.435" cy="18.565" r="6.5" stroke="none"/>
+  </g>
+</svg>
