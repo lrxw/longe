@@ -21,6 +21,8 @@
   }
   document.addEventListener("keydown", (e) => {
     var a, f;
+    // an open dialog (confirm, reject reason) handles its own keys, Escape included
+    if (document.querySelector("dialog[open]")) return;
     // Cmd/Ctrl+Enter submits the form you are typing in (prompt box, answer forms)
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && inField(document.activeElement)) {
       f = document.activeElement.form;
@@ -128,26 +130,97 @@
     var id = dragging.dataset.id;
     var from = dragging.dataset.status;
     var to = col.dataset.status;
-    var note;
     endDrag();
     var body = new URLSearchParams({ status: to });
+    var send = () =>
+      fetch(`${d.base || ""}/topics/${id}/status`, { method: "POST", body: body }).then(
+        (r) => {
+          if (!r.ok)
+            r.text().then((t) => {
+              showDropError(col, t);
+            });
+        },
+        () => {
+          showDropError(col, "");
+        },
+      );
     if (from === "review" && to === "active") {
-      note = window.prompt("Reason for rejecting (required):");
-      if (!note?.trim()) return;
-      body.set("note", note.trim());
+      ask("Reason for rejecting (required):", { input: true, ok: "Reject", danger: true }).then(
+        (note) => {
+          if (!note?.trim()) return;
+          body.set("note", note.trim());
+          send();
+        },
+      );
+      return;
     }
-    if (to === "cancelled" && !window.confirm("Cancel this topic?")) return;
-    fetch(`${d.base || ""}/topics/${id}/status`, { method: "POST", body: body }).then(
-      (r) => {
-        if (!r.ok)
-          r.text().then((t) => {
-            showDropError(col, t);
-          });
-      },
-      () => {
-        showDropError(col, "");
-      },
-    );
+    if (to === "cancelled") {
+      ask("Cancel this topic?", { ok: "Cancel topic", danger: true }).then((yes) => {
+        if (yes) send();
+      });
+      return;
+    }
+    send();
+  });
+
+  // A dialog in the page's style instead of the browser's confirm()/prompt(). Resolves
+  // with true (or the typed text) on OK, null on cancel or Escape.
+  function ask(message, opts) {
+    var o = opts || {};
+    return new Promise((resolve) => {
+      var dlg = document.createElement("dialog");
+      dlg.className = "confirm";
+      var form = document.createElement("form");
+      form.method = "dialog";
+      var p = document.createElement("p");
+      p.textContent = message;
+      form.appendChild(p);
+      var input = null;
+      if (o.input) {
+        input = document.createElement("input");
+        input.autocomplete = "off";
+        form.appendChild(input);
+      }
+      var row = document.createElement("div");
+      row.className = "row";
+      // not a submit button: Enter in the input must mean OK, not the first button
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => {
+        dlg.close("cancel");
+      });
+      var ok = document.createElement("button");
+      ok.value = "ok";
+      ok.textContent = o.ok || "OK";
+      ok.className = o.danger ? "danger" : "primary";
+      row.appendChild(cancel);
+      row.appendChild(ok);
+      form.appendChild(row);
+      dlg.appendChild(form);
+      document.body.appendChild(dlg);
+      dlg.addEventListener("close", () => {
+        var yes = dlg.returnValue === "ok";
+        var value = input ? input.value : true;
+        dlg.remove();
+        resolve(yes ? value : null);
+      });
+      dlg.showModal();
+      (input || ok).focus();
+    });
+  }
+  // htmx's hx-confirm goes through the same dialog; OK is labelled like the button
+  document.body.addEventListener("htmx:confirm", (e) => {
+    var q = e.detail.question;
+    if (!q) return;
+    e.preventDefault();
+    var elt = e.detail.elt;
+    var label = (elt?.textContent || "").trim() || "OK";
+    var danger =
+      !!elt?.classList && (elt.classList.contains("danger") || elt.classList.contains("delete"));
+    ask(q, { ok: label, danger: danger }).then((yes) => {
+      if (yes) e.detail.issueRequest(true);
+    });
   });
 
   // Slash commands: typing `/` at the start of a prompt box lists the session's commands

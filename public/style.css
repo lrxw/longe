@@ -515,6 +515,33 @@ button.danger {
 button.danger:hover {
   border-color: var(--danger);
 }
+/* confirm / prompt dialog (app.js ask()), instead of the browser's own */
+dialog.confirm {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.1rem 1.25rem 1rem;
+  width: min(26rem, 90vw);
+}
+dialog.confirm::backdrop {
+  background: rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(2px);
+}
+dialog.confirm p {
+  margin: 0 0 0.9rem;
+  line-height: 1.45;
+}
+dialog.confirm input {
+  width: 100%;
+  margin-bottom: 0.9rem;
+}
+dialog.confirm .row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
 textarea {
   width: 100%;
   resize: vertical;
