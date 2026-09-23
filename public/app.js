@@ -40,12 +40,17 @@
       return;
     }
     if (inField(document.activeElement)) return;
-    // `/` jumps into the prompt box (chat page, topic page); Escape leaves it again
+    // `/` jumps into the prompt box (chat page, topic page); Escape leaves it again.
+    // An empty box gets the `/` too, so typing on starts a slash command.
     if (e.key === "/") {
       f = document.querySelector("form.prompt textarea");
       if (f) {
         e.preventDefault();
         f.focus();
+        if (!f.value) {
+          f.value = "/";
+          showMenu(f);
+        }
       }
       return;
     }
