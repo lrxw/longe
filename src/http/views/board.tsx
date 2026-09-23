@@ -1,3 +1,4 @@
+import { todoOrder } from "../../domain/topic-ops.js";
 import { allowedTargets } from "../../domain/transitions.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../../domain/types.js";
 import type { AiIndex, IndexedTopic } from "../../index/index.js";
@@ -159,7 +160,11 @@ export function BoardFragment({
       </div>
       <div class="columns">
         {TOPIC_STATUSES.map((status) => {
-          const topics = index.topicsByStatus(status);
+          // todo shows the queue: the top card is handed to the chat next
+          const topics =
+            status === "todo"
+              ? todoOrder(index.topicsByStatus(status))
+              : index.topicsByStatus(status);
           const cards = topics.map((t) => <TopicCard t={t} index={index} now={now} base={base} />);
           return (
             <section id={`col-${status}`} class={`column ${status}`} data-status={status}>

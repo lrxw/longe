@@ -160,7 +160,8 @@ errors in the UI and applies the rules below.
 
 **Statuses.** `backlog → todo → active → review → done`, plus `needs-decision` and `cancelled`.
 The backlog is parked; agents never pick it up on their own. Todo is your queue: whenever the
-chat is free and no topic is active, longe hands it the oldest todo topic.
+chat is free and no topic is active, longe hands it the top card of the Todo column. Drag
+todo cards up and down to set the order; new ones join at the bottom.
 
 | Who | May do |
 |---|---|

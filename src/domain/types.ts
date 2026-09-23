@@ -28,6 +28,8 @@ export interface TopicFrontmatter {
   updated: string;
   links: string[];
   branch?: string | null;
+  /** Place in the todo queue, set when the human reorders it (1 = next). */
+  rank?: number;
   [key: string]: unknown;
 }
 

@@ -91,6 +91,12 @@ export function setField(doc: MdDoc, key: string, value: unknown): void {
   doc.frontmatterDirty = true;
 }
 
+export function deleteField(doc: MdDoc, key: string): void {
+  if (doc.frontmatter.contents === null || !doc.frontmatter.has(key)) return;
+  doc.frontmatter.delete(key);
+  doc.frontmatterDirty = true;
+}
+
 export function findSection(doc: MdDoc, title: string): Section | undefined {
   return doc.sections.find((s) => s.title === title);
 }

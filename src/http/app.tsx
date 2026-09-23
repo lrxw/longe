@@ -491,6 +491,15 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       }
     });
 
+    // drag within the Todo column: the new order, top to bottom
+    r.post("/topics/order", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const ids = (str((await c.req.parseBody()).ids) ?? "").split(",").filter(Boolean);
+      await human.reorderTodo(w.ctx, ids);
+      return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+    });
+
     r.post("/board/cleanup", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;

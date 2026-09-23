@@ -109,12 +109,34 @@
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", card.dataset.id);
     var targets = (card.dataset.targets || "").split(",");
+    // a todo card may also move within its column: that reorders the queue
+    if (card.dataset.status === "todo") targets.push("todo");
     columns().forEach((col) => {
       col.classList.toggle("can-drop", targets.indexOf(col.dataset.status) >= 0);
     });
   });
-  document.addEventListener("dragend", endDrag);
+  document.addEventListener("dragend", () => {
+    clearMarks();
+    endDrag();
+  });
+  // reordering todo: where in the column the card would land (before or after a card)
+  function clearMarks() {
+    document.querySelectorAll(".drop-before, .drop-after").forEach((c) => {
+      c.classList.remove("drop-before", "drop-after");
+    });
+  }
+  function placeIn(col, e) {
+    var cards = Array.prototype.slice
+      .call(col.querySelectorAll(".card.topic"))
+      .filter((c) => c !== dragging);
+    var index = cards.findIndex((c) => {
+      var box = c.getBoundingClientRect();
+      return e.clientY < box.top + box.height / 2;
+    });
+    return { cards: cards, index: index < 0 ? cards.length : index };
+  }
   document.addEventListener("dragover", (e) => {
+    var at;
     var col = dragging && columnAt(e, ".column.can-drop");
     if (!col) return;
     e.preventDefault();
@@ -122,14 +144,41 @@
     columns().forEach((c) => {
       c.classList.toggle("over", c === col);
     });
+    clearMarks();
+    if (col.dataset.status === "todo" && dragging.dataset.status === "todo") {
+      at = placeIn(col, e);
+      if (at.index < at.cards.length) at.cards[at.index].classList.add("drop-before");
+      else if (at.cards.length) at.cards[at.cards.length - 1].classList.add("drop-after");
+    }
   });
   document.addEventListener("drop", (e) => {
+    var at, ids;
     var col = dragging && columnAt(e, ".column.can-drop");
     if (!col) return;
     e.preventDefault();
     var id = dragging.dataset.id;
     var from = dragging.dataset.status;
     var to = col.dataset.status;
+    if (from === "todo" && to === "todo") {
+      at = placeIn(col, e);
+      ids = at.cards.map((c) => c.dataset.id);
+      ids.splice(at.index, 0, id);
+      clearMarks();
+      endDrag();
+      fetch(`${d.base || ""}/topics/order`, {
+        method: "POST",
+        body: new URLSearchParams({ ids: ids.join(",") }),
+      }).then(
+        (r) => {
+          if (!r.ok) showDropError(col, "");
+        },
+        () => {
+          showDropError(col, "");
+        },
+      );
+      return;
+    }
+    clearMarks();
     endDrag();
     var body = new URLSearchParams({ status: to });
     var send = () =>

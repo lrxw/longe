@@ -8,7 +8,7 @@ At the start of every session:
 1. Call \`check_answers\` and read every answer. Call \`acknowledge_answers\` for what you read.
 2. Call \`list_topics\` (status: active) to see what you own.
 
-\`todo\` is the human's queue: when no topic is active, pick up the oldest todo topic
+\`todo\` is the human's queue: when no topic is active, pick up the top todo topic
 (\`set_status\` active). Never pick up a \`backlog\` topic on your own: the backlog is
 parked, and the human moves what should be done to todo or active. Topics you create
 land in todo.

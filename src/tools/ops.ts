@@ -6,7 +6,7 @@ import {
   withdrawQuestion,
 } from "../domain/question-ops.js";
 import { type Effect, effectsForQuestionClosed } from "../domain/side-effects.js";
-import { transitionTopic } from "../domain/topic-ops.js";
+import { setRank, transitionTopic } from "../domain/topic-ops.js";
 import type { Actor, TopicStatus } from "../domain/types.js";
 import { applyEffects } from "../index/effects.js";
 import { slugify } from "../store/ids.js";
@@ -110,6 +110,19 @@ export const human = {
   reopen: (ctx: AppContext, id: string, note?: string) =>
     setTopicStatus(ctx, id, "active", "human", note),
   cleanup: (ctx: AppContext, mode: CleanupMode) => cleanupFinished(ctx, mode),
+  /**
+   * The human's order for the todo queue: `ids` top to bottom. Topics not in todo
+   * (any more) are skipped; todo topics missing from the list keep their place after.
+   */
+  reorderTodo: async (ctx: AppContext, ids: string[]): Promise<void> => {
+    let rank = 0;
+    for (const id of ids) {
+      if (ctx.index.topics.get(id)?.fm.status !== "todo") continue;
+      rank++;
+      await ctx.repo.modifyTopic(id, (t) => setRank(t, rank));
+      await ctx.index.refresh("topic", id);
+    }
+  },
   /** A topic the human adds themselves: backlog (parked) or todo (queued); the chat is not told. */
   addTopic: async (
     ctx: AppContext,

@@ -1,3 +1,4 @@
+import { todoOrder } from "../domain/topic-ops.js";
 import type { AiIndex, IndexedQuestion } from "../index/index.js";
 import { type AgentRunner, answersPrompt, todoPrompt } from "./agent.js";
 
@@ -10,9 +11,9 @@ import { type AgentRunner, answersPrompt, todoPrompt } from "./agent.js";
  *    one message. Each answer is announced once. Only for a chat that has a session: a
  *    repo that never chatted gets no agent started behind the human's back. Off when
  *    `answers` is false (the repo's own on_answer hook owns that job).
- * 2. **Then todo** (§4): when no topic is active, the oldest todo topic (the one
- *    queued first). A topic is offered once per stay in todo, so an agent that does
- *    not pick it up is not asked again in a loop.
+ * 2. **Then todo** (§4): when no topic is active, the top of the todo queue (the
+ *    human's order, see todoOrder). A topic is offered once per stay in todo, so an
+ *    agent that does not pick it up is not asked again in a loop.
  */
 export function attachChatQueue(
   index: AiIndex,
@@ -50,9 +51,7 @@ export function attachChatQueue(
     }
 
     if (index.topicsByStatus("active").length > 0) return;
-    const first = [...todo]
-      .filter((t) => !offered.has(t.id))
-      .sort((a, b) => a.fm.updated.localeCompare(b.fm.updated))[0];
+    const first = todoOrder(todo).filter((t) => !offered.has(t.id))[0];
     if (!first) return;
     offered.add(first.id);
     wake(todoPrompt({ id: first.id, title: first.fm.title }));

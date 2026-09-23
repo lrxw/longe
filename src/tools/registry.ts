@@ -379,6 +379,17 @@ export const HUMAN_TOOLS: ToolDef[] = [
     handler: async (ctx, input) => ({ id: await human.addTopic(ctx, input) }),
   }),
   def({
+    name: "reorder_todo",
+    surface: "human",
+    description:
+      "Set the order of the todo queue: topic ids top to bottom. The chat is handed the top one next.",
+    input: z.object({ ids: z.array(topicId).min(1) }),
+    handler: async (ctx, { ids }) => {
+      await human.reorderTodo(ctx, ids);
+      return { ok: true };
+    },
+  }),
+  def({
     name: "delete_question",
     surface: "human",
     description:

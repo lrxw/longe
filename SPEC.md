@@ -140,7 +140,7 @@ Statuses: `backlog | todo | active | needs-decision | review | done | cancelled`
 
 Who has the ball: `backlog`, `needs-decision`, `review` → human. `todo`, `active` → agent. `done`, `cancelled` → nobody.
 
-`backlog` is parked: agents never pick it up on their own. `todo` is the human's queue. Whenever the repo's chat is free (no turn running) and no topic is `active`, the server tells the chat to work on the oldest todo topic, the one queued first. The agent then moves it `todo → active`. Each topic is offered once per stay in todo, so an agent that does not pick it up is not asked again in a loop.
+`backlog` is parked: agents never pick it up on their own. `todo` is the human's queue. Whenever the repo's chat is free (no turn running) and no topic is `active`, the server tells the chat to work on the top todo topic: the human's order (the optional frontmatter field `rank`, set by dragging within the Todo column), then unranked topics in the order they entered todo. Entering todo clears `rank`, so a returning topic joins at the bottom. The agent then moves it `todo → active`. Each topic is offered once per stay in todo, so an agent that does not pick it up is not asked again in a loop.
 
 | From | To | Allowed actor | Notes |
 |---|---|---|---|
@@ -288,7 +288,7 @@ At the start of every session:
 1. Call `check_answers` and read every answer. Call `acknowledge_answers` for what you read.
 2. Call `list_topics` (status: active) to see what you own.
 
-`todo` is the human's queue: when no topic is active, pick up the oldest todo topic
+`todo` is the human's queue: when no topic is active, pick up the top todo topic
 (`set_status` active). Never pick up a `backlog` topic on your own: the backlog is
 parked, and the human moves what should be done to todo or active. Topics you create
 land in todo.
