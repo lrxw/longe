@@ -99,7 +99,7 @@ export const CONTINUE_PROMPT = "Continue where you left off. Report on the board
 
 /** What the Work on board button sends: the board is the task list, with or without a session. */
 export const WORK_PROMPT =
-  "Work through the board: call check_answers and acknowledge_answers, then list_topics with status active and keep working on those topics until each is in review or blocked on a question. When no active topic is left to work on, pick up backlog topics one at a time (set_status active) and work them the same way. Report on the board when you stop.";
+  "Work through the board: call check_answers and acknowledge_answers, then list_topics with status active and keep working on those topics until each is in review or blocked on a question. When no active topic is left to work on, pick up backlog topics one at a time (set_status active) and work them the same way; skip topics whose title starts with [on hold]. Report on the board when you stop.";
 
 /** While the agent works: silence this long is shown as a stall hint. */
 export const STALL_AFTER_MS = 120_000;
