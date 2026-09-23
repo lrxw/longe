@@ -1,20 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 3 52 52" role="img" aria-label="longe">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 8 48 48" role="img" aria-label="longe">
   <!--
-    Favicon: mark.svg, set 3 units lower (about 1px at 16px). The glyph is centered
-    geometrically, but its weight is on top (trail arc, runner) while the bottom is the
-    faint dashed ring that almost vanishes at tab size, so centered it looks too high.
+    Favicon: mark.svg with a heavier ring and runner, so it holds at 16px. The ring is
+    solid now, so the glyph is balanced and needs no offset (the dashed version sat
+    3 units lower to look centered).
   -->
   <style>
+    .ink { stroke: #1c1f24; }
     .accent { stroke: #2563eb; fill: #2563eb; }
     @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e5e7eb; }
       .accent { stroke: #60a5fa; fill: #60a5fa; }
     }
   </style>
+  <circle class="ink" cx="32" cy="32" r="18" fill="none" stroke-width="8"/>
   <g class="accent">
-    <circle cx="32" cy="32" r="20" fill="none" stroke-opacity=".3" stroke-width="4" stroke-dasharray="3.5 4.5"/>
-    <path d="M15.62 20.53 A20 20 0 0 1 46.14 17.86" fill="none" stroke-width="4" stroke-linecap="round"/>
-    <path d="M32 32 L46.14 17.86" stroke-width="3" stroke-linecap="round"/>
+    <path d="M32 32 L44.73 19.27" stroke-width="4.5" stroke-linecap="round"/>
     <circle cx="32" cy="32" r="5" stroke="none"/>
-    <circle cx="46.14" cy="17.86" r="7" stroke="none"/>
+    <circle cx="44.73" cy="19.27" r="8" stroke="none"/>
   </g>
 </svg>
