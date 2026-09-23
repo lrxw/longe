@@ -470,6 +470,27 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     });
 
     // archive or delete every done and cancelled topic, with its questions
+    // the human adds a topic without the chat; the board comes back with it
+    r.post("/topics/new", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const form = await c.req.parseBody();
+      try {
+        await human.addTopic(w.ctx, {
+          title: str(form.title) ?? "",
+          goal: str(form.goal),
+          status: str(form.status) === "todo" ? "todo" : "backlog",
+        });
+        return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return c.html(
+          <BoardFragment index={w.ctx.index} now={now()} base={w.view.base} error={msg} />,
+          statusFor(err) as 400,
+        );
+      }
+    });
+
     r.post("/board/cleanup", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;

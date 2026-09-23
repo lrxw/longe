@@ -9,6 +9,7 @@ import { type Effect, effectsForQuestionClosed } from "../domain/side-effects.js
 import { transitionTopic } from "../domain/topic-ops.js";
 import type { Actor, TopicStatus } from "../domain/types.js";
 import { applyEffects } from "../index/effects.js";
+import { slugify } from "../store/ids.js";
 import { type Question, questionSections } from "../store/question.js";
 import type { Topic } from "../store/topic.js";
 
@@ -109,6 +110,24 @@ export const human = {
   reopen: (ctx: AppContext, id: string, note?: string) =>
     setTopicStatus(ctx, id, "active", "human", note),
   cleanup: (ctx: AppContext, mode: CleanupMode) => cleanupFinished(ctx, mode),
+  /** A topic the human adds themselves: backlog (parked) or todo (queued); the chat is not told. */
+  addTopic: async (
+    ctx: AppContext,
+    input: { title: string; goal?: string | undefined; status: "backlog" | "todo" },
+  ): Promise<string> => {
+    const title = input.title.trim();
+    if (!title) throw new DomainError("validation", "A topic needs a title.");
+    if (title.length > 200) throw new DomainError("validation", "The title is too long.");
+    const id = await ctx.repo.createTopic(slugify(title), {
+      title,
+      goal: input.goal?.trim() || "(no goal written yet)",
+      status: input.status,
+      now: ctx.now(),
+    });
+    ctx.runner.expect(id, input.status);
+    await ctx.index.refresh("topic", id);
+    return id;
+  },
 };
 
 /** Statuses the board's cleanup clears away. */

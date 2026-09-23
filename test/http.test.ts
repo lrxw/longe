@@ -390,6 +390,21 @@ describe("actions", () => {
     expect((await app.request("/topics/nope/status", form({ status: "active" }))).status).toBe(404);
   });
 
+  it("the human adds a topic from the board, into backlog or todo, without the chat", async () => {
+    const board = await (await app.request("/board")).text();
+    expect(board).toContain('hx-post="/topics/new"');
+    let res = await app.request("/topics/new", form({ title: "Parked idea", goal: "Later." }));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("Parked idea");
+    expect(ctx.index.topics.get("parked-idea")?.fm.status).toBe("backlog");
+    res = await app.request("/topics/new", form({ title: "Do next", status: "todo" }));
+    expect(ctx.index.topics.get("do-next")?.fm.status).toBe("todo");
+    res = await app.request("/topics/new", form({ title: "  " }));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("needs a title");
+    expect(await ctx.agent.messages()).toEqual([]); // the chat is not involved
+  });
+
   it("about page shows the big logo, version and links; the footer links to it", async () => {
     const res = await app.request("/about");
     expect(res.status).toBe(200);

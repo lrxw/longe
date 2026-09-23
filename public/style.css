@@ -1130,6 +1130,31 @@ form.prompt.compact {
   gap: 0.5rem;
   margin-bottom: 0.6rem;
 }
+/* above the columns: add a topic on the left, cleanup on the right */
+.board-tools {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.board-tools .cleanup {
+  margin-left: auto;
+}
+.new-topic {
+  margin-bottom: 0.6rem;
+}
+.new-topic summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+.new-topic form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: min(28rem, 90vw);
+  margin-top: 0.4rem;
+}
 
 .errors {
   border: 1px solid var(--danger);

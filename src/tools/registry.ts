@@ -367,6 +367,18 @@ export const HUMAN_TOOLS: ToolDef[] = [
     },
   }),
   def({
+    name: "add_topic",
+    surface: "human",
+    description:
+      "Add a topic as the human, without the chat: status backlog (default, parked) or todo (the queue picks it up).",
+    input: z.object({
+      title: z.string().trim().min(1).max(200),
+      goal: z.string().optional(),
+      status: z.enum(["backlog", "todo"]).default("backlog"),
+    }),
+    handler: async (ctx, input) => ({ id: await human.addTopic(ctx, input) }),
+  }),
+  def({
     name: "delete_question",
     surface: "human",
     description:

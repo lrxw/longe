@@ -89,7 +89,49 @@ function Cleanup({ count, base }: { count: number; base: string }) {
   );
 }
 
-export function BoardFragment({ index, now, base }: { index: AiIndex; now: Date; base: string }) {
+/**
+ * Add a topic yourself, without asking the chat: it lands in backlog (parked) or todo
+ * (the queue picks it up). The chat is not told.
+ */
+function NewTopic({ base, error }: { base: string; error?: string | undefined }) {
+  return (
+    <details class="new-topic" data-key="board:new-topic" open={error ? true : undefined}>
+      <summary>+ New topic</summary>
+      <form
+        hx-post={`${base}/topics/new`}
+        hx-target="#board"
+        hx-swap="outerHTML"
+        hx-on--after-request="if (event.detail.successful) this.reset()"
+      >
+        <input name="title" placeholder="Title" required autocomplete="off" />
+        <textarea name="goal" rows={2} placeholder="Goal: what and why (optional)" />
+        <div class="row">
+          <select name="status" title="Where it lands">
+            <option value="backlog">Backlog (parked)</option>
+            <option value="todo">Todo (the agent picks it up)</option>
+          </select>
+          <button type="submit" class="primary small">
+            Add
+          </button>
+        </div>
+        {error ? <p class="error">{error}</p> : null}
+      </form>
+    </details>
+  );
+}
+
+export function BoardFragment({
+  index,
+  now,
+  base,
+  error,
+}: {
+  index: AiIndex;
+  now: Date;
+  base: string;
+  /** Shown in the new-topic form after a failed add. */
+  error?: string | undefined;
+}) {
   const finished = FINISHED.reduce((n, s) => n + index.topicsByStatus(s).length, 0);
   return (
     // hx-sync: a newer refresh cancels one still in flight, so a late stale answer never wins
@@ -101,7 +143,10 @@ export function BoardFragment({ index, now, base }: { index: AiIndex; now: Date;
       hx-swap="morph"
     >
       <ErrorList errors={[...index.errors.values()]} />
-      <Cleanup count={finished} base={base} />
+      <div class="board-tools">
+        <NewTopic base={base} error={error} />
+        <Cleanup count={finished} base={base} />
+      </div>
       <div class="columns">
         {TOPIC_STATUSES.map((status) => {
           const topics = index.topicsByStatus(status);
