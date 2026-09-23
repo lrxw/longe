@@ -160,6 +160,9 @@ export const CONTINUE_PROMPT = "Continue where you left off. Report on the board
 export const WORK_PROMPT =
   "Work through the board: call check_answers and acknowledge_answers, then list_topics with status active and keep working on those topics until each is in review or blocked on a question. When no active topic is left to work on, pick up todo topics one at a time, oldest first (set_status active), and work them the same way. Never pick up backlog topics: the backlog is parked. Report on the board when you stop.";
 
+/** Quiet this long after a result, with messages still counted: they were folded in. */
+export const SETTLE_MS = 3000;
+
 /** While the agent works: silence this long is shown as a stall hint. */
 export const STALL_AFTER_MS = 120_000;
 
@@ -209,6 +212,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private startedAt: string | undefined;
   private exitCode: number | null | undefined;
   private initSeen = false;
+  private settleTimer: NodeJS.Timeout | undefined;
   /** The running turn called ask_question. */
   private askedThisTurn = false;
   /** The last turn ended with a reminder to use the inbox (so the next one is not reminded). */
@@ -634,7 +638,31 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   }
 
   /** One line of `--output-format stream-json`. */
+  /**
+   * A message sent while a turn runs is sometimes folded into that turn: two messages,
+   * one result, and `pending` would stay above 0 for good, so the chat would never
+   * count as free (no answers, no todo). After a result, if the stream stays quiet for
+   * SETTLE_MS, no further turn is coming: the count is cleared.
+   */
+  private armSettle(): void {
+    if (this.settleTimer) clearTimeout(this.settleTimer);
+    this.settleTimer = setTimeout(() => {
+      this.settleTimer = undefined;
+      if (this.pending === 0 || this.queued > 0 || !this.child) return;
+      this.pending = 0;
+      this.armIdle();
+      this.flushNotify();
+      this.emit("agent:idle");
+    }, SETTLE_MS);
+    this.settleTimer.unref?.();
+  }
+
   private ingest(line: string): void {
+    // any output means a turn is running: the leftover count is real, keep it
+    if (this.settleTimer) {
+      clearTimeout(this.settleTimer);
+      this.settleTimer = undefined;
+    }
     let msg: Record<string, unknown>;
     try {
       msg = JSON.parse(line) as Record<string, unknown>;
@@ -731,6 +759,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         this.armIdle();
         this.flushNotify();
         if (!this.busy()) this.emit("agent:idle");
+        else this.armSettle();
         break;
       }
       default:

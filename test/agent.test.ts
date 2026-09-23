@@ -11,6 +11,7 @@ import {
   CONTINUE_PROMPT,
   endsWithQuestion,
   resumeCommand,
+  SETTLE_MS,
   todoPrompt,
   WORK_PROMPT,
 } from "../src/app/agent.js";
@@ -652,6 +653,90 @@ describe("agent over HTTP", () => {
     expect(msgs[2]?.text).toContain("q-20260922-bbbb");
     expect(msgs[2]?.text).not.toContain("q-20260922-aaaa");
   });
+
+  it("an answer given mid-turn waits and is handed over when the turn ends", async () => {
+    // a slow agent: every turn takes 0.6 s
+    const slow = path.join(dir, "fake-slow");
+    await writeFile(
+      slow,
+      `#!/bin/sh
+while IFS= read -r line; do
+  printf '%s\\n' "$line" >> ${JSON.stringify(inputFile)}
+  sleep 0.6
+  echo '{"type":"system","subtype":"init","session_id":"s","model":"m"}'
+  echo '{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"s"}'
+done
+`,
+    );
+    await chmod(slow, 0o755);
+    await writeFile(
+      path.join(dir, ".longe/config.yml"),
+      `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(slow)}\n`,
+    );
+    await writeFile(
+      path.join(dir, ".longe/questions/q-20260922-cccc.md"),
+      newQuestionText({
+        id: "q-20260922-cccc",
+        asked_by: "agent",
+        question: "Now?",
+        blocking: false,
+        assumption: "x",
+        now: new Date(),
+      }),
+    );
+    ctx = await createAppContext(dir, {
+      index: { debounceMs: 20, usePolling: true },
+      drivesChat: true,
+    });
+    await ctx.agent.say("human", "work");
+    let lines: (string | undefined)[] = [];
+    for (let i = 0; i < 100 && lines.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      lines = await inputLines();
+    }
+    expect(ctx.agent.busy()).toBe(true);
+    await answerQuestion(ctx, "q-20260922-cccc", { answer: "yes, now" });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await inputLines()).toEqual(["work"]); // not pushed into the running turn
+    await waitFor(
+      () => ctx.agent.status().events.filter((e) => e.kind === "result").length >= 2,
+      5000,
+    );
+    lines = await inputLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain("Question q-20260922-cccc was answered: yes, now");
+  });
+
+  it("a message folded into the running turn does not leave the chat busy for good", async () => {
+    // answers "work" with a result, but folds "extra" into it (no result of its own)
+    const folding = path.join(dir, "fake-folding");
+    await writeFile(
+      folding,
+      `#!/bin/sh
+while IFS= read -r line; do
+  printf '%s\\n' "$line" >> ${JSON.stringify(inputFile)}
+  case "$line" in
+    *extra*) ;;
+    *)
+      sleep 0.3
+      echo '{"type":"system","subtype":"init","session_id":"s","model":"m"}'
+      echo '{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"s"}' ;;
+  esac
+done
+`,
+    );
+    await chmod(folding, 0o755);
+    const runner = new AgentRunner(dir, { command: folding }, "fold");
+    let idle = 0;
+    runner.on("agent:idle", () => idle++);
+    await runner.say("human", "work");
+    await runner.say("human", "extra");
+    await waitFor(() => runner.status().events.some((e) => e.kind === "result"));
+    expect(runner.busy()).toBe(true); // one message still counted
+    await waitFor(() => !runner.busy(), SETTLE_MS + 2000);
+    expect(idle).toBe(1);
+    await runner.close();
+  }, 10000);
 
   it("answersPrompt: one answer reads like before, several are listed", () => {
     const one = { question_id: "q-1", topic_id: "t", answer: "yes" };
