@@ -4,9 +4,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AgentRunner,
+  ASK_IN_INBOX_PROMPT,
   activatedPrompt,
   answeredPrompt,
   CONTINUE_PROMPT,
+  endsWithQuestion,
   resumeCommand,
   todoPrompt,
   WORK_PROMPT,
@@ -135,6 +137,8 @@ describe("AgentRunner", () => {
       "Bash(pnpm test:*)",
       "Bash(git commit:*)",
     ]);
+    // questions go through the inbox, never the harness's own prompt
+    expect(args[args.indexOf("--disallowedTools") + 1]).toBe("AskUserQuestion");
     expect(args[args.indexOf("--model") + 1]).toBe("sonnet");
     expect(args[args.indexOf("--append-system-prompt") + 1]).toContain("chat of this repository");
 
@@ -237,6 +241,47 @@ done
     );
     expect(runner.status().contextTokens).toBeUndefined();
     await runner.close();
+  });
+
+  it("a reply that ends with a question in the text gets one reminder to use the inbox", async () => {
+    // always ends its reply with a question; "ask" makes it call ask_question instead
+    const asking = path.join(dir, "fake-asking");
+    await writeFile(
+      asking,
+      `#!/bin/sh
+while IFS= read -r line; do
+  printf '%s\\n' "$line" >> ${JSON.stringify(inputFile)}
+  case "$line" in
+    *'please ask'*)
+      echo '{"type":"assistant","session_id":"s","message":{"content":[{"type":"tool_use","name":"mcp__longe__ask_question","input":{"question":"Q?"}}]}}'
+      echo '{"type":"result","subtype":"success","is_error":false,"result":"Asked. Or not?","session_id":"s"}' ;;
+    *)
+      echo '{"type":"result","subtype":"success","is_error":false,"result":"Done. Shall I go on?","session_id":"s"}' ;;
+  esac
+done
+`,
+    );
+    await chmod(asking, 0o755);
+    const runner = new AgentRunner(dir, { command: asking }, "test");
+    await runner.say("human", "hello");
+    // turn 1 ends with a question → reminder; the reminder's turn ends with one too → no loop
+    await waitFor(() => runner.status().events.filter((e) => e.kind === "result").length >= 2);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(await inputLines()).toEqual(["hello", ASK_IN_INBOX_PROMPT]);
+    // a turn that called ask_question is not reminded
+    await runner.say("human", "please ask");
+    await waitFor(() => runner.status().events.filter((e) => e.kind === "result").length >= 3);
+    await new Promise((r) => setTimeout(r, 150));
+    expect((await inputLines()).length).toBe(3);
+    await runner.close();
+  });
+
+  it("endsWithQuestion: the last paragraph asks, code does not count", () => {
+    expect(endsWithQuestion("Done.\n\nShould I commit?")).toBe(true);
+    expect(endsWithQuestion("Is it **ready?** I think so.")).toBe(true);
+    expect(endsWithQuestion("Why? Because.\n\nAll done.")).toBe(false);
+    expect(endsWithQuestion("Look:\n\n```js\nx ? a : b\n```")).toBe(false);
+    expect(endsWithQuestion("")).toBe(false);
   });
 
   it("delivers messages written while no process was open, oldest first", async () => {

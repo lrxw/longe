@@ -120,6 +120,24 @@ export function todoPrompt(v: { id: string; title: string }): string {
   return `Next in the todo queue: topic \`${v.id}\` ("${v.title}"). Call check_answers, then set_status active on it, get_topic and work on it until it is in review or blocked on a question. Report on the board when you stop.`;
 }
 
+/** Sent when a turn ends with a question in its text and no ask_question call. */
+export const ASK_IN_INBOX_PROMPT =
+  "Your last reply ends with a question in the text. The human does not read the chat: if you need an answer, ask it with ask_question (2-4 options) now; if it was rhetorical, ignore this.";
+
+/**
+ * The reply's last paragraph asks something: it ends with "?", or a sentence in it
+ * does. Code blocks do not count.
+ */
+export function endsWithQuestion(text: string): boolean {
+  const prose = text.replace(/```[\s\S]*?```/g, "").trim();
+  const last =
+    prose
+      .split(/\n\s*\n/)
+      .at(-1)
+      ?.trim() ?? "";
+  return /\?(\s|$|["'`)*_])/.test(last);
+}
+
 /** What the Continue button sends: pick the conversation up where it stopped (needs a session). */
 export const CONTINUE_PROMPT = "Continue where you left off. Report on the board when you stop.";
 
@@ -176,6 +194,10 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private startedAt: string | undefined;
   private exitCode: number | null | undefined;
   private initSeen = false;
+  /** The running turn called ask_question. */
+  private askedThisTurn = false;
+  /** The last turn ended with a reminder to use the inbox (so the next one is not reminded). */
+  private remindedLastTurn = false;
   /** A compaction happened and no reply since: the context size is unknown. */
   private compacted = false;
   private modelOverride: string | undefined;
@@ -454,6 +476,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       ...(this.session ? ["--resume", this.session.id] : []),
       ...mcp,
       ...(allowed.length > 0 ? ["--allowedTools", ...allowed] : []),
+      // questions go to the inbox (ask_question), never to a prompt nobody sees
+      "--disallowedTools",
+      "AskUserQuestion",
       "--append-system-prompt",
       SYSTEM_PROMPT,
       ...(this.config.args ?? []),
@@ -646,8 +671,10 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         for (const block of content) {
           if (block.type === "text" && typeof block.text === "string" && block.text.trim())
             this.push("text", block.text);
-          else if (block.type === "tool_use")
+          else if (block.type === "tool_use") {
             this.push("tool", `${String(block.name)} ${summarize(block.input)}`);
+            if (String(block.name).endsWith("ask_question")) this.askedThisTurn = true;
+          }
         }
         break;
       }
@@ -668,6 +695,17 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         if (msg.is_error || !text || last?.kind !== "text" || last.text !== text)
           this.push(msg.is_error ? "error" : "result", text || String(msg.subtype ?? "done"));
         this.pending = Math.max(0, this.pending - 1);
+        // a question left in the reply text never reaches the human: remind the chat
+        // once to use the inbox; the reminder's own turn is never reminded again
+        const remind =
+          !msg.is_error &&
+          !this.askedThisTurn &&
+          !this.remindedLastTurn &&
+          this.pending === 0 &&
+          endsWithQuestion(text);
+        this.remindedLastTurn = remind;
+        this.askedThisTurn = false;
+        if (remind) void this.say("board", ASK_IN_INBOX_PROMPT);
         this.armIdle();
         this.flushNotify();
         if (!this.busy()) this.emit("agent:idle");
