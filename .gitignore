@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# longe's own board: only the config is shared
+.ai/messages/
+.ai/archive/

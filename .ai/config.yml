@@ -1,0 +1,33 @@
+version: 1
+project: "longe"
+
+# Optional: wake an agent when you answer a question on the board.
+# Runs once per answer (coalesced while a run is in progress), cwd = this repo.
+# Placeholders: {question_id} {topic_id} {answer} {question}
+# Output goes to ~/.cache/longe/hooks/<project>.log and the inbox shows the status.
+#
+# hooks:
+#   on_answer: >-
+#     claude -p --permission-mode acceptEdits
+#     "Question {question_id} on topic {topic_id} was answered: {answer}.
+#      Call check_answers, acknowledge_answers, then continue that topic."
+
+# What the chat may run without asking (headless runs cannot answer prompts).
+# Takes effect when the hub is (re)started with a build that knows allowed_tools;
+# .claude/settings.json carries the same rules for the current build.
+agent:
+  allowed_tools:
+    - "Bash(pnpm typecheck)"
+    - "Bash(pnpm lint)"
+    - "Bash(pnpm lint:fix)"
+    - "Bash(pnpm test)"
+    - "Bash(pnpm test:*)"
+    - "Bash(pnpm vitest:*)"
+    - "Bash(pnpm biome:*)"
+    - "Bash(pnpm build)"
+    - "Bash(git status:*)"
+    - "Bash(git diff:*)"
+    - "Bash(git log:*)"
+    - "Bash(git add:*)"
+    - "Bash(git commit:*)"
+    - "Read(~/.cache/longe/**)"
