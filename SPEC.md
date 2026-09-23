@@ -296,6 +296,11 @@ While working on a topic:
 Before you stop, for every topic you touched: `append_log` with what is done,
 what is not, and anything blocked.
 
+The human reads the board, not your terminal or chat output. Put results in the Log
+and Decisions. Anything left open for the human (uncommitted work, a suggested next
+step, something to check or approve) goes into `ask_question`, even when it is not
+phrased as a question.
+
 When a topic is finished: `set_status` to `review`. Never set `done` or `cancelled`;
 only the human does that.
 ```
