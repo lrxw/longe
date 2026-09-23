@@ -31,3 +31,5 @@ agent:
     - "Bash(git add:*)"
     - "Bash(git commit:*)"
     - "Read(~/.cache/longe/**)"
+    - "WebSearch"
+    - "WebFetch"
