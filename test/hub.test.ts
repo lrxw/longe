@@ -138,9 +138,15 @@ describe("hub mode", () => {
     expect(chat.headers.get("location")).toBe("/r/blog/chat");
 
     // the inbox is global; cards carry the repo's avatar and color
-    expect(inbox).toMatch(
-      /<a class="repo" href="\/r\/blog\/board" style="--repo:hsl\(\d+ 55% 46%\)">/,
-    );
+    expect(inbox).toMatch(/<a class="repo" href="\/r\/blog\/board" style="--repo:hsl\([^)]+\)">/);
+    // every repo gets its own color
+    const colors = [
+      ...inbox.matchAll(
+        /<a href="\/[^"]*" class="[^"]*" title="[^"]*" data-n="\d" style="--repo:([^"]+)"/g,
+      ),
+    ].map((m) => m[1]);
+    expect(colors).toHaveLength(3);
+    expect(new Set(colors).size).toBe(3);
     expect(inbox).toContain('title="Blog">BL</span>');
     expect((await app.request("/r/shop/inbox")).status).toBe(404);
 

@@ -13,7 +13,7 @@ import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
 import { answerQuestion, human, setTopicStatus } from "../tools/ops.js";
 import { API_BASE, createApiApp, docsPage, openApiDocument } from "./api.js";
 import { statusFor } from "./errors.js";
-import { monogram, repoColor } from "./identity.js";
+import { monogram, repoColor, repoColors } from "./identity.js";
 import { mountMcp } from "./mcp.js";
 import { vendorPath } from "./vendor.js";
 import { AboutPage } from "./views/about.js";
@@ -38,11 +38,15 @@ export interface HttpOptions {
 }
 
 function nav(hub: Hub, r: HubRepo): RepoNav {
+  // assigned over all repos, so no two share a color (up to the palette size)
+  const colors = repoColors(
+    hub.list().map((x) => ({ name: x.name, override: x.ctx?.config.color })),
+  );
   return {
     name: r.name,
     title: r.title,
     base: hub.base(r.name),
-    color: repoColor(r.name, r.ctx?.config.color),
+    color: colors.get(r.name) ?? repoColor(r.name, r.ctx?.config.color),
     mono: monogram(r.title),
     blocking: r.ctx?.index.blockingCount() ?? 0,
     missing: r.missing,
