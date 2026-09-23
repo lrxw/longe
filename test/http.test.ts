@@ -339,6 +339,11 @@ describe("actions", () => {
   });
 
   it("status form enforces §4 for humans and logs rejections", async () => {
+    // moving a topic to active wakes the chat; record instead of starting claude
+    const woken: unknown[] = [];
+    ctx.agent.notifyActivated = async (v) => {
+      woken.push(v);
+    };
     await rm(questionFile("q-20260922-bl0k"));
     await waitFor(() => !ctx.index.questions.has("q-20260922-bl0k"));
     // needs-decision → active is system-only, even for a human
@@ -365,6 +370,9 @@ describe("actions", () => {
     );
     expect(res.status).toBe(200);
     expect(await readFile(topicFile("billing"), "utf8")).toMatch(/human — rejected: missing tests/);
+    expect(woken).toEqual([
+      { id: "billing", title: "Billing refactor", from: "review", note: "missing tests" },
+    ]);
 
     await app.request("/topics/billing/status", form({ status: "review" }));
     res = await app.request("/topics/billing/status", form({ status: "done" }));
@@ -372,6 +380,8 @@ describe("actions", () => {
     const done = await res.text();
     expect(done).toContain('class="status done"');
     expect(done).not.toContain("Reject");
+    // refused moves and other targets do not wake it
+    expect(woken).toHaveLength(1);
 
     res = await app.request("/topics/billing/status", form({ status: "bogus" }));
     expect(res.status).toBe(400);

@@ -98,6 +98,21 @@ export function answeredPrompt(v: AnsweredVars): string {
 Call check_answers and acknowledge_answers, then continue that topic.`;
 }
 
+/** A topic the human moved to active on the board (drag or topic-page button). */
+export interface ActivatedVars {
+  id: string;
+  title: string;
+  from: string;
+  note?: string | undefined;
+}
+
+/** What the chat is told when the human moves a topic to active. */
+export function activatedPrompt(v: ActivatedVars): string {
+  const why = v.note?.trim() ? `; note: ${v.note.trim()}` : "";
+  return `The human moved topic \`${v.id}\` ("${v.title}") to active (from ${v.from}${why}).
+Call check_answers, then get_topic and work on it. Report on the board when you stop.`;
+}
+
 /** What the Continue button sends: pick the conversation up where it stopped (needs a session). */
 export const CONTINUE_PROMPT = "Continue where you left off. Report on the board when you stop.";
 
@@ -309,6 +324,15 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     if (!this.session && !this.child) return false;
     await this.say("board", answeredPrompt(vars));
     return true;
+  }
+
+  /**
+   * The human moved a topic to active: that asks for work now, so unlike an answer
+   * this starts the chat also when the repo has no session yet.
+   */
+  async notifyActivated(vars: ActivatedVars): Promise<void> {
+    await this.loaded;
+    await this.say("board", activatedPrompt(vars));
   }
 
   /** Kills the live process (SIGTERM). The session stays resumable. */

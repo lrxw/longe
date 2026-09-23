@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AgentRunner,
+  activatedPrompt,
   answeredPrompt,
   CONTINUE_PROMPT,
   resumeCommand,
@@ -367,6 +368,21 @@ while IFS= read -r line; do :; done
     expect(answeredPrompt(vars)).toContain(
       "Question q-20260922-aaaa on topic `t1` was answered: yes",
     );
+    runner.stop();
+    await waitFor(() => !runner.status().alive);
+  });
+
+  it("notifyActivated starts the chat even without a session", async () => {
+    const runner = new AgentRunner(dir, { command: fake }, "test");
+    const vars = { id: "t1", title: "T one", from: "review", note: "tests missing" };
+    await runner.notifyActivated(vars);
+    await waitFor(() => runner.status().pending === 0 && runner.status().sessionId !== undefined);
+    expect(await inputLines()).toEqual([activatedPrompt(vars)]);
+    expect((await runner.messages())[0]?.fm.from).toBe("board");
+    expect(activatedPrompt(vars)).toContain(
+      'moved topic `t1` ("T one") to active (from review; note: tests missing)',
+    );
+    expect(activatedPrompt({ id: "t1", title: "T", from: "backlog" })).toContain("(from backlog)");
     runner.stop();
     await waitFor(() => !runner.status().alive);
   });

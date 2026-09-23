@@ -404,11 +404,16 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       try {
         if (!TOPIC_STATUSES.includes(to))
           throw new DomainError("validation", `unknown status ${to}`);
+        const from = w.ctx.index.topics.get(id)?.fm.status;
         if (to === "done") await human.approve(w.ctx, id);
         else if (to === "cancelled") await human.cancel(w.ctx, id, note);
         else await setTopicStatus(w.ctx, id, to, "human", note);
         const t = w.ctx.index.topics.get(id);
         if (!t) return c.html(<p class="error">Topic was removed.</p>, 404);
+        // pick up, reject or reopen: the human wants work on it now, so wake the chat
+        if (to === "active" && from && from !== "active") {
+          void w.ctx.agent.notifyActivated({ id, title: t.fm.title, from, note });
+        }
         return c.html(<StatusActions t={t} base={w.view.base} />);
       } catch (err) {
         const t = w.ctx.index.topics.get(id);
