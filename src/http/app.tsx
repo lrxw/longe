@@ -6,6 +6,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { streamSSE } from "hono/streaming";
 import { CONTINUE_PROMPT, WORK_PROMPT } from "../app/agent.js";
 import type { AppContext } from "../app/context.js";
+import { topicCommits, uncommittedFiles } from "../app/git.js";
 import { Hub, type HubRepo } from "../app/hub.js";
 import { createProject } from "../app/new-project.js";
 import { DomainError } from "../domain/errors.js";
@@ -341,8 +342,18 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       return { repo, ctx: repo.ctx, view: nav(hub, repo) };
     };
     const isResponse = (x: unknown): x is Response => x instanceof Response;
+    /** The board with its git state (uncommitted work outside the board folder). */
+    const board = async (w: { ctx: AppContext; view: RepoNav }, error?: string) => (
+      <BoardFragment
+        index={w.ctx.index}
+        now={now()}
+        base={w.view.base}
+        error={error}
+        uncommitted={await uncommittedFiles(w.ctx.root)}
+      />
+    );
 
-    r.get("/board", (c) => {
+    r.get("/board", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       remember(c, w.repo);
@@ -357,7 +368,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
           board={boardCounts(w.ctx)}
           agent={w.ctx.agent.status()}
         >
-          <BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />
+          {await board(w)}
         </Layout>,
       );
     });
@@ -387,22 +398,23 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
         </Layout>,
       );
     });
-    r.get("/fragments/board", (c) => {
+    r.get("/fragments/board", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
-      return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+      return c.html(await board(w));
     });
     r.get("/fragments/board-badge", (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       return c.html(<BoardBadge counts={boardCounts(w.ctx)} base={w.view.base} />);
     });
-    r.get("/topics/:id", (c) => {
+    r.get("/topics/:id", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       const t = w.ctx.index.topics.get(c.req.param("id"));
       if (!t) return c.text("topic not found", 404);
       remember(c, w.repo);
+      const commits = await topicCommits(w.ctx.root, t.id);
       return c.html(
         <Layout
           title={t.fm.title}
@@ -414,17 +426,20 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
           board={boardCounts(w.ctx)}
           agent={w.ctx.agent.status()}
         >
-          <TopicFragment t={t} index={w.ctx.index} now={now()} repo={w.view} />
+          <TopicFragment t={t} index={w.ctx.index} now={now()} repo={w.view} commits={commits} />
           <TopicPrompt base={w.view.base} topicId={t.id} title={t.fm.title} />
         </Layout>,
       );
     });
-    r.get("/fragments/topics/:id", (c) => {
+    r.get("/fragments/topics/:id", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       const t = w.ctx.index.topics.get(c.req.param("id"));
       if (!t) return c.html(<p class="error">Topic was removed.</p>, 404);
-      return c.html(<TopicFragment t={t} index={w.ctx.index} now={now()} repo={w.view} />);
+      const commits = await topicCommits(w.ctx.root, t.id);
+      return c.html(
+        <TopicFragment t={t} index={w.ctx.index} now={now()} repo={w.view} commits={commits} />,
+      );
     });
 
     r.post("/questions/:id/answer", async (c) => {
@@ -469,7 +484,6 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       }
     });
 
-    // archive or delete every done and cancelled topic, with its questions
     // the human adds a topic without the chat; the board comes back with it
     r.post("/topics/new", async (c) => {
       const w = withRepo(c);
@@ -481,13 +495,10 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
           goal: str(form.goal),
           status: str(form.status) === "todo" ? "todo" : "backlog",
         });
-        return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+        return c.html(await board(w));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return c.html(
-          <BoardFragment index={w.ctx.index} now={now()} base={w.view.base} error={msg} />,
-          statusFor(err) as 400,
-        );
+        return c.html(await board(w, msg), statusFor(err) as 400);
       }
     });
 
@@ -497,16 +508,17 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       if (isResponse(w)) return w;
       const ids = (str((await c.req.parseBody()).ids) ?? "").split(",").filter(Boolean);
       await human.reorderTodo(w.ctx, ids);
-      return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+      return c.html(await board(w));
     });
 
+    // archive or delete every done and cancelled topic, with its questions
     r.post("/board/cleanup", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       const mode = str((await c.req.parseBody()).mode);
       if (mode !== "archive" && mode !== "delete") return c.text(`unknown mode ${mode}`, 400);
       await human.cleanup(w.ctx, mode);
-      return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+      return c.html(await board(w));
     });
 
     r.post("/topics/:id/status", async (c) => {

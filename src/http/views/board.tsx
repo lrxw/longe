@@ -136,12 +136,15 @@ export function BoardFragment({
   now,
   base,
   error,
+  uncommitted,
 }: {
   index: AiIndex;
   now: Date;
   base: string;
   /** Shown in the new-topic form after a failed add. */
   error?: string | undefined;
+  /** Files with uncommitted changes (outside .longe/); undefined outside git. */
+  uncommitted?: number | undefined;
 }) {
   const finished = FINISHED.reduce((n, s) => n + index.topicsByStatus(s).length, 0);
   return (
@@ -156,6 +159,14 @@ export function BoardFragment({
       <ErrorList errors={[...index.errors.values()]} />
       <div class="board-tools">
         <NewTopic base={base} error={error} />
+        {uncommitted ? (
+          <span
+            class="tag uncommitted"
+            title="Changed files in this repo that are not committed yet (the .longe/ folder does not count)"
+          >
+            {uncommitted} uncommitted {uncommitted === 1 ? "file" : "files"}
+          </span>
+        ) : null}
         <Cleanup count={finished} base={base} />
       </div>
       <div class="columns">

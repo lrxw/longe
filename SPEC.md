@@ -306,6 +306,8 @@ While working on a topic:
   once (`create_topic`, quoting the request), before you continue; otherwise it is lost.
 - "Continue where you left off" means: resume the open work on the board. It never
   means there is nothing to do.
+- When you commit work for a topic, end the commit message with a line
+  `Topic: <topic id>`. The topic page lists those commits.
 - Do not break the running longe server: never move or rename the board folder, or
   change files the server reads, in a way it cannot follow. If a change needs a server
   restart, ask for it with `ask_question`.

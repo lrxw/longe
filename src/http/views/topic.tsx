@@ -1,4 +1,5 @@
 import { raw } from "hono/html";
+import type { TopicCommit } from "../../app/git.js";
 import { allowedTargets } from "../../domain/transitions.js";
 import { ballHolder, QUESTION_STATUSES, type TopicStatus } from "../../domain/types.js";
 import type { AiIndex, IndexedQuestion, IndexedTopic } from "../../index/index.js";
@@ -105,11 +106,14 @@ export function TopicFragment({
   index,
   now,
   repo,
+  commits = [],
 }: {
   t: IndexedTopic;
   index: AiIndex;
   now: Date;
   repo: RepoNav;
+  /** Git commits made for this topic (their message says `Topic: <id>`). */
+  commits?: TopicCommit[];
 }) {
   const questions = index.questionsForTopic(t.id);
   const base = repo.base;
@@ -148,6 +152,19 @@ export function TopicFragment({
           {raw(renderMarkdown(t.sections.Plan))}
         </section>
         <section class="md">
+          {commits.length > 0 ? (
+            <>
+              <h2>Commits</h2>
+              <ul class="commits">
+                {commits.map((c) => (
+                  <li>
+                    <code>{c.hash}</code> {c.subject}{" "}
+                    <span class="meta">{ago(c.date, now)} ago</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           <h2>Decisions</h2>
           {raw(renderMarkdown(t.sections.Decisions || "_None yet._"))}
           <h2>Log</h2>

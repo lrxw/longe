@@ -1008,6 +1008,21 @@ form.prompt.compact {
   transform: translateY(-1px);
   text-decoration: none;
 }
+/* work in the repo not committed yet */
+.tag.uncommitted {
+  background: var(--danger-soft);
+  color: var(--danger);
+  align-self: center;
+}
+/* commits made for a topic, on its page */
+ul.commits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+ul.commits li {
+  margin: 0.2rem 0;
+}
 /* reordering todo: a line where the dragged card would land */
 .card.topic.drop-before {
   box-shadow: 0 -3px 0 0 var(--accent);
