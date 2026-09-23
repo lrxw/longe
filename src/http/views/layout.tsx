@@ -67,7 +67,7 @@ export interface LayoutProps {
   project: string;
   /** Open questions across repos: title prefix and the Inbox badge. */
   inbox: InboxCounts;
-  active: "inbox" | "board" | "topic" | "chat";
+  active: "inbox" | "board" | "topic" | "chat" | "about";
   /**
    * Hub mode: every registered repo, one avatar each in the header; each one is that
    * repo's board link. Undefined in single mode (a plain Board link instead).
@@ -171,7 +171,7 @@ export function Layout({
             </>
           ) : null}
           {" · "}
-          <kbd>/</kbd> prompt · <kbd>⌘↩</kbd> send
+          <kbd>/</kbd> prompt · <kbd>⌘↩</kbd> send · <a href="/about">about</a>
         </footer>
         <script src="/public/app.js"></script>
       </body>

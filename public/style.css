@@ -807,6 +807,32 @@ form.prompt.compact {
 .tile.missing {
   opacity: 0.6;
 }
+/* about page: the big wordmark, centered */
+.about {
+  max-width: 40rem;
+  margin: 2.5rem auto;
+  text-align: center;
+}
+.about-logo {
+  width: min(28rem, 90%);
+  height: auto;
+}
+.about-version {
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+.about-lead {
+  font-size: 1.1em;
+  margin: 1.5rem 0 1rem;
+}
+.about-points {
+  text-align: left;
+  display: inline-block;
+  margin: 0 auto 1.25rem;
+}
+.about-points li {
+  margin: 0.35rem 0;
+}
 .tile.new {
   border-style: dashed;
   box-shadow: none;

@@ -388,6 +388,16 @@ describe("actions", () => {
     expect((await app.request("/topics/nope/status", form({ status: "active" }))).status).toBe(404);
   });
 
+  it("about page shows the big logo, version and links; the footer links to it", async () => {
+    const res = await app.request("/about");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('<img class="about-logo" src="/public/logo/wordmark.svg" alt="longe"/>');
+    expect(html).toMatch(/version <code>\d+\.\d+\.\d+<\/code>/);
+    expect(html).toContain('href="/api/docs"');
+    expect(await (await app.request("/board")).text()).toContain('<a href="/about">about</a>');
+  });
+
   it("SSE endpoint streams events", async () => {
     const res = await app.request("/events");
     expect(res.status).toBe(200);

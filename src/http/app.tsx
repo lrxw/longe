@@ -16,6 +16,7 @@ import { statusFor } from "./errors.js";
 import { monogram, repoColor } from "./identity.js";
 import { mountMcp } from "./mcp.js";
 import { vendorPath } from "./vendor.js";
+import { AboutPage } from "./views/about.js";
 import { AgentBadge, AgentPanel, AgentSection, TopicPrompt } from "./views/agent.js";
 import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./views/badge.js";
 import { BoardFragment } from "./views/board.js";
@@ -253,6 +254,31 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       </Layout>,
     ),
   );
+  // ---- about: the big logo, version and links ---------------------------------
+  let pkg: Promise<{ version?: string; description?: string; homepage?: string }> | undefined;
+  app.get("/about", async (c) => {
+    pkg ??= readFile(path.join(PUBLIC_DIR, "..", "package.json"), "utf8")
+      .then((t) => JSON.parse(t) as { version?: string; description?: string; homepage?: string })
+      .catch(() => ({}));
+    const p = await pkg;
+    return c.html(
+      <Layout
+        title="About"
+        project={projectLabel()}
+        inbox={inboxCounts()}
+        active="about"
+        repos={switcher()}
+        board={singleBoard()}
+      >
+        <AboutPage
+          version={p.version ?? "?"}
+          description={p.description ?? "A local-first board for work done by AI coding agents."}
+          homepage={p.homepage}
+        />
+      </Layout>,
+    );
+  });
+
   // ---- new project (hub mode): folder + .ai/ + registry, then its board ---------
   const home = opts.home ?? os.homedir();
   const newProjectPage = (
