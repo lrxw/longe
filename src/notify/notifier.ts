@@ -17,23 +17,32 @@ export const desktopNotifier: Notifier = (title, body) => {
 };
 
 /**
- * Sends bursts as one: notifications within `ms` of the first are collected, and
- * each title goes out once, with a count when there were several ("longe · Ready
- * for review (3)", the bodies joined).
+ * Sends bursts as one: notifications within `ms` of the first are collected per
+ * repo (the title's part before " · "). A single one goes out as it is; several
+ * become "longe · 3 blocking questions" with their titles as the text.
  */
 export function coalescing(send: Notifier, ms = 5000): Notifier {
   let pending: { title: string; body: string }[] = [];
   let timer: NodeJS.Timeout | undefined;
   const flush = () => {
     timer = undefined;
-    const byTitle = new Map<string, string[]>();
-    for (const n of pending) byTitle.set(n.title, [...(byTitle.get(n.title) ?? []), n.body]);
+    const byRepo = new Map<string, { title: string; body: string }[]>();
+    for (const n of pending) {
+      const repo = n.title.includes(" · ") ? (n.title.split(" · ")[0] as string) : "";
+      byRepo.set(repo, [...(byRepo.get(repo) ?? []), n]);
+    }
     pending = [];
-    for (const [title, bodies] of byTitle) {
-      const uniq = [...new Set(bodies)];
-      const body = uniq.join("; ");
+    for (const [repo, list] of byRepo) {
+      const first = list[0];
+      if (!first) continue;
+      if (list.length === 1) {
+        send(first.title, first.body);
+        continue;
+      }
+      const titles = list.map((n) => (repo ? n.title.slice(repo.length + 3) : n.title));
+      const body = titles.join("; ");
       send(
-        uniq.length > 1 ? `${title} (${uniq.length})` : title,
+        `${repo ? `${repo} · ` : ""}${list.length} blocking questions`,
         body.length > 200 ? `${body.slice(0, 199)}…` : body,
       );
     }

@@ -96,9 +96,9 @@ describe("REST /api/v1", () => {
     const qid = r.body.id as string;
     expect(qid).toMatch(/^q-\d{8}-[0-9a-z]{4}$/);
     expect(r.body.topic_status).toBe("needs-decision");
-    // the title names the repo (its folder here), the body the topic and the question
+    // the title is the repo (its folder here) and the question; the body its topic
     expect(notifications).toEqual([
-      `${path.basename(dir)} · Blocking question: Billing refactor: Webhooks or polling?`,
+      `${path.basename(dir)} · Webhooks or polling?: Blocking · Billing refactor`,
     ]);
     expect(await readFile(path.join(dir, ".ai/topics/billing-refactor.md"), "utf8")).toMatch(
       /system — blocked on q-/,

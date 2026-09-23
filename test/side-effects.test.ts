@@ -37,7 +37,7 @@ describe("§5 side effects", () => {
         to: "needs-decision",
         note: "blocked on q-20260922-aaaa",
       },
-      { kind: "notify", title: "Blocking question", body: "Topic one: Which DB?" },
+      { kind: "notify", title: "Which DB?", body: "Blocking · Topic one" },
     ]);
   });
 
@@ -51,7 +51,7 @@ describe("§5 side effects", () => {
   it("project-wide blocking question → notify only", () => {
     const { topic: _omit, ...projectWide } = q(true);
     expect(effectsForQuestionCreated(projectWide, "Q", undefined)).toEqual([
-      { kind: "notify", title: "Blocking question", body: "Q" },
+      { kind: "notify", title: "Q", body: "Blocking · project-wide" },
     ]);
   });
 

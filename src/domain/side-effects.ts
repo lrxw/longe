@@ -21,6 +21,23 @@ function truncate(s: string, n = 200): string {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 }
 
+/**
+ * A short headline of a markdown question for a notification title: its first
+ * paragraph without markdown marks, cut after the first sentence when that is
+ * long enough, at most `n` characters.
+ */
+export function headline(markdown: string, n = 90): string {
+  const first = markdown.trim().split(/\n\s*\n/)[0] ?? "";
+  const plain = first
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`#>]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const sentence = /^(.{20,}?[.?!])(\s|$)/.exec(plain)?.[1] ?? plain;
+  return truncate(sentence || "Question", n);
+}
+
 /** A question was created (by the tool or detected by the watcher). */
 export function effectsForQuestionCreated(
   q: QuestionFrontmatter,
@@ -38,10 +55,11 @@ export function effectsForQuestionCreated(
       note: `blocked on ${q.id}`,
     });
   }
+  // the question itself is the title; the body says where it belongs
   effects.push({
     kind: "notify",
-    title: "Blocking question",
-    body: truncate(topic ? `${topic.fm.title}: ${questionText}` : questionText),
+    title: headline(questionText),
+    body: topic ? `Blocking · ${topic.fm.title}` : "Blocking · project-wide",
   });
   return effects;
 }

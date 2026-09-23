@@ -182,7 +182,7 @@ describe("EffectRunner (§7.4 external changes)", () => {
     const text = await readFile(topicFile("t"), "utf8");
     expect(text).toContain("status: needs-decision");
     expect(text).toMatch(/system — blocked on q-20260922-bbbb/);
-    expect(notifications).toEqual(["Blocking question: Topic T: Which DB?"]);
+    expect(notifications).toEqual(["Which DB?: Blocking · Topic T"]);
 
     // answer it by editing the file → back to active
     const q = await readFile(questionFile("q-20260922-bbbb"), "utf8");

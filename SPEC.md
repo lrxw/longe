@@ -318,7 +318,7 @@ topic back to active, and you continue there.
 
 ## 10. Notifications
 
-`node-notifier` desktop notification only on a **new blocking question**: title `<project> · Blocking question`, body `<topic title>: <question text>`. Only the server (`longe serve`) notifies; a `longe mcp` process does not, because it would report the same change again. Notifications within 5 seconds are sent as one per title, with a count. Topic moves (including review) do not notify; the human asked for questions only. Must never fail the operation if the notifier is unavailable.
+`node-notifier` desktop notification only on a **new blocking question**: title `<project> · <the question's first sentence, without markdown>`, body `Blocking · <topic title>` (or `project-wide`). Only the server (`longe serve`) notifies; a `longe mcp` process does not, because it would report the same change again. Several within 5 seconds for one repo are sent as one, `<project> · N blocking questions`, with their headlines as the body. Topic moves (including review) do not notify; the human asked for questions only. Must never fail the operation if the notifier is unavailable.
 
 ## 11. Non-goals for v1
 
