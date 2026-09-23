@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  effectsForQuestionClosed,
-  effectsForQuestionCreated,
-  effectsForTopicStatus,
-} from "../src/domain/side-effects.js";
+import { effectsForQuestionClosed, effectsForQuestionCreated } from "../src/domain/side-effects.js";
 import type { QuestionFrontmatter, TopicFrontmatter, TopicStatus } from "../src/domain/types.js";
 
 const topic = (status: TopicStatus): TopicFrontmatter => ({
@@ -41,7 +37,7 @@ describe("§5 side effects", () => {
         to: "needs-decision",
         note: "blocked on q-20260922-aaaa",
       },
-      { kind: "notify", title: "Topic one", body: "Which DB?" },
+      { kind: "notify", title: "Blocking question", body: "Topic one: Which DB?" },
     ]);
   });
 
@@ -55,7 +51,7 @@ describe("§5 side effects", () => {
   it("project-wide blocking question → notify only", () => {
     const { topic: _omit, ...projectWide } = q(true);
     expect(effectsForQuestionCreated(projectWide, "Q", undefined)).toEqual([
-      { kind: "notify", title: "longe", body: "Q" },
+      { kind: "notify", title: "Blocking question", body: "Q" },
     ]);
   });
 
@@ -132,10 +128,5 @@ describe("§5 side effects", () => {
     expect(effectsForQuestionClosed({ ...verify, status: "withdrawn" }, review, "Broken")).toEqual(
       [],
     );
-  });
-
-  it("entering review notifies", () => {
-    expect(effectsForTopicStatus(topic("review"), "active", "review")).toHaveLength(1);
-    expect(effectsForTopicStatus(topic("done"), "review", "done")).toEqual([]);
   });
 });

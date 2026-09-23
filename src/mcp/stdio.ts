@@ -1,12 +1,13 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { closeAppContext, createAppContext } from "../app/context.js";
-import { desktopNotifier } from "../notify/notifier.js";
 import { registerRepo } from "../store/registry.js";
 import { createMcpServer } from "./server.js";
 
 /** `longe mcp`: MCP over stdio. stdout is the protocol channel; logs go to stderr. */
 export async function runMcpStdio(repo: string): Promise<void> {
-  const ctx = await createAppContext(repo, { notify: desktopNotifier });
+  // no desktop notifications here: the server (longe serve) sends them, and this
+  // process would report the same change a second time
+  const ctx = await createAppContext(repo);
   await registerRepo(ctx.root).catch(() => undefined);
   const server = createMcpServer(ctx);
   const transport = new StdioServerTransport();

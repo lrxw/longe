@@ -41,7 +41,10 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
   }
-  const notify = opts.notify ?? (() => {});
+  // with several repos, the title says which one: "longe · Ready for review"
+  const send = opts.notify;
+  const project = config.project ?? path.basename(root);
+  const notify: Notifier = send ? (title, body) => send(`${project} · ${title}`, body) : () => {};
   const repo = new Repo(root);
   const index = new AiIndex(root, opts.index ?? {});
   const logName = config.project ?? path.basename(root);

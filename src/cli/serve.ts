@@ -2,7 +2,7 @@ import { exec } from "node:child_process";
 import { serve } from "@hono/node-server";
 import { createRegistryHub } from "../app/hub.js";
 import { createHttpApp } from "../http/app.js";
-import { desktopNotifier } from "../notify/notifier.js";
+import { coalescing, desktopNotifier } from "../notify/notifier.js";
 import { hasAiDir, registerRepo } from "../store/registry.js";
 import {
   isAlive,
@@ -72,7 +72,7 @@ export async function runServe(opts: ServeOptions): Promise<void> {
     process.exit(0);
   }
 
-  const hub = await createRegistryHub({ notify: desktopNotifier, drivesChat: true });
+  const hub = await createRegistryHub({ notify: coalescing(desktopNotifier), drivesChat: true });
   const app = createHttpApp(hub, { port: opts.port });
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: opts.port }, (info) => {
     const lines = [

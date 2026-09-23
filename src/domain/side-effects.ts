@@ -40,8 +40,8 @@ export function effectsForQuestionCreated(
   }
   effects.push({
     kind: "notify",
-    title: topic ? topic.fm.title : "longe",
-    body: truncate(questionText),
+    title: "Blocking question",
+    body: truncate(topic ? `${topic.fm.title}: ${questionText}` : questionText),
   });
   return effects;
 }
@@ -85,18 +85,4 @@ export function effectsForQuestionClosed(
       note: `${q.id} ${q.status === "withdrawn" ? "withdrawn" : "answered"}, unblocked`,
     },
   ];
-}
-
-/** A topic changed status. */
-export function effectsForTopicStatus(
-  topic: TopicFrontmatter,
-  from: TopicStatus,
-  to: TopicStatus,
-): Effect[] {
-  if (to === "review" && from !== "review") {
-    return [
-      { kind: "notify", title: `Ready for review: ${topic.title}`, body: "Topic entered review." },
-    ];
-  }
-  return [];
 }

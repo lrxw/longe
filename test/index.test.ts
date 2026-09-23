@@ -182,7 +182,7 @@ describe("EffectRunner (§7.4 external changes)", () => {
     const text = await readFile(topicFile("t"), "utf8");
     expect(text).toContain("status: needs-decision");
     expect(text).toMatch(/system — blocked on q-20260922-bbbb/);
-    expect(notifications).toEqual(["Topic T: Which DB?"]);
+    expect(notifications).toEqual(["Blocking question: Topic T: Which DB?"]);
 
     // answer it by editing the file → back to active
     const q = await readFile(questionFile("q-20260922-bbbb"), "utf8");
@@ -194,20 +194,14 @@ describe("EffectRunner (§7.4 external changes)", () => {
     expect(notifications).toHaveLength(1);
   });
 
-  it("hand-edit to review notifies; expected changes are not double-applied", async () => {
+  it("topic moves do not notify (only blocking questions do)", async () => {
     const text = await readFile(topicFile("t"), "utf8");
     await writeFile(topicFile("t"), text.replace("status: active", "status: review"));
     await waitFor(() => index.topics.get("t")?.fm.status === "review");
-    await waitFor(() => notifications.length === 1);
-    expect(notifications[0]).toMatch(/Ready for review: Topic T/);
-
     runner.expect("t", "active");
     await writeFile(topicFile("t"), text);
     await waitFor(() => index.topics.get("t")?.fm.status === "active");
-    runner.expect("t", "review");
-    await writeFile(topicFile("t"), text.replace("status: active", "status: review"));
-    await waitFor(() => index.topics.get("t")?.fm.status === "review");
     await new Promise((r) => setTimeout(r, 100));
-    expect(notifications).toHaveLength(1);
+    expect(notifications).toEqual([]);
   });
 });

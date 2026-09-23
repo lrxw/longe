@@ -96,7 +96,10 @@ describe("REST /api/v1", () => {
     const qid = r.body.id as string;
     expect(qid).toMatch(/^q-\d{8}-[0-9a-z]{4}$/);
     expect(r.body.topic_status).toBe("needs-decision");
-    expect(notifications).toEqual(["Billing refactor: Webhooks or polling?"]);
+    // the title names the repo (its folder here), the body the topic and the question
+    expect(notifications).toEqual([
+      `${path.basename(dir)} · Blocking question: Billing refactor: Webhooks or polling?`,
+    ]);
     expect(await readFile(path.join(dir, ".ai/topics/billing-refactor.md"), "utf8")).toMatch(
       /system — blocked on q-/,
     );
@@ -128,7 +131,7 @@ describe("REST /api/v1", () => {
       await post("set_status", { id: "billing-refactor", status: "review", note: "Ready." }),
     );
     expect(r.status).toBe(200);
-    expect(notifications.at(-1)).toMatch(/Ready for review/);
+    expect(notifications).toHaveLength(1); // review is not notified, only blocking questions
     r = await json(await post("set_status", { id: "billing-refactor", status: "done" }));
     expect(r.status).toBe(409);
     expect(r.body.code).toBe("human_only");

@@ -42,7 +42,7 @@ The files are the source of truth.
   OpenAPI document. Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline and others.
 - **Wake-up hooks.** Run a command when you answer a question, or feed new answers into the
   next Claude Code prompt.
-- **Desktop notifications** for new blocking questions and topics ready for review.
+- **Desktop notifications** for new blocking questions, naming the repo; bursts are grouped.
 - **Cleanup.** Archive or delete finished topics in one go.
 
 ## Requirements

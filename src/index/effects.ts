@@ -2,7 +2,6 @@ import {
   type Effect,
   effectsForQuestionClosed,
   effectsForQuestionCreated,
-  effectsForTopicStatus,
 } from "../domain/side-effects.js";
 import { transitionTopic } from "../domain/topic-ops.js";
 import type { Repo } from "../store/repo.js";
@@ -53,7 +52,7 @@ export async function applyEffects(
 /**
  * Reacts to changes the index observed but the tool did not perform itself
  * (§7.4): a blocking question file appearing, a question being answered by
- * hand, a topic being moved to review by editing the file.
+ * hand.
  *
  * Tool handlers apply their own effects synchronously and call `expect()`
  * beforehand so that the watcher does not apply them twice.
@@ -124,14 +123,12 @@ export class EffectRunner {
       }
     }
 
+    // topic moves have no effects of their own (no notification since the human asked
+    // for questions only); clear what a tool announced so the map does not grow
     for (const c of topics) {
       const cur = c.current;
-      if (!cur || !c.previous) continue;
-      const from = c.previous.fm.status;
-      const to = cur.fm.status;
-      if (from === to) continue;
-      if (this.consume(cur.id, to)) continue;
-      effects.push(...effectsForTopicStatus(cur.fm, from, to));
+      if (cur && c.previous && c.previous.fm.status !== cur.fm.status)
+        this.consume(cur.id, cur.fm.status);
     }
 
     // a system status change we are about to write will show up in the next batch: expect it

@@ -1,11 +1,7 @@
 import type { AppContext } from "../app/context.js";
 import { DomainError } from "../domain/errors.js";
 import { type AnswerInput, answerQuestion as answerOp } from "../domain/question-ops.js";
-import {
-  type Effect,
-  effectsForQuestionClosed,
-  effectsForTopicStatus,
-} from "../domain/side-effects.js";
+import { type Effect, effectsForQuestionClosed } from "../domain/side-effects.js";
 import { transitionTopic } from "../domain/topic-ops.js";
 import type { Actor, TopicStatus } from "../domain/types.js";
 import { applyEffects } from "../index/effects.js";
@@ -41,12 +37,10 @@ export async function setTopicStatus(
   actor: Actor,
   note?: string | null,
 ): Promise<Topic> {
-  let from: TopicStatus | undefined;
   ctx.runner.expect(id, to);
   let topic: Topic;
   try {
     topic = await ctx.repo.modifyTopic(id, (t) => {
-      from = t.fm.status;
       transitionTopic(t, to, actor, ctx.now(), note);
     });
   } catch (err) {
@@ -54,7 +48,6 @@ export async function setTopicStatus(
     throw err;
   }
   await ctx.index.refresh("topic", id);
-  if (from !== undefined) await runEffects(ctx, effectsForTopicStatus(topic.fm, from, to));
   return topic;
 }
 

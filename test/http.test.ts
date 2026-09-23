@@ -361,7 +361,6 @@ describe("actions", () => {
     res = await app.request("/topics/billing/status", form({ status: "review" }));
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('class="status review"');
-    await waitFor(() => notifications.some((n) => n.startsWith("Ready for review")));
 
     res = await app.request("/topics/billing/status", form({ status: "active" }));
     expect(res.status).toBe(400);
