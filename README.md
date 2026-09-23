@@ -1,44 +1,80 @@
-# longe
+<p align="center">
+  <img src="public/logo/wordmark.svg" alt="longe" height="72">
+</p>
 
-Local-first board for work done by AI coding agents in one repository.
+<p align="center">
+  <strong>A local-first work board for AI coding agents.</strong><br>
+  Topics, decisions and a question inbox, stored as markdown in your repository.
+</p>
 
-- **What was done, what was decided** — one markdown file per topic (Goal, Plan, Decisions, Log),
-  committed with the code.
-- **What is waiting on me** — an inbox of questions agents asked, blocking ones first, answer with
-  one click.
+---
 
-The repo's `.ai/` folder is the source of truth. longe is a viewer plus a validated write layer
-that agents reach through **MCP** (stdio or HTTP), **REST**, or by editing the files. Binds to
-`127.0.0.1` only, no auth, no database, no telemetry.
+AI coding agents do a lot of work, but it is hard to keep track of what they did and why, and
+what they are waiting on. longe gives every repository a small board that agents keep up to date
+themselves:
 
-Full specification: [SPEC.md](./SPEC.md).
+- **Topics** hold the work: a goal, a plan, the decisions taken and a log. Each one is a markdown
+  file in `.ai/topics/`, committed together with the code it describes.
+- **The inbox** collects the questions agents ask you, with blocking ones first. You answer with
+  one click, and the answer goes back to the agent.
+- **The chat** lets you talk to Claude Code from the board and send it through the open work.
+
+Agents reach longe through **MCP**, **REST** or by editing the files directly. longe runs
+entirely on your machine: it binds to `127.0.0.1`, has no database, no account and no telemetry.
+The files are the source of truth.
+
+## Features
+
+- **Live board.** Columns for backlog, active, needs-decision, review, done and cancelled. It
+  updates as agents write, and you move cards by drag and drop.
+- **Question inbox.** Agents ask with options you can pick in one click. Blocking questions stop
+  the topic until you answer; non-blocking ones state the assumption the agent works on
+  meanwhile. Markdown and code blocks are rendered.
+- **Review flow.** Agents submit topics for review; only you approve, reject (with a note),
+  cancel or reopen.
+- **Chat with Claude Code.** One conversation per repository, with streaming output, model
+  choice, context and cost display. "Work on board" sends the agent through the active topics,
+  then the backlog.
+- **One server, many repositories.** A single `longe serve` shows every registered repository:
+  one shared inbox, one board and chat per repository.
+- **Any agent.** A standard MCP server (stdio and Streamable HTTP) plus a REST API with an
+  OpenAPI document. Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline and others.
+- **Wake-up hooks.** Run a command when you answer a question, or feed new answers into the
+  next Claude Code prompt.
+- **Desktop notifications** for new blocking questions and topics ready for review.
+- **Cleanup.** Archive or delete finished topics in one go.
+
+## Requirements
+
+- Node.js 22 or later
+- For the chat: [Claude Code](https://claude.com/claude-code) (`claude`) on your `PATH`
 
 ## Install
 
 ```sh
-npm i -g longe                 # once published
-npm i -g github:lrxw/longe     # straight from GitHub (builds on install)
+npm install -g github:lrxw/longe
 ```
 
-From a clone:
+Or from a clone:
 
 ```sh
 git clone https://github.com/lrxw/longe && cd longe
 pnpm install && pnpm build
-npm link                       # puts `longe` on PATH, pointing at this checkout
+npm link
 ```
 
-## Set up a project
+## Quick start
 
 ```sh
-cd /path/to/project
-longe init                     # creates .ai/{config.yml,topics/,questions/,AGENT-INSTRUCTIONS.md}
-git add .ai && git commit -m "chore: add longe board"
-longe serve -d --open          # UI at http://127.0.0.1:7311 (one server for all your repos)
+cd /path/to/your/project
+longe init                     # creates .ai/ with config, topics/, questions/ and the agent protocol
+longe serve -d --open          # starts the server in the background and opens the board
 ```
 
-Then tell your agent to follow the protocol. Add one line to `CLAUDE.md`, `AGENTS.md`,
-`.cursorrules` or equivalent:
+The board runs at <http://127.0.0.1:7311>. Commit `.ai/` with your code.
+
+Then point your agent at the protocol. Add this line to `CLAUDE.md`, `AGENTS.md`, `.cursorrules`
+or your agent's equivalent:
 
 ```
 Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
@@ -46,20 +82,23 @@ Follow .ai/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
 
 `longe init` is idempotent and never overwrites existing files.
 
-## Connect an agent (MCP)
+## Connect your agent
 
-Two transports. **stdio** spawns `longe mcp` per agent session and needs no server.
-**HTTP** talks to a running `longe serve` at `http://127.0.0.1:7311/r/<name>/mcp` (Streamable HTTP; `/mcp` serves all repos and needs a `repo` argument).
+longe speaks MCP over two transports:
 
-### Claude Code
+- **stdio:** the agent starts `longe mcp` itself. No server needed.
+- **HTTP:** the agent talks to a running `longe serve` at `http://127.0.0.1:7311/r/<name>/mcp`.
+  `<name>` is the repository's name as listed by `longe repos`.
+
+**Claude Code**
 
 ```sh
 claude mcp add longe -- longe mcp --repo .
-# or, while `longe serve` runs (per-repo endpoint, no repo argument needed):
+# or, over HTTP:
 claude mcp add --transport http longe http://127.0.0.1:7311/r/<name>/mcp
 ```
 
-### Codex CLI (`~/.codex/config.toml`)
+**Codex CLI** (`~/.codex/config.toml`)
 
 ```toml
 [mcp_servers.longe]
@@ -67,192 +106,188 @@ command = "longe"
 args = ["mcp", "--repo", "."]
 ```
 
-### Gemini CLI (`.gemini/settings.json` or `~/.gemini/settings.json`)
+**Gemini CLI** (`.gemini/settings.json`)
 
 ```json
 { "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
 ```
 
-HTTP variant: `{ "mcpServers": { "longe": { "httpUrl": "http://127.0.0.1:7311/r/<name>/mcp" } } }`
-
-### Cursor (`.cursor/mcp.json`)
+**Cursor** (`.cursor/mcp.json`) and **Cline**
 
 ```json
 { "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
 ```
 
-HTTP variant: `{ "mcpServers": { "longe": { "url": "http://127.0.0.1:7311/r/<name>/mcp" } } }`
+HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, with the address above.
 
-### Cline (MCP settings)
+The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
-```json
-{ "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."], "disabled": false } } }
-```
+## How it works
 
-The MCP server also exposes the resource `longe://agent-instructions` and a server-level
-instruction string, for clients that read those.
-
-### Tools
-
-Agent-facing (MCP + REST): `list_topics`, `get_topic`, `create_topic`, `set_plan`, `set_status`,
-`add_decision`, `append_log`, `ask_question`, `check_answers`, `acknowledge_answers`,
-`wait_for_answer`, `withdraw_question`.
-
-Human-facing (REST + UI only): `answer_question`, `approve`, `reject`, `cancel`, `reopen`.
-
-## REST
-
-`POST /api/v1/<tool>` with a JSON body, JSON out. `GET` works for `list_topics`, `get_topic`,
-`check_answers` with query params. Errors are `400` (validation), `404` (unknown id),
-`409` (disallowed transition), body `{ "code", "message" }`.
-
-```sh
-curl -s -X POST http://127.0.0.1:7311/api/v1/create_topic \
-  -H 'content-type: application/json' \
-  -d '{"title":"Billing refactor","goal":"Move invoices to Stripe."}'
-
-curl -s 'http://127.0.0.1:7311/api/v1/list_topics?status=active'
-```
-
-`GET /openapi.json` is generated from the same schemas; `GET /api/docs` is a try-it page.
-
-## Files
-
-Agents (and you) may edit `.ai/**` directly. The watcher re-indexes, validation errors show up
-in the UI, and side effects are applied: a blocking question file appearing on an `active`
-topic moves it to `needs-decision`; answering the last open blocking question moves it back.
+Everything lives in the repository's `.ai/` folder:
 
 ```
 .ai/
-  config.yml                 # version, project name, optional hooks
-  topics/<slug>.md           # frontmatter + ## Goal / ## Plan / ## Decisions / ## Log
-  questions/q-YYYYMMDD-xxxx.md
-  AGENT-INSTRUCTIONS.md      # the agent protocol, generated by `longe init`
+  config.yml                     # project name, color, hooks, chat settings
+  AGENT-INSTRUCTIONS.md          # the protocol agents follow (written by longe init)
+  topics/<slug>.md               # one topic: frontmatter + Goal, Plan, Decisions, Log
+  questions/q-YYYYMMDD-xxxx.md   # one question and its answer
+  messages/m-YYYYMMDD-xxxx.md    # messages you sent in the chat
+  archive/                       # archived topics and their questions
 ```
 
-Statuses: `backlog → active → review → done`, plus `needs-decision` (system-set while a blocking
-question is open) and `cancelled`. Agents may pick up (`backlog → active`) and submit
-(`active → review`). Only a human approves, rejects, cancels, or reopens.
+You and your agents may edit these files directly. longe watches them, validates them, shows
+errors in the UI and applies the rules below.
 
-## Waking the agent when you answer
+**Statuses.** `backlog → active → review → done`, plus `needs-decision` and `cancelled`.
 
-The board is pull-based: agents pick answers up with `check_answers` (next session) or
-`wait_for_answer` (same session). Two ways to close the loop automatically:
+| Who | May do |
+|---|---|
+| Agent | pick up (`backlog → active`), submit (`active → review`) |
+| Human | approve, reject with a note, cancel, reopen |
+| longe | `active → needs-decision` while a blocking question is open, and back when it is answered |
 
-### 1. `hooks.on_answer` in `.ai/config.yml` (any agent)
+**Tools.** Agents use `list_topics`, `get_topic`, `create_topic`, `set_plan`, `set_status`,
+`add_decision`, `append_log`, `ask_question`, `check_answers`, `acknowledge_answers`,
+`wait_for_answer` and `withdraw_question`. Humans answer, approve, reject, cancel and reopen
+through the UI or REST.
 
-longe runs a shell command every time a human answers a question (via UI, REST, or by
-editing the file). Runs are serialized per repo; triggers that arrive during a run are
-coalesced into one follow-up run.
+## Using the board
+
+- **Inbox** (`/`): everything waiting on you across repositories, blocking questions first, with
+  an overview of each repository on top.
+- **Board** (`/r/<name>/board`): one per repository. Drag a card to change its status; only the
+  columns you may move it to light up. Done and cancelled topics can be archived or deleted in
+  one go.
+- **Topic page:** goal, plan with progress, decisions, log, questions and the actions for its
+  current status.
+- **Chat** (`/r/<name>/chat`): see below.
+
+Keyboard: `i` inbox, `b` board, `c` chat, `1`–`9` a repository's board, `/` jumps into the
+prompt box, `Esc` leaves it (or goes back from a topic), `⌘↩` / `Ctrl+Enter` sends the form you
+are typing in.
+
+## Chat
+
+Each repository has one conversation with Claude Code. longe keeps a `claude` process running in
+stream-JSON mode and hands it longe's MCP endpoint, so the agent can use the board without any
+setup. You can send messages at any time, also while it works.
+
+- **Continue** resumes the conversation where it stopped. **Work on board** sends the agent
+  through the active topics, then the backlog, until each is in review or waiting on you.
+- When you answer a question, the answer goes into the chat and the agent continues.
+- The process closes after a period without work and resumes the session with the next message.
+  **New session** starts fresh, **Clear history** empties the page, **Copy resume command**
+  continues the same session in a terminal.
+- Messages are stored as files in `.ai/messages/`, so the chat survives restarts.
+- A small prompt box on each topic page sends a message about that topic.
+
+Headless runs cannot answer permission prompts. Edits are allowed by default
+(`--permission-mode acceptEdits`); list everything else the chat may run, such as tests or
+commits, under `agent.allowed_tools`.
+
+## Configuration
+
+`.ai/config.yml`:
 
 ```yaml
+version: 1
+project: "My project"            # display name; default: the folder name
+color: "#2563eb"                 # optional; default: derived from the name
+
 hooks:
-  on_answer: >-
+  on_answer: >-                  # optional; runs when you answer a question
     claude -p --permission-mode acceptEdits
     "Question {question_id} on topic {topic_id} was answered: {answer}.
      Call check_answers, acknowledge_answers, then continue that topic."
+
+agent:                           # the chat
+  command: claude                # default
+  model: sonnet                  # optional; can also be picked in the chat
+  permission_mode: acceptEdits   # default
+  allowed_tools:                 # Claude Code permission rules
+    - "Bash(pnpm test:*)"
+    - "Bash(git commit:*)"
+  idle_minutes: 30               # default; 0 keeps the process open
+  args: []                       # extra arguments, appended as given
 ```
 
-Placeholders `{question_id}` `{topic_id}` `{answer}` `{question}` expand to the matching
-`LONGE_*` environment variables (safe inside double quotes). Output goes to
-`~/.cache/longe/hooks/<project>.log`; the inbox shows running/last status.
+### Waking your agent when you answer
 
-Headless agents need explicit permissions (`--permission-mode acceptEdits`, an allowlist, or
-`--dangerously-skip-permissions`). A hook run works in the same checkout as any interactive
-session you have open — point it at a worktree if that is a problem.
+- **`hooks.on_answer`** runs a shell command for every answer, from the UI, REST or a file edit.
+  The placeholders `{question_id}`, `{topic_id}`, `{answer}` and `{question}` are passed safely
+  as `LONGE_*` environment variables. Runs are serialized per repository; output goes to
+  `~/.cache/longe/hooks/`.
+- **`longe answers`** prints answered questions the agent has not picked up yet, straight from
+  the files. As a Claude Code `UserPromptSubmit` hook, new answers arrive with your next prompt:
 
-Keyboard: `i` inbox, `b` board, `Esc` back from a topic, `⌘↩` / `Ctrl+Enter` sends the answer
-form you are typing in.
+  ```json
+  { "hooks": { "UserPromptSubmit": [ { "hooks": [ { "type": "command", "command": "longe answers" } ] } ] } }
+  ```
 
-### 2. Claude Code prompt hook (inject answers into your next prompt)
-
-`longe answers` prints answered-but-unacknowledged questions straight from the files (no
-server needed) and nothing when there are none. As a `UserPromptSubmit` hook its output becomes
-context for the next turn:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "longe answers" } ] }
-    ]
-  }
-}
-```
-
-Put that in the project's `.claude/settings.json` (or `~/.claude/settings.json`).
-
-## Several projects, one board
-
-`longe serve` runs **one server per machine** on port 7311 and serves every registered repo.
-Every `longe init`, `longe serve` (run inside a project) and `longe mcp` registers its repo in
-`~/.config/longe/repos.yml`; a running server picks registry changes up live.
+## REST API
 
 ```sh
-longe serve -d --open          # start (or just open) — inside a project this lands on its board
-longe repos                    # list | add <dir> [--name n] | remove <dir> | rename <dir> <name> | prune
+curl -s -X POST http://127.0.0.1:7311/r/<name>/api/v1/create_topic \
+  -H 'content-type: application/json' \
+  -d '{"title":"Billing refactor","goal":"Move invoices to Stripe."}'
+
+curl -s 'http://127.0.0.1:7311/r/<name>/api/v1/list_topics?status=active'
 ```
 
-- **`/`**: overview tiles per repo (topics per status, blocking count) above the merged inbox,
-  blocking first, each card tagged with its repo.
-- **Board** and topic pages live under `/r/<name>/…`; a switcher in the header moves between repos.
-- **REST**: `/r/<name>/api/v1/…`, or `/api/v1/…` with a `repo` field. `list_topics` without
-  `repo` aggregates across repos and adds `repo` to each summary.
-- **MCP over HTTP**: `/r/<name>/mcp` is a plain per-repo server; `/mcp` serves all repos and adds a
-  required `repo` argument to every tool plus a `list_repos` tool. `longe mcp` (stdio) stays
-  per repo.
-- Hooks and notifications work per repo, from each repo's own `.ai/config.yml`.
-- A registered path that disappears is shown as unavailable; `longe repos prune` forgets it.
-
-## Background server
-
-```sh
-longe serve -d                 # detached; log in ~/.cache/longe/serve/hub.log
-longe status                   # running? which repos?
-longe stop
-```
-
-`longe serve` is idempotent: if the server is already up it prints the URL (and opens the
-browser with `--open`) instead of failing.
-
-## Notifications
-
-Desktop notification (via `node-notifier`) on a new blocking question and on a topic entering
-`review`. A missing or failing notifier never fails the operation.
+Every tool is available as `POST /api/v1/<tool>` with a JSON body. Errors are `400`
+(validation), `404` (unknown id) and `409` (transition not allowed), each with
+`{ "code", "message" }`. Without the `/r/<name>` prefix, pass `repo` in the body or as `?repo=`;
+`list_topics` without it lists all repositories. The OpenAPI
+document is at `/openapi.json`, a try-it page at `/api/docs`.
 
 ## CLI
 
 ```
-longe init    [--repo <dir>]
-longe serve   [--repo <dir>] [--port 7311] [--open] [--daemon|-d]
+longe init    [--repo <dir>]                         set up .ai/ in a repository
+longe serve   [--repo <dir>] [--port 7311] [--open] [-d]   start the server (one per machine)
+longe status                                         is it running, which repositories
+longe stop                                           stop the background server
 longe repos   [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
-longe status
-longe stop
-longe mcp     [--repo <dir>]
-longe answers [--repo <dir>] [--json]
+longe mcp     [--repo <dir>]                         MCP server over stdio
+longe answers [--repo <dir>] [--json]                answers not yet picked up
 ```
+
+Repositories register themselves when you run `longe init`, `longe serve` or `longe mcp` in
+them. The list lives in `~/.config/longe/repos.yml`, and a running server follows it live.
+
+## Security
+
+longe is a single-user tool for your own machine. It listens on `127.0.0.1` only and has no
+authentication, so do not expose its port. It sends nothing anywhere; notifications are local.
 
 ## Development
 
 ```sh
 pnpm install
-pnpm test          # vitest (unit + integration incl. MCP over stdio and HTTP)
+pnpm dev serve --repo /path/to/project --open
+pnpm test          # vitest: unit and integration, MCP over stdio and HTTP included
 pnpm typecheck
 pnpm lint          # biome
-pnpm dev serve --repo /path/to/project --open
 ```
 
-Layout: `src/store` (files, atomic writes, ids), `src/domain` (transitions, validation, side
-effects — pure), `src/index` (chokidar watcher, in-memory index, effect runner), `src/tools`
-(the single registry MCP and REST adapt), `src/mcp`, `src/http` (Hono + JSX + htmx), `src/app`
-(context, hooks), `src/cli`.
+The server is TypeScript on Node with [Hono](https://hono.dev). Pages are rendered on the server
+with JSX and updated live over server-sent events with [htmx](https://htmx.org) and
+[idiomorph](https://github.com/bigskysoftware/idiomorph); there is no client build step. The
+full design is in [SPEC.md](./SPEC.md).
 
-## Not in v1
+## Roadmap
 
-Auth, multi-user, multiple repos in one view, worktree tagging, drag-and-drop, a database,
-editing topic text in the UI, cloud sync, telemetry, remote binding. See SPEC.md §12 for the
-design hooks left in place.
+Planned or under consideration:
+
+- A release on the npm registry (`npm install -g longe`)
+- Editing topic text directly in the UI
+- Search and an archive view
+- Chat with other coding agents besides Claude Code
+- Awareness of git worktrees, so parallel agents keep their work apart
+
+Ideas and bug reports are welcome in the [issues](https://github.com/lrxw/longe/issues).
 
 ## License
 
-MIT
+[MIT](./LICENSE)
