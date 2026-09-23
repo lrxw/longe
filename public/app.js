@@ -539,6 +539,7 @@
   var overInbox = false;
   var heldSince = 0;
   var retry = null;
+  var forceNext = false;
   document.addEventListener("pointermove", (e) => {
     lastMove = Date.now();
     overInbox = !!e.target?.closest?.("#inbox");
@@ -551,7 +552,8 @@
   document.body.addEventListener("htmx:beforeRequest", (e) => {
     var el = e.detail?.elt;
     if (el?.id !== "inbox" || e.detail.requestConfig?.verb !== "get") return;
-    if (!usingInbox()) {
+    if (forceNext || !usingInbox()) {
+      forceNext = false;
       heldSince = 0;
       return;
     }
@@ -561,11 +563,37 @@
       return; // held long enough: refresh anyway
     }
     e.preventDefault();
+    showHeld(el);
     if (!retry)
       retry = setTimeout(() => {
         retry = null;
         htmx.trigger(el, "sse:changed");
       }, 700);
+  });
+  // While a refresh is held, a small pill says so. It floats (no layout shift) and a
+  // click on it shows the new state right away.
+  var pill = null;
+  function showHeld(inbox) {
+    if (pill) return;
+    pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "held-pill";
+    pill.textContent = "↑ New in the inbox, click to show";
+    pill.addEventListener("click", () => {
+      hideHeld();
+      heldSince = 0;
+      forceNext = true; // this refresh goes through, even while typing
+      htmx.trigger(inbox, "sse:changed");
+    });
+    document.body.appendChild(pill);
+  }
+  function hideHeld() {
+    if (pill) pill.remove();
+    pill = null;
+  }
+  document.body.addEventListener("htmx:afterSwap", (e) => {
+    if (e.detail?.target?.id === "inbox" || document.getElementById("inbox") === e.detail?.target)
+      hideHeld();
   });
   document.body.addEventListener("htmx:afterSwap", (e) => {
     var el = e.detail?.target;
