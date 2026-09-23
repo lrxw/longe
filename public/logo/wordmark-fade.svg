@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 64" role="img" aria-label="longe">
+  <!--
+    Candidate wordmark (not in use yet; see preview.html). Between the dashed and the
+    solid "o": the ring is the runner's trail. Right behind the runner it is solid;
+    going back around the circle it fades out in 12 steps of 30°, as if the runner
+    were circling (the longe). SVG has no conic gradient, hence the segments.
+  -->
+  <style>
+    .ink { stroke: #1c1f24; }
+    .accent { stroke: #2563eb; fill: #2563eb; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e5e7eb; }
+      .accent { stroke: #60a5fa; fill: #60a5fa; }
+    }
+  </style>
+  <g class="ink" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- l -->
+    <path d="M6 8 V48"/>
+    <!-- n -->
+    <path d="M52 48 V24 M52 34 A10 10 0 0 1 72 34 V48"/>
+    <!-- g -->
+    <circle cx="96" cy="36" r="12"/>
+    <path d="M108 24 V50 A10 10 0 0 1 98 60 H91"/>
+    <!-- e -->
+    <path d="M120 36 H144 A12 12 0 1 0 140.49 44.49"/>
+  </g>
+  <!-- o: runner at the upper right (-45°); the trail runs back counter-clockwise -->
+  <g class="accent" transform="translate(5.96 12.96) scale(0.72)">
+    <g fill="none" stroke-width="6.5">
+      <path d="M45.435 18.565 A19 19 0 0 0 36.918 13.648" stroke-opacity="1"/>
+      <path d="M36.918 13.648 A19 19 0 0 0 27.082 13.648" stroke-opacity=".9"/>
+      <path d="M27.082 13.648 A19 19 0 0 0 18.565 18.565" stroke-opacity=".8"/>
+      <path d="M18.565 18.565 A19 19 0 0 0 13.648 27.082" stroke-opacity=".7"/>
+      <path d="M13.648 27.082 A19 19 0 0 0 13.648 36.918" stroke-opacity=".6"/>
+      <path d="M13.648 36.918 A19 19 0 0 0 18.565 45.435" stroke-opacity=".52"/>
+      <path d="M18.565 45.435 A19 19 0 0 0 27.082 50.352" stroke-opacity=".44"/>
+      <path d="M27.082 50.352 A19 19 0 0 0 36.918 50.352" stroke-opacity=".37"/>
+      <path d="M36.918 50.352 A19 19 0 0 0 45.435 45.435" stroke-opacity=".3"/>
+      <path d="M45.435 45.435 A19 19 0 0 0 50.352 36.918" stroke-opacity=".24"/>
+      <path d="M50.352 36.918 A19 19 0 0 0 50.352 27.082" stroke-opacity=".18"/>
+      <path d="M50.352 27.082 A19 19 0 0 0 45.435 18.565" stroke-opacity=".13"/>
+    </g>
+    <path d="M32 32 L45.435 18.565" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="4.5" stroke="none"/>
+    <circle cx="45.435" cy="18.565" r="7" stroke="none"/>
+  </g>
+</svg>
