@@ -17,6 +17,15 @@ dependencies:
   hono:
     specifier: ^4.13.8
     version: 4.13.8
+  htmx-ext-sse:
+    specifier: ^2.2.4
+    version: 2.2.4
+  htmx.org:
+    specifier: 2.0.4
+    version: 2.0.4
+  idiomorph:
+    specifier: ^0.8.0
+    version: 0.8.0
   markdown-it:
     specifier: ^15.0.2
     version: 15.0.2
@@ -1235,6 +1244,16 @@ packages:
     engines: {node: '>=16.9.0'}
     dev: false
 
+  /htmx-ext-sse@2.2.4:
+    resolution: {integrity: sha512-LJmxVhykyflBWgh5PvbRidcyuqMHlgfajmmzumvKctv9puvsufeH6OaejSMZTNTnEI8O2wXXn4ZZtBdpEMqmEQ==}
+    dependencies:
+      htmx.org: 2.0.4
+    dev: false
+
+  /htmx.org@2.0.4:
+    resolution: {integrity: sha512-HLxMCdfXDOJirs3vBZl/ZLoY+c7PfM4Ahr2Ad4YXh6d22T5ltbTXFFkpx9Tgb2vvmWFMbIc3LqN2ToNkZJvyYQ==}
+    dev: false
+
   /http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
@@ -1251,6 +1270,10 @@ packages:
     engines: {node: '>=0.10.0'}
     dependencies:
       safer-buffer: 2.1.2
+    dev: false
+
+  /idiomorph@0.8.0:
+    resolution: {integrity: sha512-R47JBL+6jHDQvcnbppIUtXXcxi5h6+wuCEEZXnRhUltsgzPFKzThL5PuHppP9ypJuy+7WawcY1TsSBD/iQbMhw==}
     dev: false
 
   /inherits@2.0.4:

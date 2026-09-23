@@ -1,9 +1,9 @@
-import { readdir, readFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { DomainError } from "../domain/errors.js";
 import { atomicCreate, modifyFile } from "./atomic.js";
 import { uniqueQuestionId, uniqueSlug } from "./ids.js";
-import { questionPath, questionsDir, stemOf, topicPath, topicsDir } from "./paths.js";
+import { archiveDir, questionPath, questionsDir, stemOf, topicPath, topicsDir } from "./paths.js";
 import {
   type NewQuestionInput,
   newQuestionText,
@@ -74,6 +74,32 @@ export class Repo {
       return serializeQuestion(q);
     });
     return result as Question;
+  }
+
+  /**
+   * Moves a topic or question file into `.ai/archive/<kind>/`. An id archived before
+   * (a slug can be reused once its topic is gone) gets a `-2`, `-3`, … suffix.
+   * Returns the archive path.
+   */
+  async archive(kind: "topic" | "question", id: string): Promise<string> {
+    const from = kind === "topic" ? topicPath(this.root, id) : questionPath(this.root, id);
+    const dir = archiveDir(this.root, kind === "topic" ? "topics" : "questions");
+    await mkdir(dir, { recursive: true });
+    for (let n = 1; ; n++) {
+      const to = path.join(dir, n === 1 ? `${id}.md` : `${id}-${n}.md`);
+      const taken = await access(to).then(
+        () => true,
+        () => false,
+      );
+      if (taken) continue;
+      await rename(from, to);
+      return to;
+    }
+  }
+
+  /** Deletes a topic or question file for good. */
+  async remove(kind: "topic" | "question", id: string): Promise<void> {
+    await unlink(kind === "topic" ? topicPath(this.root, id) : questionPath(this.root, id));
   }
 
   /** Creates a topic file; picks a collision-free slug from `baseSlug`. Returns the id. */

@@ -101,17 +101,59 @@ describe("hub mode", () => {
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get("location")).toBe("/r/shop/board");
 
-    const board = await (await app.request("/r/shop/board")).text();
+    const boardRes = await app.request("/r/shop/board");
+    const board = await boardRes.text();
     expect(board).toContain("Shop topic");
     expect(board).not.toContain("Blog topic");
     expect(board).toContain('href="/r/shop/topics/t1"');
+    // header on every page: Inbox, then one avatar per repo (its board link); the current one lit
+    expect(board).toContain('class="repos"');
+    expect(board).toMatch(
+      /<a href="\/r\/shop\/board" class="on ".*?<span class="avatar">SH<\/span>/s,
+    );
+    expect(board).toContain('data-n="2"');
+    // the strip is a live fragment: counts refresh on SSE, the current repo stays lit
+    expect(board).toContain('id="repos" class="repos"');
+    const strip = await (await app.request("/fragments/repos?current=shop")).text();
+    expect(strip).toContain('hx-get="/fragments/repos?current=shop" hx-trigger="sse:changed"');
+    expect(strip).toMatch(/<a href="\/r\/shop\/board" class="on "/);
+    expect(strip).toMatch(
+      /<a href="\/r\/blog\/board" class=" "[^>]*>.*?<span class="count">1<\/span>/s,
+    );
+    expect(inbox).toContain('href="/r/blog/board"');
+    expect(inbox).not.toContain('class="tabs"');
 
-    const topic = await (await app.request("/r/blog/topics/t1")).text();
-    expect(topic).toContain("Blog topic");
-    expect(topic).toContain('hx-post="/r/blog/topics/t1/status"');
-    expect((await app.request("/r/nope/board")).status).toBe(404);
-    expect((await app.request("/r/gone/board")).status).toBe(503);
-    expect((await app.request("/topics/t1")).status).toBe(404); // unscoped pages only in single mode
+    // the board you visited last is remembered; /board follows it
+    const cookie = boardRes.headers.get("set-cookie") ?? "";
+    expect(cookie).toMatch(/^longe_repo=shop/);
+    const blogRes = await app.request("/r/blog/board");
+    const blogCookie = (blogRes.headers.get("set-cookie") ?? "").split(";")[0];
+    const followed = await app.request("/board", { headers: { cookie: blogCookie } });
+    expect(followed.headers.get("location")).toBe("/r/blog/board");
+    const stale = await app.request("/board", { headers: { cookie: "longe_repo=nope" } });
+    expect(stale.headers.get("location")).toBe("/r/shop/board");
+    // the "c" key on the inbox goes to /chat: the same redirect, to that repo's chat
+    const chat = await app.request("/chat", { headers: { cookie: blogCookie } });
+    expect(chat.status).toBe(302);
+    expect(chat.headers.get("location")).toBe("/r/blog/chat");
+
+    // the inbox is global; cards carry the repo's avatar and color
+    expect(inbox).toMatch(
+      /<a class="repo" href="\/r\/blog\/board" style="--repo:hsl\(\d+ 55% 46%\)">/,
+    );
+    expect(inbox).toContain('title="Blog">BL</span>');
+    expect((await app.request("/r/shop/inbox")).status).toBe(404);
+
+    // a topic page keeps the repo prefix: live refresh and the Reject form
+    const t1 = path.join(shop, ".ai/topics/t1.md");
+    await writeFile(t1, (await readFile(t1, "utf8")).replace("status: active", "status: review"));
+    let topicPage = "";
+    for (let i = 0; i < 80 && !topicPage.includes('class="reject"'); i++) {
+      await new Promise((r) => setTimeout(r, 25));
+      topicPage = await (await app.request("/r/shop/topics/t1")).text();
+    }
+    expect(topicPage).toContain('hx-get="/r/shop/fragments/topics/t1"');
+    expect(topicPage).toMatch(/<form hx-post="\/r\/shop\/topics\/t1\/status"[^>]*class="reject"/);
   });
 
   it("REST: repo param, prefixed routes, aggregated list_topics", async () => {

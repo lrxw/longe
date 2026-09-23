@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 64" role="img" aria-label="longe">
+  <!--
+    Wordmark. The letters are stroke paths on one grid (stroke 6, x-height 24..48,
+    6 units between neighbouring letters, 4 next to the lighter "o"). The "o" is the
+    logo from mark.svg: the longe ring, with the line from the center to the runner.
+  -->
+  <style>
+    .ink { stroke: #1c1f24; }
+    .accent { stroke: #2563eb; fill: #2563eb; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e5e7eb; }
+      .accent { stroke: #60a5fa; fill: #60a5fa; }
+    }
+  </style>
+  <g class="ink" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- l -->
+    <path d="M6 8 V48"/>
+    <!-- n -->
+    <path d="M52 48 V24 M52 34 A10 10 0 0 1 72 34 V48"/>
+    <!-- g -->
+    <circle cx="96" cy="36" r="12"/>
+    <path d="M108 24 V50 A10 10 0 0 1 98 60 H91"/>
+    <!-- e -->
+    <path d="M120 36 H144 A12 12 0 1 0 140.49 44.49"/>
+  </g>
+  <!-- o: the logo glyph (same drawing as mark.svg), centered at 29,36 -->
+  <g class="accent" transform="translate(5.96 12.96) scale(0.72)">
+    <circle cx="32" cy="32" r="20" fill="none" stroke-opacity=".3" stroke-width="4" stroke-dasharray="3.5 4.5"/>
+    <path d="M15.62 20.53 A20 20 0 0 1 46.14 17.86" fill="none" stroke-width="4" stroke-linecap="round"/>
+    <path d="M32 32 L46.14 17.86" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="5" stroke="none"/>
+    <circle cx="46.14" cy="17.86" r="7" stroke="none"/>
+  </g>
+</svg>

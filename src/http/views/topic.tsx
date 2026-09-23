@@ -45,7 +45,7 @@ export function StatusActions({
         ))}
       {reject ? (
         <form
-          hx-post={`/topics/${t.id}/status`}
+          hx-post={`${base}/topics/${t.id}/status`}
           hx-target="#actions"
           hx-swap="outerHTML"
           class="reject"
@@ -75,7 +75,7 @@ function QuestionGroup({
 }) {
   if (questions.length === 0) return null;
   return (
-    <details open={status === "open"}>
+    <details data-key={`questions:${status}`} open={status === "open"}>
       <summary>
         {status} <span class="count">{questions.length}</span>
       </summary>
@@ -115,9 +115,10 @@ export function TopicFragment({
   return (
     <div
       id="topic"
-      hx-get={`/fragments/topics/${t.id}`}
+      hx-get={`${base}/fragments/topics/${t.id}`}
       hx-trigger="sse:changed"
-      hx-swap="outerHTML"
+      hx-sync="this:replace"
+      hx-swap="morph"
     >
       <header class="topic-head">
         <a class="back" href={`${base}/board`}>

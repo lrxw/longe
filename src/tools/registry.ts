@@ -205,10 +205,13 @@ export const AGENT_TOOLS: ToolDef[] = [
     name: "ask_question",
     surface: "agent",
     description:
-      "Ask the human a question. RULE: if a reasonable default exists, set blocking=false, state your `assumption`, and keep working on that assumption (assumption is REQUIRED when blocking is false). If you cannot proceed without the answer, set blocking=true, append_log that you stopped, and stop working on that topic — a blocking question moves the topic to needs-decision. Offer 2–4 `options` when you can so the human can answer with one click.",
+      "Ask the human a question. RULE: if a reasonable default exists, set blocking=false, state your `assumption`, and keep working on that assumption (assumption is REQUIRED when blocking is false). If you cannot proceed without the answer, set blocking=true, append_log that you stopped, and stop working on that topic — a blocking question moves the topic to needs-decision. Offer 2–4 `options` when you can so the human can answer with one click. `question` and `context` are markdown: show code in ``` fences with a language (```ts), it renders as a code block in the inbox; options are plain text.",
     input: z.object({
-      question: z.string().trim().min(1),
-      context: z.string().optional().describe("Why it matters / what depends on it"),
+      question: z.string().trim().min(1).describe("Markdown; code in ``` fences"),
+      context: z
+        .string()
+        .optional()
+        .describe("Why it matters / what depends on it. Markdown; code in ``` fences"),
       topic: topicId.optional().describe("Omit for project-wide questions"),
       options: z.array(z.string().trim().min(1)).min(2).max(4).optional(),
       assumption: z.string().trim().min(1).optional().describe("Required when blocking=false"),

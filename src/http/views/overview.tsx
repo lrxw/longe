@@ -1,5 +1,5 @@
 import { TOPIC_STATUSES } from "../../domain/types.js";
-import type { RepoNav } from "./layout.js";
+import { Avatar, type RepoNav } from "./layout.js";
 
 export interface RepoOverview {
   nav: RepoNav;
@@ -25,8 +25,12 @@ export function OverviewStrip({ repos }: { repos: RepoOverview[] }) {
           class={`tile ${r.nav.missing ? "missing" : ""}`}
           href={r.nav.missing ? "/" : `${r.nav.base}/board`}
           title={r.nav.missing ?? r.nav.name}
+          style={`--repo:${r.nav.color}`}
         >
-          <strong>{r.nav.title}</strong>
+          <strong>
+            <Avatar repo={r.nav} />
+            {r.nav.title}
+          </strong>
           {r.nav.missing ? (
             <span class="meta">unavailable</span>
           ) : (

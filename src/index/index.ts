@@ -58,6 +58,9 @@ export interface IndexEvents {
   ready: [];
 }
 
+/** Past chokidar's 50ms `change` throttle, with room for the write to finish. */
+const RECHECK_MS = 100;
+
 export interface IndexOptions {
   debounceMs?: number;
   /** Set for tests; chokidar polling is more deterministic on some filesystems. */
@@ -76,6 +79,9 @@ export class AiIndex extends EventEmitter<IndexEvents> {
   private watcher: FSWatcher | undefined;
   private pending = new Set<string>();
   private timer: NodeJS.Timeout | undefined;
+  private readonly rechecks = new Map<string, NodeJS.Timeout>();
+  /** Text each indexed file had when read, so a re-read of the same text changes nothing. */
+  private readonly texts = new Map<string, string>();
   private flushing: Promise<void> = Promise.resolve();
   private readonly debounceMs: number;
   private readonly usePolling: boolean;
@@ -103,7 +109,11 @@ export class AiIndex extends EventEmitter<IndexEvents> {
       ignored: (p, stats) => !!stats?.isFile() && !p.endsWith(".md"),
     });
     const onFs = (file: string) => this.schedule(file);
-    this.watcher.on("add", onFs).on("change", onFs).on("unlink", onFs);
+    const onChange = (file: string) => {
+      this.schedule(file);
+      this.recheck(file);
+    };
+    this.watcher.on("add", onFs).on("change", onChange).on("unlink", onFs);
     await new Promise<void>((resolve, reject) => {
       this.watcher?.once("ready", () => resolve());
       this.watcher?.once("error", reject);
@@ -114,6 +124,8 @@ export class AiIndex extends EventEmitter<IndexEvents> {
 
   async stop(): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
+    for (const t of this.rechecks.values()) clearTimeout(t);
+    this.rechecks.clear();
     await this.watcher?.close();
     this.watcher = undefined;
   }
@@ -135,6 +147,22 @@ export class AiIndex extends EventEmitter<IndexEvents> {
       this.timer = undefined;
       void this.flush();
     }, this.debounceMs);
+  }
+
+  /**
+   * chokidar drops a second `change` of the same file within 50ms (a leading-edge
+   * throttle with no trailing event), so two quick writes would leave the index on
+   * the first. Read the file once more after that window; unchanged text is a no-op.
+   */
+  private recheck(file: string): void {
+    const had = this.rechecks.get(file);
+    if (had) clearTimeout(had);
+    const t = setTimeout(() => {
+      this.rechecks.delete(file);
+      this.schedule(file);
+    }, RECHECK_MS);
+    t.unref();
+    this.rechecks.set(file, t);
   }
 
   private flush(): Promise<void> {
@@ -194,6 +222,8 @@ export class AiIndex extends EventEmitter<IndexEvents> {
   private async reindexTopic(id: string, file: string): Promise<TopicChange | undefined> {
     const previous = this.topics.get(id);
     const text = await this.readOrNull(file);
+    if (previous && text !== null && this.texts.get(file) === text) return undefined;
+    this.texts.delete(file);
     if (text === null) {
       this.setError(file, undefined);
       if (!previous) return undefined;
@@ -202,6 +232,7 @@ export class AiIndex extends EventEmitter<IndexEvents> {
     }
     try {
       const t = parseTopic(text, { expectedId: id, file: path.relative(this.root, file) });
+      this.texts.set(file, text);
       const current: IndexedTopic = {
         kind: "topic",
         id,
@@ -223,6 +254,8 @@ export class AiIndex extends EventEmitter<IndexEvents> {
   private async reindexQuestion(id: string, file: string): Promise<QuestionChange | undefined> {
     const previous = this.questions.get(id);
     const text = await this.readOrNull(file);
+    if (previous && text !== null && this.texts.get(file) === text) return undefined;
+    this.texts.delete(file);
     if (text === null) {
       this.setError(file, undefined);
       if (!previous) return undefined;
@@ -231,6 +264,7 @@ export class AiIndex extends EventEmitter<IndexEvents> {
     }
     try {
       const q = parseQuestion(text, { expectedId: id, file: path.relative(this.root, file) });
+      this.texts.set(file, text);
       const current: IndexedQuestion = {
         kind: "question",
         id,

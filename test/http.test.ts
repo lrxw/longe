@@ -17,10 +17,11 @@ const now = new Date();
 const topicFile = (id: string) => path.join(dir, ".ai/topics", `${id}.md`);
 const questionFile = (id: string) => path.join(dir, ".ai/questions", `${id}.md`);
 
-async function waitFor(fn: () => boolean, ms = 10000): Promise<void> {
+// below vitest's 5s test timeout, so a hang names the condition instead of the whole test
+async function waitFor(fn: () => boolean, ms = 4000): Promise<void> {
   const start = Date.now();
   while (!fn()) {
-    if (Date.now() - start > ms) throw new Error("timeout");
+    if (Date.now() - start > ms) throw new Error(`timeout waiting for ${fn}`);
     await new Promise((r) => setTimeout(r, 25));
   }
 }
@@ -84,12 +85,45 @@ describe("pages", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("<title>(1) Inbox · longe</title>");
+    // menu badges: Inbox counts questions, Board counts topics; both refresh over SSE
+    // data-blocking keeps the tab title's "(1)" current after a refresh (app.js)
+    expect(html).toContain('id="inbox-badge" class="state-badge attn" data-blocking="1"');
+    expect(html).toContain("<i></i>1 blocking</span>");
+    expect(html).toContain('hx-get="/fragments/inbox-badge" hx-trigger="sse:changed"');
+    // the blocking question moves the topic to needs-decision as a side effect; timing varies
+    expect(html).toMatch(
+      /id="board-badge" class="state-badge (quiet|attn)"[^>]*><i><\/i>1 (active|to decide)<\/span>/,
+    );
+    expect(html).toContain('hx-get="/fragments/board-badge" hx-trigger="sse:changed"');
     expect(html.indexOf("Webhooks or polling?")).toBeLessThan(html.indexOf("Tabs or spaces?"));
     expect(html).toContain('<details class="nonblocking"');
     expect(html).toContain("Assumption: <em>spaces</em>");
     expect(html).toContain('href="/topics/billing"');
     expect(html).toContain('name="option_index" value="1"');
     expect(html).not.toContain("Withdraw");
+  });
+
+  it("inbox renders fenced code as a code block and opens a context that holds code", async () => {
+    await writeFile(
+      questionFile("q-20260922-c0de"),
+      newQuestionText({
+        id: "q-20260922-c0de",
+        question: "Keep this guard?\n\n```ts\nif (x < 1) return;\n```",
+        context: "Current version:\n\n```ts\nconst a = 1;\n```",
+        blocking: true,
+        asked_by: "claude-code",
+        now,
+      }),
+    );
+    await waitFor(() => ctx.index.questions.has("q-20260922-c0de"));
+    const html = await (await app.request("/")).text();
+    expect(html).toContain('<pre><code class="language-ts">if (x &lt; 1) return;\n</code></pre>');
+    expect(html).toContain('<code class="language-ts">const a = 1;');
+    expect(html).toMatch(
+      /<details data-key="context:q-20260922-c0de" open="">\s*<summary>Context<\/summary>/,
+    );
+    // a context without code stays collapsed
+    expect(html).toMatch(/<details data-key="context:q-20260922-bl0k">\s*<summary>Context/);
   });
 
   it("inbox empty state", async () => {
@@ -99,16 +133,55 @@ describe("pages", () => {
     const html = await (await app.request("/")).text();
     expect(html).toContain("Nothing is waiting on you.");
     expect(html).toContain("<title>Inbox · longe</title>");
+    expect(html).toContain('id="inbox-badge" class="state-badge quiet" data-blocking="0"');
+    expect(html).toContain("<i></i>empty</span>");
+  });
+
+  it("menu badges follow the questions and topics", async () => {
+    // the blocking question moves billing to needs-decision on startup; let that write land
+    // first, or it can overwrite the status this test writes below and the wait times out
+    await waitFor(() => ctx.index.topics.get("billing")?.fm.status === "needs-decision");
+    await rm(questionFile("q-20260922-bl0k"));
+    await waitFor(() => ctx.index.blockingCount() === 0);
+    const inbox = await (await app.request("/fragments/inbox-badge")).text();
+    expect(inbox).toContain('class="state-badge busy"');
+    expect(inbox).toContain("<i></i>1 open</span>");
+
+    const moveTo = async (status: string) => {
+      const text = await readFile(topicFile("billing"), "utf8");
+      await writeFile(topicFile("billing"), text.replace(/^status: .*$/m, `status: ${status}`));
+      await waitFor(() => ctx.index.topics.get("billing")?.fm.status === status);
+    };
+    await moveTo("review");
+    const review = await (await app.request("/fragments/board-badge")).text();
+    expect(review).toContain('class="state-badge busy"');
+    expect(review).toContain("<i></i>1 to review</span>");
+    await moveTo("needs-decision");
+    const decide = await (await app.request("/fragments/board-badge")).text();
+    expect(decide).toContain('class="state-badge attn"');
+    expect(decide).toContain("<i></i>1 to decide</span>");
   });
 
   it("board has one column per status with the topic in active", async () => {
-    const html = await (await app.request("/board")).text();
+    const res = await app.request("/board");
+    // never a stale copy on back/forward navigation
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const html = await res.text();
     for (const s of ["backlog", "active", "needs-decision", "review", "done", "cancelled"]) {
       expect(html).toContain(`class="column ${s}"`);
     }
     expect(html).toContain("Billing refactor");
     expect(html).toContain("1 open");
-    expect(html.match(/<details>/g)?.length).toBe(2); // done + cancelled collapsed
+    // cards are draggable; the card says which columns a human may drop it on (§4)
+    expect(html).toContain('draggable="true" data-id="billing" data-status="');
+    expect(html).toMatch(/data-status="(active|needs-decision)" data-targets="[a-z,-]+"/);
+    expect(html).toContain('class="column active" data-status="active"');
+    // ids let morph refreshes match cards and columns by identity, not position
+    expect(html).toContain('<a id="card-billing" class="card topic"');
+    expect(html).toContain('<section id="col-active" class="column active"');
+    // done + cancelled collapsed; the key lets the browser remember a column you opened
+    expect(html).toContain('<details data-key="column:done">');
+    expect(html).toContain('<details data-key="column:cancelled">');
   });
 
   it("topic page renders sections, questions and human-only actions", async () => {
@@ -125,11 +198,24 @@ describe("pages", () => {
 
   it("404 for unknown topic; static assets served; raw html not rendered", async () => {
     expect((await app.request("/topics/nope")).status).toBe(404);
-    expect((await app.request("/public/vendor/htmx.min.js")).status).toBe(200);
+    // browser libraries come from node_modules; only the listed files are served
+    for (const name of ["htmx.min.js", "sse.js", "idiomorph-ext.min.js"]) {
+      const lib = await app.request(`/vendor/${name}`);
+      expect(lib.status).toBe(200);
+      expect(lib.headers.get("content-type")).toContain("text/javascript");
+    }
+    expect((await app.request("/vendor/package.json")).status).toBe(404);
     expect((await app.request("/public/style.css")).headers.get("content-type")).toContain(
       "text/css",
     );
     expect((await app.request("/public/../package.json")).status).not.toBe(200);
+    // the logo: favicon linked from every page, SVGs served as images
+    const icon = await app.request("/public/logo/favicon.svg");
+    expect(icon.status).toBe(200);
+    expect(icon.headers.get("content-type")).toContain("image/svg+xml");
+    const page = await (await app.request("/")).text();
+    expect(page).toContain('<link rel="icon" type="image/svg+xml" href="/public/logo/favicon.svg"');
+    expect(page).toContain('<img src="/public/logo/wordmark.svg" alt="longe"');
     await writeFile(
       topicFile("evil"),
       newTopicText({ id: "evil", title: "Evil", goal: "<script>alert(1)</script> **bold**", now }),
@@ -173,6 +259,70 @@ describe("actions", () => {
     // answering again is a conflict
     const again = await app.request("/questions/q-20260922-bl0k/answer", form({ answer: "x" }));
     expect(again.status).toBe(409);
+  });
+
+  it("board cleanup archives or deletes done and cancelled topics with their questions", async () => {
+    const finish = async (id: string, status: string) => {
+      await writeFile(
+        topicFile(id),
+        newTopicText({ id, title: id, goal: "g", now }).replace(
+          "status: backlog",
+          `status: ${status}`,
+        ),
+      );
+      await waitFor(() => ctx.index.topics.get(id)?.fm.status === status);
+    };
+    await finish("shipped", "done");
+    await finish("dropped", "cancelled");
+    await writeFile(
+      questionFile("q-20260922-dn0q"),
+      newQuestionText({
+        id: "q-20260922-dn0q",
+        question: "Which one?",
+        topic: "shipped",
+        blocking: false,
+        assumption: "a",
+        asked_by: "claude-code",
+        now,
+      }),
+    );
+    await waitFor(() => ctx.index.questions.has("q-20260922-dn0q"));
+    const board = await (await app.request("/board")).text();
+    expect(board).toContain("2 done and cancelled topics");
+    expect(board).toContain('hx-vals="{&quot;mode&quot;:&quot;archive&quot;}"');
+    expect(board).toContain('hx-vals="{&quot;mode&quot;:&quot;delete&quot;}"');
+
+    expect((await app.request("/board/cleanup", form({ mode: "nope" }))).status).toBe(400);
+
+    // archive: the files move to .ai/archive/, the topic in progress stays
+    const res = await app.request("/board/cleanup", form({ mode: "archive" }));
+    expect(res.status).toBe(200);
+    const after = await res.text();
+    expect(after).not.toContain("done and cancelled");
+    expect(ctx.index.topics.has("shipped")).toBe(false);
+    expect(ctx.index.topics.has("dropped")).toBe(false);
+    expect(ctx.index.questions.has("q-20260922-dn0q")).toBe(false);
+    expect(ctx.index.topics.has("billing")).toBe(true);
+    const archive = path.join(dir, ".ai/archive");
+    expect(await readFile(path.join(archive, "topics/shipped.md"), "utf8")).toContain(
+      "status: done",
+    );
+    expect(await readFile(path.join(archive, "questions/q-20260922-dn0q.md"), "utf8")).toContain(
+      "Which one?",
+    );
+    // the same id archived again gets a suffix instead of overwriting
+    await finish("shipped", "done");
+    await app.request("/board/cleanup", form({ mode: "archive" }));
+    expect(await readFile(path.join(archive, "topics/shipped-2.md"), "utf8")).toContain(
+      "status: done",
+    );
+
+    // delete: the file is gone, nothing lands in the archive
+    await finish("gone", "cancelled");
+    expect((await app.request("/board/cleanup", form({ mode: "delete" }))).status).toBe(200);
+    expect(ctx.index.topics.has("gone")).toBe(false);
+    await expect(readFile(topicFile("gone"), "utf8")).rejects.toThrow();
+    await expect(readFile(path.join(archive, "topics/gone.md"), "utf8")).rejects.toThrow();
   });
 
   it("answer validation: empty and bad option", async () => {
@@ -236,5 +386,35 @@ describe("actions", () => {
     const first = new TextDecoder().decode((await reader?.read())?.value);
     expect(first).toContain("event: hello");
     await reader?.cancel();
+  });
+
+  it("SSE sends a burst of changes as fewer 'changed' events", async () => {
+    const res = await app.request("/events");
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("no body");
+    let text = "";
+    const decoder = new TextDecoder();
+    const pump = (async () => {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) return;
+        text += decoder.decode(value);
+      }
+    })().catch(() => {});
+    const count = (re: RegExp) => (text.match(re) ?? []).length;
+    for (let i = 0; i < 5; i++)
+      await writeFile(
+        topicFile(`burst-${i}`),
+        newTopicText({ id: `burst-${i}`, title: "b", goal: "g", now }),
+      );
+    await waitFor(() => count(/event: topic-changed\ndata: [^\n]*"burst-/g) === 5);
+    await new Promise((r) => setTimeout(r, 300)); // let the last window close
+    await reader.cancel();
+    await pump;
+    // every change still gets its own kind event (billing's startup move may add one)
+    const perTopic = count(/event: topic-changed/g);
+    const changed = count(/event: changed/g);
+    expect(changed).toBeGreaterThanOrEqual(1);
+    expect(changed).toBeLessThan(perTopic);
   });
 });

@@ -12,6 +12,12 @@ export function toLocalIso(d: Date): string {
   );
 }
 
+/** Like `toLocalIso` with milliseconds, for things that must sort within a second (chat messages). */
+export function toLocalIsoMs(d: Date): string {
+  const base = toLocalIso(d);
+  return `${base.slice(0, 19)}.${pad(d.getMilliseconds(), 3)}${base.slice(19)}`;
+}
+
 export function nowIso(): string {
   return toLocalIso(new Date());
 }

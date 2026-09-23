@@ -35,6 +35,34 @@ afterEach(async () => {
 });
 
 describe("AiIndex", () => {
+  it("a second write within chokidar's 50ms change throttle is not lost", async () => {
+    await writeFile(topicFile("quick"), newTopicText({ id: "quick", title: "Q", goal: "g", now }));
+    index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
+    await index.start();
+    const text = await readFile(topicFile("quick"), "utf8");
+    // the moment the first change is indexed (20ms debounce after chokidar's event),
+    // write again: that is inside chokidar's 50ms window, so its event is dropped
+    const seen = new Promise<void>((resolve) =>
+      index.on("topic:changed", (c) => {
+        if (c.current?.fm.status === "active") resolve();
+      }),
+    );
+    await writeFile(topicFile("quick"), text.replace("status: backlog", "status: active"));
+    await seen;
+    await writeFile(topicFile("quick"), text.replace("status: backlog", "status: review"));
+    await waitFor(() => index.topics.get("quick")?.fm.status === "review", 2000);
+  });
+
+  it("re-reading a file with unchanged text emits nothing", async () => {
+    await writeFile(topicFile("same"), newTopicText({ id: "same", title: "S", goal: "g", now }));
+    index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
+    await index.start();
+    const events: TopicChange[] = [];
+    index.on("topic:changed", (c) => events.push(c));
+    await index.refresh("topic", "same");
+    expect(events).toEqual([]);
+  });
+
   it("indexes existing files on start and tracks add/change/delete", async () => {
     await writeFile(
       topicFile("first"),

@@ -17,6 +17,10 @@ export function topicPath(root: string, id: string): string {
 export function questionPath(root: string, id: string): string {
   return path.join(questionsDir(root), `${id}.md`);
 }
+/** Cleaned-up topics and their questions; outside the watched folders, so off the board. */
+export function archiveDir(root: string, kind: "topics" | "questions"): string {
+  return path.join(root, AI_DIR, "archive", kind);
+}
 export function configPath(root: string): string {
   return path.join(root, AI_DIR, "config.yml");
 }

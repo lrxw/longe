@@ -2,6 +2,12 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
-  "linter": { "enabled": true, "rules": { "recommended": true } },
-  "files": { "includes": ["**", "!dist", "!node_modules", "!public/vendor"] }
+  "linter": { "enabled": true, "rules": { "preset": "recommended" } },
+  "files": { "includes": ["**", "!dist", "!node_modules"] },
+  "overrides": [
+    {
+      "includes": ["public/style.css"],
+      "linter": { "rules": { "style": { "noDescendingSpecificity": "off" } } }
+    }
+  ]
 }

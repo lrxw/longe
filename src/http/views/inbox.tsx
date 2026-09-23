@@ -3,7 +3,7 @@ import type { Child } from "hono/jsx";
 import type { HookStatus } from "../../app/hooks.js";
 import type { IndexedQuestion } from "../../index/index.js";
 import { ago, renderMarkdown } from "../format.js";
-import { ErrorList, type RepoNav } from "./layout.js";
+import { Avatar, ErrorList, type RepoNav } from "./layout.js";
 
 export interface InboxItem {
   q: IndexedQuestion;
@@ -24,7 +24,8 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
           <span class="tag">non-blocking</span>
         )}
         {showRepo ? (
-          <a class="repo" href={`${base}/board`}>
+          <a class="repo" href={`${base}/board`} style={`--repo:${repo.color}`}>
+            <Avatar repo={repo} />
             {repo.title}
           </a>
         ) : null}
@@ -41,7 +42,8 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
       </header>
       <div class="body md">{raw(renderMarkdown(q.sections.Question))}</div>
       {q.sections.Context ? (
-        <details>
+        // code is shown for the human to read: do not hide it behind a click
+        <details data-key={`context:${q.id}`} open={q.sections.Context.includes("```")}>
           <summary>Context</summary>
           <div class="md">{raw(renderMarkdown(q.sections.Context))}</div>
         </details>
@@ -143,7 +145,13 @@ export function InboxFragment({
   const blocking = items.filter((i) => i.q.fm.blocking);
   const other = items.filter((i) => !i.q.fm.blocking);
   return (
-    <div id="inbox" hx-get="/fragments/inbox" hx-trigger="sse:changed" hx-swap="outerHTML">
+    <div
+      id="inbox"
+      hx-get="/fragments/inbox"
+      hx-trigger="sse:changed"
+      hx-sync="this:replace"
+      hx-swap="morph"
+    >
       {overview}
       <ErrorList errors={errors} />
       {missing.length > 0 ? (
@@ -167,7 +175,7 @@ export function InboxFragment({
         <QuestionCard {...i} now={now} />
       ))}
       {other.length > 0 ? (
-        <details class="nonblocking" open={blocking.length === 0}>
+        <details class="nonblocking" data-key="inbox:nonblocking" open={blocking.length === 0}>
           <summary>
             {other.length} non-blocking {other.length === 1 ? "question" : "questions"} (agent
             continues on its assumption)

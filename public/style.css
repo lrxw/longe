@@ -79,6 +79,20 @@ kbd {
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
+pre {
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+  line-height: 1.45;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  white-space: pre;
+}
 kbd {
   border: 1px solid var(--line);
   border-bottom-width: 2px;
@@ -116,6 +130,11 @@ header.top .brand {
 header.top .brand:hover {
   text-decoration: none;
 }
+header.top .brand img {
+  display: block;
+  height: 22px;
+  width: auto;
+}
 header.top .project {
   color: var(--muted);
   flex: 1;
@@ -138,23 +157,153 @@ header.top nav a.on {
   background: var(--accent-soft);
   color: var(--accent);
 }
+/* repo identity: monogram on the repo's color, the same everywhere */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  background: var(--repo, var(--accent));
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  flex: none;
+}
+.avatar.missing {
+  background: var(--muted);
+  opacity: 0.6;
+}
+a.avatar:hover {
+  text-decoration: none;
+  filter: brightness(1.1);
+}
+
+/* boards: one entry per repo */
 header.top nav.repos {
   flex: 1;
   gap: 0.15rem;
   overflow-x: auto;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--line);
+}
+header.top nav.repos a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.25rem;
+  white-space: nowrap;
+}
+header.top nav.repos a.on {
+  background: color-mix(in srgb, var(--repo) 16%, transparent);
+  color: var(--repo);
+  box-shadow: inset 0 -2px 0 var(--repo);
+  border-radius: 6px 6px 0 0;
 }
 header.top nav.repos a.missing {
   color: var(--muted);
   text-decoration: line-through;
 }
-#badge:not(:empty) {
-  color: var(--block);
+header.top nav.repos .count {
+  font-size: 0.7em;
+  font-weight: 700;
+  padding: 0.05em 0.45em;
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+header.top nav.main a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-main {
-  padding: 1.25rem;
+/* shell: side menu (inside a repo) + main */
+.shell {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
   max-width: 1400px;
   margin: 0 auto;
+}
+.shell.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+main {
+  padding: 1.25rem;
+  min-width: 0;
+}
+aside.side {
+  padding: 1.25rem 0 1.25rem 1.25rem;
+}
+aside.side nav {
+  position: sticky;
+  top: 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+aside.side nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  color: var(--fg);
+  font-weight: 500;
+}
+aside.side nav a:hover {
+  background: var(--bg-2);
+  text-decoration: none;
+}
+aside.side nav a.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* menu state: dot + word next to Inbox / Board / Chat.
+   quiet = nothing for you, busy = something is moving, attn = your turn */
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+.state-badge i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--line);
+  flex: none;
+}
+.state-badge.busy {
+  color: var(--accent);
+}
+.state-badge.busy i {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.state-badge.attn {
+  color: var(--block);
+}
+.state-badge.attn i {
+  background: var(--block);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 footer.hints {
   text-align: center;
@@ -209,6 +358,13 @@ footer.hints kbd {
   margin-bottom: 0.5rem;
 }
 .card header .topic {
+  font-weight: 600;
+}
+.card header .repo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--repo, var(--fg));
   font-weight: 600;
 }
 .card header .meta {
@@ -372,6 +528,200 @@ form.answer {
   margin: 0 0 1rem;
 }
 
+/* agent: prompt box + live transcript */
+.agent {
+  margin-bottom: 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.2rem;
+}
+.agent h2 {
+  margin-top: 0;
+}
+form.prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+form.prompt textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+}
+form.prompt .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+/* status bar: one line that never changes shape while the agent works.
+   state + detail | meters | actions; the log path sits on its own line below */
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 2.1rem;
+  margin: 0.9rem 0 0.15rem;
+  font-size: 0.85em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.agent-status .state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.agent-status .state .tag {
+  min-width: 4.8em;
+  text-align: center;
+}
+.agent-status .detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-status .meters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.agent-status .cost {
+  min-width: 3.6em;
+  text-align: right;
+}
+.agent-status select.model {
+  font: inherit;
+  font-size: 0.95em;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
+  max-width: 11rem;
+}
+.agent-status .actions {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+/* the bar's text is muted; buttons and the select must not inherit that, or the whole
+   action group looks disabled even when it is not */
+.agent button.small {
+  font-size: 0.8em;
+  padding: 0.15rem 0.6rem;
+  color: var(--fg);
+}
+.agent button.small.primary {
+  color: #fff;
+}
+.agent button.small[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.agent button.small[disabled]:hover {
+  border-color: var(--line);
+  background: var(--card);
+}
+.agent-status .stall {
+  color: var(--warn);
+  font-weight: 600;
+}
+.agent-log {
+  margin: 0 0 0.5rem;
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* context in use vs the model's window */
+.ctx-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 13.5rem;
+  white-space: nowrap;
+}
+.ctx-meter .bar {
+  display: inline-block;
+  width: 5rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.ctx-meter .bar b {
+  display: block;
+  height: 100%;
+  background: var(--meter, var(--accent));
+}
+.ctx-meter.mid {
+  --meter: var(--warn);
+}
+.ctx-meter.high {
+  --meter: var(--danger);
+}
+/* topic page: compact prompt that goes to the repo chat */
+form.prompt.compact {
+  margin-top: 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.2rem;
+}
+.transcript {
+  max-height: 28rem;
+  overflow-y: auto;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.93em;
+}
+.transcript .you {
+  margin: 0.6rem 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 6px 6px 0;
+}
+.transcript .you.from-board {
+  border-left-color: var(--muted);
+  background: var(--bg-2);
+}
+.transcript .you > .meta {
+  margin: 0 0 0.25rem;
+}
+.transcript .you .md > :last-child {
+  margin-bottom: 0;
+}
+.transcript .ev {
+  margin: 0.3rem 0;
+}
+.transcript .ev.tool code,
+.transcript .ev.system code {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+.transcript .ev.error code {
+  color: var(--danger);
+}
+.transcript .ev.result {
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+  margin-top: 0.6rem;
+}
+.agent-panel.working .transcript {
+  border-color: var(--accent);
+}
+
 /* overview strip (hub) */
 .overview {
   display: grid;
@@ -403,6 +753,12 @@ form.answer {
 }
 .tile strong {
   font-size: 1.02em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.tile:hover strong {
+  color: var(--repo, var(--accent));
 }
 .tile .counts {
   display: flex;
@@ -462,6 +818,26 @@ form.answer {
   background: var(--card);
   padding: 0 0.5em;
   border-radius: 999px;
+}
+/* drag a card to another column */
+.card.topic[draggable] {
+  cursor: grab;
+}
+.card.topic.dragging {
+  opacity: 0.4;
+}
+.column.can-drop {
+  outline: 2px dashed var(--line);
+  outline-offset: -2px;
+}
+.column.can-drop.over {
+  outline-color: var(--accent);
+  background: var(--accent-soft);
+}
+.column .drop-error {
+  color: var(--danger);
+  font-size: 0.8em;
+  margin: 0.3rem 0;
 }
 .column details > summary {
   margin: 0 0 0.3rem;
@@ -624,6 +1000,15 @@ form.answer {
   text-decoration: line-through;
 }
 
+/* board: archive or delete the done and cancelled topics */
+.cleanup {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
 .errors {
   border: 1px solid var(--danger);
   background: var(--danger-soft);
@@ -647,6 +1032,16 @@ form.answer {
   }
 }
 @media (max-width: 700px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  aside.side {
+    padding: 0.75rem 0.75rem 0;
+  }
+  aside.side nav {
+    position: static;
+    flex-direction: row;
+  }
   main {
     padding: 0.75rem;
   }

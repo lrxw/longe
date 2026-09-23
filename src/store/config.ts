@@ -13,10 +13,33 @@ export const hooksSchema = z.object({
   on_answer: z.string().trim().min(1).optional(),
 });
 
+/** How the board starts the coding agent (Claude Code by default). */
+export const agentSchema = z.object({
+  /** Binary to run. */
+  command: z.string().trim().min(1).optional(),
+  /** `--permission-mode` for headless runs. */
+  permission_mode: z.string().trim().min(1).optional(),
+  /** `--model` for the chat (alias like `sonnet` or a full id). The chat page can override it per session. */
+  model: z.string().trim().min(1).optional(),
+  /**
+   * Claude Code permission rules the chat may use without asking, e.g.
+   * `Bash(pnpm test:*)`; appended to `--allowedTools` (longe's own tools are always allowed).
+   */
+  allowed_tools: z.array(z.string().trim().min(1)).optional(),
+  /** Extra CLI arguments appended verbatim. */
+  args: z.array(z.string()).optional(),
+  /** Close the agent process after this long without work (0: never). Default 30. */
+  idle_minutes: z.number().min(0).optional(),
+});
+export type AgentConfig = z.infer<typeof agentSchema>;
+
 export const configSchema = z.looseObject({
   version: z.literal(1),
   project: z.string().trim().min(1).optional(),
+  /** Accent color for this repo in the UI (any CSS color). Default: derived from the name. */
+  color: z.string().trim().min(1).optional(),
   hooks: hooksSchema.optional(),
+  agent: agentSchema.optional(),
 });
 export type Config = z.infer<typeof configSchema>;
 export type HookName = keyof z.infer<typeof hooksSchema>;
@@ -42,5 +65,22 @@ project: ${JSON.stringify(projectName)}
 #     claude -p --permission-mode acceptEdits
 #     "Question {question_id} on topic {topic_id} was answered: {answer}.
 #      Call check_answers, acknowledge_answers, then continue that topic."
+
+# Optional: how the board runs the agent behind the chat (and topic-page prompts).
+# Defaults: command claude, permission_mode acceptEdits, claude's default model, no
+# allowed_tools, no extra args, idle_minutes 30.
+# One session per repo: a process stays open while you chat, closes after idle_minutes,
+# and the next message resumes the session. longe's MCP endpoint is passed in.
+# Answers you give on the board are fed into the chat unless hooks.on_answer is set.
+# Headless runs cannot answer permission prompts: list what the chat may run in
+# allowed_tools (Claude Code permission rules), or allow it in .claude/settings.json.
+#
+# agent:
+#   command: claude
+#   permission_mode: acceptEdits
+#   model: sonnet
+#   allowed_tools: ["Bash(pnpm test:*)", "Bash(git add:*)", "Bash(git commit:*)"]
+#   args: []
+#   idle_minutes: 30
 `;
 }

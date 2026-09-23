@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { type Context, Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import { streamSSE } from "hono/streaming";
+import { CONTINUE_PROMPT, WORK_PROMPT } from "../app/agent.js";
 import type { AppContext } from "../app/context.js";
 import { Hub, type HubRepo } from "../app/hub.js";
 import { DomainError } from "../domain/errors.js";
@@ -9,14 +11,21 @@ import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
 import { answerQuestion, human, setTopicStatus } from "../tools/ops.js";
 import { API_BASE, createApiApp, docsPage, openApiDocument } from "./api.js";
 import { statusFor } from "./errors.js";
+import { monogram, repoColor } from "./identity.js";
 import { mountMcp } from "./mcp.js";
+import { vendorPath } from "./vendor.js";
+import { AgentBadge, AgentPanel, AgentSection, TopicPrompt } from "./views/agent.js";
+import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./views/badge.js";
 import { BoardFragment } from "./views/board.js";
 import { AnsweredStub, InboxFragment, type InboxItem, QuestionCard } from "./views/inbox.js";
-import { Badge, Layout, type RepoNav } from "./views/layout.js";
+import { Layout, type RepoNav, ReposNav } from "./views/layout.js";
 import { OverviewStrip, type RepoOverview } from "./views/overview.js";
 import { StatusActions, TopicFragment } from "./views/topic.js";
 
 export const PUBLIC_DIR = path.resolve(import.meta.dirname, "../../public");
+
+/** SSE "changed" events within this window go out as one (see /events). */
+export const CHANGED_WINDOW_MS = 100;
 
 export interface HttpOptions {
   /** Port the server listens on; only used for the OpenAPI `servers` entry. */
@@ -24,7 +33,15 @@ export interface HttpOptions {
 }
 
 function nav(hub: Hub, r: HubRepo): RepoNav {
-  return { name: r.name, title: r.title, base: hub.base(r.name), missing: r.missing };
+  return {
+    name: r.name,
+    title: r.title,
+    base: hub.base(r.name),
+    color: repoColor(r.name, r.ctx?.config.color),
+    mono: monogram(r.title),
+    blocking: r.ctx?.index.blockingCount() ?? 0,
+    missing: r.missing,
+  };
 }
 
 /** Accepts a single AppContext (tests, embedding) or a Hub. */
@@ -47,6 +64,9 @@ export function createHttpApp(target: AppContext | Hub, opts: HttpOptions = {}):
   ctx.hooks.on("hook:changed", () =>
     hub.emit("changed", { repo: entry.name, kind: "hook", id: "" }),
   );
+  ctx.agent.on("agent:changed", () =>
+    hub.emit("changed", { repo: entry.name, kind: "agent", id: "" }),
+  );
   return buildApp(hub, opts);
 }
 
@@ -55,6 +75,24 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
   const port = opts.port ?? 7311;
   const now = () => new Date();
   const repoNavs = () => hub.list().map((r) => nav(hub, r));
+  // every repo's agent gets this server's MCP endpoint, also repos that appear later
+  const wireAgents = () => {
+    for (const r of hub.live())
+      (r.ctx as AppContext).agent.mcpUrl = `http://127.0.0.1:${port}${hub.base(r.name)}/mcp`;
+  };
+  wireAgents();
+  hub.on("changed", (e) => {
+    if (e.kind === "repos") wireAgents();
+  });
+
+  // Pages must not be served from the browser's HTTP cache on back/forward navigation
+  // (browsers reuse a stale copy there without asking), else the board you return to
+  // still shows the topic where it was. Static files under /public set their own header.
+  app.use("*", async (c, next) => {
+    await next();
+    const type = c.res.headers.get("content-type") ?? "";
+    if (type.startsWith("text/html")) c.res.headers.set("cache-control", "no-store");
+  });
 
   app.get("/health", (c) =>
     c.json({
@@ -67,6 +105,20 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     }),
   );
 
+  // htmx, its SSE extension and idiomorph, from node_modules (see vendor.ts)
+  app.get("/vendor/:name", async (c) => {
+    try {
+      const file = await vendorPath(c.req.param("name"));
+      if (!file) return c.text("not found", 404);
+      return c.body(await readFile(file), 200, {
+        "content-type": "text/javascript; charset=utf-8",
+        "cache-control": "no-cache",
+      });
+    } catch (err) {
+      return c.text(err instanceof Error ? err.message : String(err), 500);
+    }
+  });
+
   app.get("/public/*", async (c) => {
     const rel = c.req.path.replace(/^\/public\//, "");
     const file = path.resolve(PUBLIC_DIR, rel);
@@ -77,7 +129,11 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
         ? "text/css"
         : file.endsWith(".js")
           ? "text/javascript"
-          : "application/octet-stream";
+          : file.endsWith(".svg")
+            ? "image/svg+xml"
+            : file.endsWith(".html")
+              ? "text/html"
+              : "application/octet-stream";
       return c.body(body, 200, {
         "content-type": `${type}; charset=utf-8`,
         "cache-control": "no-cache",
@@ -135,6 +191,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       }
       return { nav: nav(hub, r), counts, blocking, open };
     });
+  /** The one inbox: everything waiting on you, across repos. */
   const inboxFragment = () => (
     <InboxFragment
       items={inboxItems()}
@@ -147,23 +204,56 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
   );
   const projectLabel = () =>
     hub.mode === "single" ? (hub.single()?.title ?? "") : `${hub.live().length} repos`;
+  /** Hub mode: the switcher lists every repo. Single mode: no switcher. */
+  const switcher = () => (hub.mode === "hub" ? repoNavs() : undefined);
+  /** Numbers behind the Inbox badge (and the title prefix). */
+  const inboxCounts = (): InboxCounts => ({
+    blocking: hub.blockingCount(),
+    open: hub.openCount(),
+  });
+  /** Numbers behind a repo's Board badge. */
+  const boardCounts = (ctx: AppContext): BoardCounts => ({
+    active: ctx.index.topicsByStatus("active").length,
+    needsDecision: ctx.index.topicsByStatus("needs-decision").length,
+    review: ctx.index.topicsByStatus("review").length,
+  });
+  /** Single mode: the one repo's board is in the header, also on the inbox page. */
+  const singleBoard = (): BoardCounts | undefined => {
+    const r = hub.mode === "single" ? hub.single() : undefined;
+    return r?.ctx ? boardCounts(r.ctx) : undefined;
+  };
+
+  // ---- last visited repo (hub mode): drives `/board` and the `b` key on the home ---
+  const LAST = "longe_repo";
+  const remember = (c: Context, r: HubRepo) => {
+    if (hub.mode === "hub")
+      setCookie(c, LAST, r.name, { path: "/", sameSite: "Lax", maxAge: 60 * 60 * 24 * 365 });
+  };
+  const lastRepo = (c: Context): HubRepo | undefined => {
+    const name = getCookie(c, LAST);
+    const r = name ? hub.get(name) : undefined;
+    return r?.ctx ? r : hub.live()[0];
+  };
 
   app.get("/", (c) =>
     c.html(
       <Layout
         title="Inbox"
         project={projectLabel()}
-        blocking={hub.blockingCount()}
+        inbox={inboxCounts()}
         active="inbox"
-        repos={repoNavs()}
-        base={hub.mode === "single" ? "" : hub.live()[0] ? hub.base(hub.live()[0]?.name ?? "") : ""}
+        repos={switcher()}
+        board={singleBoard()}
       >
         {inboxFragment()}
       </Layout>,
     ),
   );
   app.get("/fragments/inbox", (c) => c.html(inboxFragment()));
-  app.get("/fragments/badge", (c) => c.html(<Badge blocking={hub.blockingCount()} />));
+  app.get("/fragments/inbox-badge", (c) => c.html(<InboxBadge counts={inboxCounts()} />));
+  app.get("/fragments/repos", (c) =>
+    c.html(<ReposNav repos={repoNavs()} current={c.req.query("current")} />),
+  );
 
   // ---- per-repo routes ---------------------------------------------------------
   // Mounted twice: under /r/:repo (always) and at the root (single mode only).
@@ -182,17 +272,45 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     r.get("/board", (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
+      remember(c, w.repo);
       return c.html(
         <Layout
           title={`Board · ${w.repo.title}`}
           project={w.repo.title}
-          blocking={hub.blockingCount()}
+          inbox={inboxCounts()}
           active="board"
-          repos={repoNavs()}
+          repos={switcher()}
           current={w.view}
-          base={w.view.base}
+          board={boardCounts(w.ctx)}
+          agent={w.ctx.agent.status()}
         >
           <BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />
+        </Layout>,
+      );
+    });
+    // the repo's one conversation with the agent
+    r.get("/chat", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      remember(c, w.repo);
+      const status = w.ctx.agent.status();
+      return c.html(
+        <Layout
+          title={`Chat · ${w.repo.title}`}
+          project={w.repo.title}
+          inbox={inboxCounts()}
+          active="chat"
+          repos={switcher()}
+          current={w.view}
+          board={boardCounts(w.ctx)}
+          agent={status}
+        >
+          <AgentSection
+            status={status}
+            messages={await w.ctx.agent.messages()}
+            base={w.view.base}
+            now={now()}
+          />
         </Layout>,
       );
     });
@@ -201,22 +319,30 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       if (isResponse(w)) return w;
       return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
     });
+    r.get("/fragments/board-badge", (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      return c.html(<BoardBadge counts={boardCounts(w.ctx)} base={w.view.base} />);
+    });
     r.get("/topics/:id", (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       const t = w.ctx.index.topics.get(c.req.param("id"));
       if (!t) return c.text("topic not found", 404);
+      remember(c, w.repo);
       return c.html(
         <Layout
           title={t.fm.title}
           project={w.repo.title}
-          blocking={hub.blockingCount()}
+          inbox={inboxCounts()}
           active="topic"
-          repos={repoNavs()}
+          repos={switcher()}
           current={w.view}
-          base={w.view.base}
+          board={boardCounts(w.ctx)}
+          agent={w.ctx.agent.status()}
         >
           <TopicFragment t={t} index={w.ctx.index} now={now()} repo={w.view} />
+          <TopicPrompt base={w.view.base} topicId={t.id} title={t.fm.title} />
         </Layout>,
       );
     });
@@ -258,6 +384,16 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       }
     });
 
+    // archive or delete every done and cancelled topic, with its questions
+    r.post("/board/cleanup", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const mode = str((await c.req.parseBody()).mode);
+      if (mode !== "archive" && mode !== "delete") return c.text(`unknown mode ${mode}`, 400);
+      await human.cleanup(w.ctx, mode);
+      return c.html(<BoardFragment index={w.ctx.index} now={now()} base={w.view.base} />);
+    });
+
     r.post("/topics/:id/status", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
@@ -283,6 +419,80 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
           statusFor(err) as 400,
         );
       }
+    });
+
+    // ---- the chat: messages in, live transcript out, stop, reset, badge ---------
+    const panel = async (w: { ctx: AppContext; view: RepoNav }, error?: string) => (
+      <AgentPanel
+        status={w.ctx.agent.status()}
+        messages={await w.ctx.agent.messages()}
+        base={w.view.base}
+        now={now()}
+        error={error}
+      />
+    );
+    r.get("/fragments/agent", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      return c.html(await panel(w));
+    });
+    r.get("/fragments/agent-badge", (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      return c.html(<AgentBadge status={w.ctx.agent.status()} base={w.view.base} />);
+    });
+    r.post("/agent/prompt", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const form = await c.req.parseBody();
+      const prompt = str(form.prompt)?.trim();
+      const topicId = str(form.topic)?.trim();
+      const topic = topicId ? w.ctx.index.topics.get(topicId) : undefined;
+      if (!prompt) return c.html(await panel(w, "Message is empty."), 400);
+      if (topicId && !topic) return c.html(await panel(w, `unknown topic ${topicId}`), 404);
+      await w.ctx.agent.say("human", prompt, {
+        topic: topic ? { id: topic.id, title: topic.fm.title } : undefined,
+      });
+      // a plain form post (topic page) lands on the chat; htmx gets the panel
+      if (!c.req.header("hx-request")) return c.redirect(`${w.view.base}/chat`, 303);
+      return c.html(await panel(w));
+    });
+    r.post("/agent/continue", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      await w.ctx.agent.say("human", CONTINUE_PROMPT);
+      return c.html(await panel(w));
+    });
+    r.post("/agent/work", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      await w.ctx.agent.say("human", WORK_PROMPT);
+      return c.html(await panel(w));
+    });
+    r.post("/agent/model", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const form = await c.req.parseBody();
+      await w.ctx.agent.setModel(str(form.model));
+      return c.html(await panel(w));
+    });
+    r.post("/agent/stop", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      w.ctx.agent.stop();
+      return c.html(await panel(w));
+    });
+    r.post("/agent/reset", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      await w.ctx.agent.reset();
+      return c.html(await panel(w));
+    });
+    r.post("/agent/clear", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      await w.ctx.agent.clearHistory();
+      return c.html(await panel(w));
     });
 
     // agent surfaces, scoped to this repo
@@ -312,13 +522,15 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       repoApp(() => hub.single()),
     );
   } else {
-    // hub mode: unscoped agent surfaces need a `repo` field; /board goes to the first repo
-    app.get("/board", (c) => {
-      const first = hub.live()[0];
-      return first
-        ? c.redirect(`${hub.base(first.name)}/board`)
-        : c.text("no repos registered", 404);
-    });
+    // hub mode: unscoped agent surfaces need a `repo` field; /board and /chat (the "b" and
+    // "c" keys on the inbox, which belongs to no repo) go to the last visited repo
+    // (cookie), else the first one
+    for (const page of ["board", "chat"]) {
+      app.get(`/${page}`, (c) => {
+        const r = lastRepo(c);
+        return r ? c.redirect(`${hub.base(r.name)}/${page}`) : c.text("no repos registered", 404);
+      });
+    }
     app.route(
       API_BASE,
       createApiApp(
@@ -353,14 +565,32 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       let seq = 0;
       const send = (event: string, data: string) =>
         stream.writeSSE({ event, data, id: String(seq++) });
+      // "changed" makes every open page fetch a fresh fragment. A burst (a cleanup that
+      // moves 40 files, an agent writing several) is sent as one event per window, so
+      // pages do not fetch dozens of in-between states whose late answers overwrite the
+      // final one. Every change still leads to an event at or after it.
+      let changedData: string | undefined;
+      let changedTimer: NodeJS.Timeout | undefined;
+      const flushChanged = () => {
+        changedTimer = undefined;
+        const data = changedData ?? "";
+        changedData = undefined;
+        void send("changed", data);
+      };
       const onChange = (e: { repo: string; kind: string; id: string }) => {
-        void send(`${e.kind}-changed`, JSON.stringify(e)).then(() =>
-          send("changed", `${e.repo}:${e.id}`),
-        );
+        // agent output streams often; it only refreshes agent panels. The files the
+        // agent changes reach the pages through the index watcher as usual.
+        void send(`${e.kind}-changed`, JSON.stringify(e));
+        if (e.kind === "agent") return;
+        // one change names its card (the page flashes it); several name none
+        const key = `${e.repo}:${e.id}`;
+        changedData = changedData === undefined || changedData === key ? key : `${e.repo}:`;
+        changedTimer ??= setTimeout(flushChanged, CHANGED_WINDOW_MS);
       };
       hub.on("changed", onChange);
       stream.onAbort(() => {
         hub.off("changed", onChange);
+        if (changedTimer) clearTimeout(changedTimer);
       });
       await send("hello", "longe");
       while (!stream.aborted) {

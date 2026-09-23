@@ -14,7 +14,13 @@ export interface HubRepo {
 }
 
 export interface HubEvents {
-  changed: [{ repo: string; kind: "topic" | "question" | "error" | "hook" | "repos"; id: string }];
+  changed: [
+    {
+      repo: string;
+      kind: "topic" | "question" | "error" | "hook" | "agent" | "repos";
+      id: string;
+    },
+  ];
 }
 
 /**
@@ -126,6 +132,9 @@ export class Hub extends EventEmitter<HubEvents> {
       ctx.hooks.on("hook:changed", () =>
         this.emit("changed", { repo: name, kind: "hook", id: "" }),
       );
+      ctx.agent.on("agent:changed", () =>
+        this.emit("changed", { repo: name, kind: "agent", id: "" }),
+      );
     } catch (err) {
       entry.missing = err instanceof Error ? err.message : String(err);
     }
@@ -141,6 +150,11 @@ export class Hub extends EventEmitter<HubEvents> {
   /** Total open blocking questions across live repos (title badge). */
   blockingCount(): number {
     return this.live().reduce((n, r) => n + (r.ctx?.index.blockingCount() ?? 0), 0);
+  }
+
+  /** Total open questions across live repos (Inbox badge). */
+  openCount(): number {
+    return this.live().reduce((n, r) => n + (r.ctx?.index.inbox().length ?? 0), 0);
   }
 }
 

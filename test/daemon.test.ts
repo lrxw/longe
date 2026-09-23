@@ -51,7 +51,9 @@ describe("serve --daemon", () => {
     const h = await probeHealth(port);
     expect(h?.root).toBe("*");
     expect(h?.pid).toBe(rec.pid);
-    expect(h?.repos?.map((r) => r.root)).toEqual([await realpath(dir)]);
+    // `serve` run inside a project registers that project too, so when this checkout
+    // has its own .ai/ the hub lists it as well; the temp repo must be there in any case
+    expect(h?.repos?.map((r) => r.root)).toContain(await realpath(dir));
     expect((await listRecords()).map((r) => r.root)).toEqual(["*"]);
     expect(await readFile(rec.log, "utf8")).toContain("longe serving");
 

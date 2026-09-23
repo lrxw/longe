@@ -65,7 +65,7 @@ describe("topic store", () => {
       "- 2026-09-22 15:02 agent — Did one.\n- 2026-09-22 15:02 human — Looks good.",
     );
     expect(t.fm.updated).not.toBe(before);
-    expect(t.fm.created).toBe("2026-01-01T00:00:00" + t.fm.created.slice(19));
+    expect(t.fm.created).toBe(`2026-01-01T00:00:00${t.fm.created.slice(19)}`);
     // serialized output re-parses identically
     const out = serializeTopic(t);
     expect(serializeTopic(parseTopic(out))).toBe(out);

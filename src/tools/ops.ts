@@ -89,4 +89,41 @@ export const human = {
     setTopicStatus(ctx, id, "cancelled", "human", note),
   reopen: (ctx: AppContext, id: string, note?: string) =>
     setTopicStatus(ctx, id, "active", "human", note),
+  cleanup: (ctx: AppContext, mode: CleanupMode) => cleanupFinished(ctx, mode),
 };
+
+/** Statuses the board's cleanup clears away. */
+export const FINISHED: readonly TopicStatus[] = ["done", "cancelled"];
+
+/** `archive` moves the files to `.ai/archive/`; `delete` removes them. */
+export type CleanupMode = "archive" | "delete";
+
+/**
+ * Archives or deletes every done and cancelled topic with its questions. The status
+ * is checked on the fresh file, so a topic reopened a moment ago stays. Returns the
+ * topic ids cleared away.
+ */
+async function cleanupFinished(ctx: AppContext, mode: CleanupMode): Promise<string[]> {
+  const clear = (kind: "topic" | "question", id: string) =>
+    mode === "archive" ? ctx.repo.archive(kind, id) : ctx.repo.remove(kind, id);
+  const cleared: string[] = [];
+  const ids = [...ctx.index.topics.values()]
+    .filter((t) => FINISHED.includes(t.fm.status))
+    .map((t) => t.id);
+  for (const id of ids) {
+    try {
+      const t = await ctx.repo.readTopic(id);
+      if (!FINISHED.includes(t.fm.status)) continue;
+    } catch {
+      continue; // gone or unparsable: nothing to archive
+    }
+    for (const q of ctx.index.questionsForTopic(id)) {
+      await clear("question", q.id);
+      await ctx.index.refresh("question", q.id);
+    }
+    await clear("topic", id);
+    await ctx.index.refresh("topic", id);
+    cleared.push(id);
+  }
+  return cleared;
+}

@@ -1,5 +1,4 @@
 import { exec } from "node:child_process";
-import path from "node:path";
 import { serve } from "@hono/node-server";
 import { createRegistryHub } from "../app/hub.js";
 import { createHttpApp } from "../http/app.js";
