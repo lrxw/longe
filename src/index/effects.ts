@@ -119,7 +119,7 @@ export class EffectRunner {
       if (state === "open" && before === undefined) {
         effects.push(...effectsForQuestionCreated(cur.fm, cur.sections.Question, view));
       } else if (before === "open" && (state === "answered" || state === "withdrawn")) {
-        effects.push(...effectsForQuestionClosed(cur.fm, view));
+        effects.push(...effectsForQuestionClosed(cur.fm, view, cur.sections.Answer));
         if (state === "answered") this.fireAnswerHook(cur);
       }
     }

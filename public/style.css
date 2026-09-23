@@ -517,6 +517,15 @@ form.answer {
   background: var(--accent);
   color: #fff;
 }
+/* picking it sends the topic back from review to active */
+.options button.reject {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.options button.reject:hover {
+  background: var(--danger);
+  color: #fff;
+}
 .row {
   display: flex;
   gap: 0.5rem;

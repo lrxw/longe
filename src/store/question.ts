@@ -67,6 +67,7 @@ export interface NewQuestionInput {
   context?: string | undefined;
   topic?: string | undefined;
   options?: string[] | undefined;
+  reject_options?: string[] | undefined;
   assumption?: string | undefined;
   blocking: boolean;
   asked_by: string;
@@ -84,6 +85,10 @@ export function newQuestionText(input: NewQuestionInput): string {
   if (input.options && input.options.length > 0) {
     fm.push("options:");
     for (const o of input.options) fm.push(`  - ${yamlString(o)}`);
+  }
+  if (input.reject_options && input.reject_options.length > 0) {
+    fm.push("reject_options:");
+    for (const o of input.reject_options) fm.push(`  - ${yamlString(o)}`);
   }
   if (input.assumption !== undefined) fm.push(`assumption: ${yamlString(input.assumption)}`);
   fm.push("---");

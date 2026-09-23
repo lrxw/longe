@@ -9,7 +9,7 @@ import {
 import { transitionTopic } from "../domain/topic-ops.js";
 import type { Actor, TopicStatus } from "../domain/types.js";
 import { applyEffects } from "../index/effects.js";
-import type { Question } from "../store/question.js";
+import { type Question, questionSections } from "../store/question.js";
 import type { Topic } from "../store/topic.js";
 
 /**
@@ -72,7 +72,10 @@ export async function answerQuestion(
     throw err;
   }
   await ctx.index.refresh("question", id);
-  await runEffects(ctx, effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id)));
+  await runEffects(
+    ctx,
+    effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id), questionSections(q).Answer),
+  );
   const indexed = ctx.index.questions.get(id);
   if (indexed) ctx.runner.fireAnswerHook(indexed);
   return q;

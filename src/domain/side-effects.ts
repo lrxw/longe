@@ -46,12 +46,35 @@ export function effectsForQuestionCreated(
   return effects;
 }
 
-/** A question left `open` (answered or withdrawn). */
+/**
+ * A question left `open` (answered or withdrawn). `answer` is the text under
+ * `## Answer`: the chosen option, then the human's note after a blank line.
+ */
 export function effectsForQuestionClosed(
   q: QuestionFrontmatter,
   topic: TopicView | undefined,
+  answer = "",
 ): Effect[] {
-  if (!q.blocking || !topic) return [];
+  if (!topic) return [];
+  // the human rejected reviewed work from the inbox: send the topic back to the agent
+  const chosen = answer.split(/\n\s*\n/)[0]?.trim() ?? "";
+  if (
+    q.status === "answered" &&
+    topic.fm.status === "review" &&
+    chosen &&
+    (q.reject_options ?? []).includes(chosen)
+  ) {
+    return [
+      {
+        kind: "set_topic_status",
+        topic: topic.fm.id,
+        from: "review",
+        to: "active",
+        note: `rejected in ${q.id}: ${truncate(answer)}`,
+      },
+    ];
+  }
+  if (!q.blocking) return [];
   if (topic.fm.status !== "needs-decision" || topic.openBlockingCount > 0) return [];
   return [
     {

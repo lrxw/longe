@@ -31,6 +31,7 @@ export const questionFrontmatterSchema = z
     status: z.enum(QUESTION_STATUSES),
     blocking: z.boolean(),
     options: z.array(z.string().trim().min(1)).min(2).max(4).nullish(),
+    reject_options: z.array(z.string().trim().min(1)).nullish(),
     assumption: nullishString,
     answered_at: isoTimestamp.nullish(),
     acknowledged_at: isoTimestamp.nullish(),
@@ -47,6 +48,7 @@ export const askQuestionInputSchema = z
     context: z.string().optional(),
     topic: z.string().regex(SLUG_RE).optional(),
     options: z.array(z.string().trim().min(1)).min(2).max(4).optional(),
+    reject_options: z.array(z.string().trim().min(1)).min(1).optional(),
     assumption: z.string().trim().min(1).optional(),
     blocking: z.boolean(),
     asked_by: z.string().trim().min(1).optional(),
@@ -54,6 +56,14 @@ export const askQuestionInputSchema = z
   .refine((q) => q.blocking || q.assumption !== undefined, {
     message: "a non-blocking question requires an assumption (blocking: false ⇒ assumption)",
     path: ["assumption"],
+  })
+  .refine((q) => (q.reject_options ?? []).every((r) => q.options?.includes(r)), {
+    message: "reject_options must each be one of the options",
+    path: ["reject_options"],
+  })
+  .refine((q) => !q.reject_options || q.topic !== undefined, {
+    message: "reject_options need a topic",
+    path: ["reject_options"],
   });
 export type AskQuestionInput = z.infer<typeof askQuestionInputSchema>;
 

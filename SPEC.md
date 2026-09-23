@@ -132,6 +132,7 @@ Rules:
 - `blocking: false` **requires** `assumption`. The tool rejects the write otherwise.
 - The `## Answer` section is written by the human (via UI or REST). If an option was chosen, the answer body is the option text, optionally followed by a note.
 - `asked_by` is whatever the agent supplies. The tool does not verify identity.
+- `reject_options` (optional, needs a topic) lists options, copied exactly, that reject the topic's reviewed work. If the human picks one while the topic is in `review`, the system moves it back to `active` (§4). The inbox shows these options in red.
 
 ## 4. Statuses and transitions
 
@@ -145,6 +146,7 @@ Who has the ball: `backlog`, `needs-decision`, `review` → human. `active` → 
 | active | review | human, agent | Agent submits work. Should be preceded by a Log entry. |
 | review | done | **human only** | Agents may never approve their own work. |
 | review | active | human | Reject. Requires a note; written to Log as `human — rejected: <note>`. |
+| review | active | **system** | Set automatically when the human answers a question on the topic with one of its `reject_options`. The note is `rejected in <question id>: <answer>`. |
 | any non-terminal | cancelled | **human only** | |
 | done, cancelled | active | human | Reopen. |
 | active | needs-decision | **system** | Set automatically when a blocking question is created for the topic. |
@@ -302,7 +304,9 @@ step, something to check or approve) goes into `ask_question`, even when it is n
 phrased as a question.
 
 When a topic is finished: `set_status` to `review`. Never set `done` or `cancelled`;
-only the human does that.
+only the human does that. When you ask the human to verify the work in review, put the
+options that mean "it does not work" into `reject_options`: picking one moves the
+topic back to active, and you continue there.
 ```
 
 ## 10. Notifications

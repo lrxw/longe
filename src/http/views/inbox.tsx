@@ -55,17 +55,31 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
       ) : null}
       <form
         class="answer"
+        data-base={base}
         hx-post={`${base}/questions/${q.id}/answer`}
         hx-target={`#q-${q.id}`}
         hx-swap="outerHTML"
       >
         {options.length > 0 ? (
           <div class="options">
-            {options.map((o, i) => (
-              <button type="submit" name="option_index" value={String(i)}>
-                {o}
-              </button>
-            ))}
+            {options.map((o, i) =>
+              // a reject option sends the topic back from review to active
+              q.fm.reject_options?.includes(o) ? (
+                <button
+                  type="submit"
+                  name="option_index"
+                  value={String(i)}
+                  class="reject"
+                  title="Rejects the work: the topic goes back to active"
+                >
+                  {o}
+                </button>
+              ) : (
+                <button type="submit" name="option_index" value={String(i)}>
+                  {o}
+                </button>
+              ),
+            )}
           </div>
         ) : null}
         <textarea

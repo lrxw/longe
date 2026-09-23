@@ -179,6 +179,38 @@ describe("REST /api/v1", () => {
     expect(ctx.index.topics.get("t")?.fm.status).toBe("active");
   });
 
+  it("a reject option answered in the inbox sends a review topic back to active", async () => {
+    await post("create_topic", { title: "T", goal: "g" });
+    await post("set_status", { id: "t", status: "active" });
+    await post("set_status", { id: "t", status: "review" });
+    const ask = (reject_options: string[]) =>
+      post("ask_question", {
+        question: "Does it work?",
+        topic: "t",
+        options: ["Works", "Broken"],
+        reject_options,
+        blocking: false,
+        assumption: "it works",
+      });
+    let r = await json(await ask(["Kaputt"]));
+    expect(r.status).toBe(400);
+    expect(String(r.body.message)).toMatch(/reject_options/);
+
+    r = await json(await ask(["Broken"]));
+    const qid = r.body.id as string;
+    expect(r.body.topic_status).toBe("review");
+    r = await json(await app.request(`/api/v1/get_topic?id=t`));
+    expect((r.body.questions as { reject_options: string[] }[])[0]?.reject_options).toEqual([
+      "Broken",
+    ]);
+
+    await post("answer_question", { id: qid, option_index: 1, note: "menu never opens" });
+    expect(ctx.index.topics.get("t")?.fm.status).toBe("active");
+    expect(await readFile(path.join(dir, ".ai/topics/t.md"), "utf8")).toMatch(
+      /system — rejected in q-.*: Broken menu never opens/,
+    );
+  });
+
   it("errors: 404 unknown id, 400 bad json, 404 unknown route", async () => {
     let r = await json(await post("get_topic", { id: "nope" }));
     expect(r).toMatchObject({ status: 404, body: { code: "not_found" } });

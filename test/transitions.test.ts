@@ -39,6 +39,8 @@ describe("§4 transition table", () => {
     expectCode("review", "active", "human", "note_required");
     expectCode("review", "active", "human", "note_required", "   ");
     expectCode("review", "active", "agent", "human_only", "note");
+    // the human's reject option in the inbox, applied by the system
+    expectOk("review", "active", "system", "rejected in q-x");
   });
 
   it("any non-terminal → cancelled: human only", () => {

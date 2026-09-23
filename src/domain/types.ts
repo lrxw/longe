@@ -38,6 +38,8 @@ export interface QuestionFrontmatter {
   status: QuestionStatus;
   blocking: boolean;
   options?: string[] | null;
+  /** Options that reject the topic's reviewed work: picking one moves it review → active. */
+  reject_options?: string[] | null;
   assumption?: string | null;
   answered_at?: string | null;
   acknowledged_at?: string | null;

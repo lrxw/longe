@@ -28,7 +28,8 @@ export const TRANSITION_RULES: readonly Rule[] = [
   {
     from: "review",
     to: "active",
-    actors: ["human"],
+    // system: the human picked one of a question's reject_options in the inbox
+    actors: ["human", "system"],
     requiresNote: true,
     rule: "review → active (reject) is human-only and requires a note",
   },
@@ -85,7 +86,7 @@ export function checkTransition(
   const allowed = candidates.find((r) => r.actors.includes(actor));
   if (!allowed) {
     const rule = candidates[0] as Rule;
-    const code = rule.actors.includes("system") ? "system_only" : "human_only";
+    const code = rule.actors.includes("human") ? "human_only" : "system_only";
     return {
       ok: false,
       error: new DomainError(code, `${from} → ${to} not allowed for ${actor}: ${rule.rule}`),

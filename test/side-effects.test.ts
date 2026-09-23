@@ -107,6 +107,33 @@ describe("§5 side effects", () => {
     ).toEqual([]);
   });
 
+  it("picking a reject option sends a review topic back to active", () => {
+    const verify = {
+      ...q(false, "answered"),
+      options: ["Works", "Broken"],
+      reject_options: ["Broken"],
+    };
+    const review = { fm: topic("review"), openBlockingCount: 0 };
+    expect(effectsForQuestionClosed(verify, review, "Broken\n\nmenu never opens")).toEqual([
+      {
+        kind: "set_topic_status",
+        topic: "t1",
+        from: "review",
+        to: "active",
+        note: "rejected in q-20260922-aaaa: Broken menu never opens",
+      },
+    ]);
+    // other options, free text, or a topic no longer in review: nothing happens
+    expect(effectsForQuestionClosed(verify, review, "Works")).toEqual([]);
+    expect(effectsForQuestionClosed(verify, review, "Broken, sort of")).toEqual([]);
+    expect(
+      effectsForQuestionClosed(verify, { fm: topic("active"), openBlockingCount: 0 }, "Broken"),
+    ).toEqual([]);
+    expect(effectsForQuestionClosed({ ...verify, status: "withdrawn" }, review, "Broken")).toEqual(
+      [],
+    );
+  });
+
   it("entering review notifies", () => {
     expect(effectsForTopicStatus(topic("review"), "active", "review")).toHaveLength(1);
     expect(effectsForTopicStatus(topic("done"), "review", "done")).toEqual([]);

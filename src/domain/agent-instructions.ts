@@ -31,5 +31,7 @@ step, something to check or approve) goes into \`ask_question\`, even when it is
 phrased as a question.
 
 When a topic is finished: \`set_status\` to \`review\`. Never set \`done\` or \`cancelled\`;
-only the human does that.
+only the human does that. When you ask the human to verify the work in review, put the
+options that mean "it does not work" into \`reject_options\`: picking one moves the
+topic back to active, and you continue there.
 `;
