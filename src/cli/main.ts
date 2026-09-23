@@ -46,6 +46,10 @@ async function main(argv: string[]): Promise<number> {
       );
       return 0;
     }
+    case "hooks": {
+      const { runHooks } = await import("./hooks.js");
+      return runHooks(cli.rest, repo);
+    }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");
       await runMcpStdio(repo);

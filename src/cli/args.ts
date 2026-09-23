@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-export type Command = "init" | "serve" | "mcp" | "answers" | "status" | "stop" | "repos";
+export type Command = "init" | "serve" | "mcp" | "answers" | "status" | "stop" | "repos" | "hooks";
 
 export interface ParsedCli {
   command: Command;
@@ -26,6 +26,8 @@ const USAGE = `Usage:
   longe status                              # is the server running, which repos
   longe stop                                # stop the background server
   longe mcp    [--repo <dir>]
+  longe hooks  [install | remove] [--repo <dir>]
+               # Claude Code sessions in the repo ask through the longe inbox
 
 Options:
   --repo   Repository root containing (or to receive) .ai/  (default: .)
@@ -77,11 +79,20 @@ export function parseCli(argv: string[]): ParsedCli {
   if (values.help) throw new CliError(USAGE, 0);
 
   const command = positionals[0];
-  const commands: Command[] = ["init", "serve", "mcp", "answers", "status", "stop", "repos"];
+  const commands: Command[] = [
+    "init",
+    "serve",
+    "mcp",
+    "answers",
+    "status",
+    "stop",
+    "repos",
+    "hooks",
+  ];
   if (!commands.includes(command as Command)) {
     throw new CliError(`Unknown or missing command: ${command ?? "(none)"}\n\n${USAGE}`);
   }
-  if (positionals.length > 1 && command !== "repos") {
+  if (positionals.length > 1 && command !== "repos" && command !== "hooks") {
     throw new CliError(`Unexpected argument: ${positionals[1]}\n\n${USAGE}`);
   }
 

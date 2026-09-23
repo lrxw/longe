@@ -123,6 +123,18 @@ HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, with the addres
 
 The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
+**Questions go to the inbox, also from the terminal.** Claude Code has its own way to ask
+you (the AskUserQuestion tool). The chat in the web UI never uses it. For terminal sessions,
+run once per repository:
+
+```sh
+longe hooks install   # adds a PreToolUse hook to .claude/settings.json; `longe hooks remove` undoes it
+```
+
+When a session in that repository wants to ask you something, the question lands in the
+inbox (blocking, with its options) instead of the terminal. The agent is told the
+question id, so it can wait for the answer or continue on an assumption.
+
 ## How it works
 
 Everything lives in the repository's `.ai/` folder:
