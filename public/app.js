@@ -507,13 +507,13 @@
   // refreshes, only that card is highlighted. Never the whole fragment: that reads as
   // flicker while the agent writes to files.
   var changed = null;
+  var changedRepo = null;
   document.body.addEventListener("htmx:sseMessage", (e) => {
     var d = e.detail || {};
-    if (d.type === "changed")
-      changed =
-        String(d.data || "")
-          .split(":")
-          .pop() || null;
+    if (d.type !== "changed") return;
+    var parts = String(d.data || "").split(":");
+    changed = parts.pop() || null;
+    changedRepo = parts[0] || null;
   });
   // The tab title starts with the blocking count, "(1) Inbox · longe". The server sets
   // it on page load; the inbox badge's refresh keeps it current.
@@ -570,34 +570,47 @@
         htmx.trigger(el, "sse:changed");
       }, 700);
   });
-  // While a refresh is held, the Inbox badge in the header pulses gently: something new
-  // is waiting. Nothing on the page moves; a click on the badge shows it right away.
-  var holding = false;
-  function markBadge() {
-    var b = document.getElementById("inbox-badge");
-    if (b) b.classList.toggle("held", holding);
+  // While a refresh is held, the project's card rings like a phone: the repo tile at the
+  // top of the inbox (else its avatar in the header) wiggles now and then. A wiggle is a
+  // transform, so nothing around it moves. Clicking the ringing card shows what is new.
+  var ringing = null;
+  function ringTarget() {
+    var sel = (root) => {
+      if (!changedRepo) return null;
+      return (
+        document.querySelector(`${root}[href="/r/${changedRepo}/board"]`) ||
+        document.querySelector(`${root}[href="/board"]`)
+      );
+    };
+    return (
+      sel(".overview .tile") ||
+      sel("nav.repos a") ||
+      document.querySelector(".overview .tile") ||
+      document.querySelector("nav.repos a")
+    );
   }
   function showHeld() {
-    holding = true;
-    markBadge();
+    var t = ringTarget();
+    if (t === ringing) return;
+    hideHeld();
+    ringing = t;
+    if (ringing) ringing.classList.add("ringing");
   }
   function hideHeld() {
-    holding = false;
-    markBadge();
+    if (ringing) ringing.classList.remove("ringing");
+    ringing = null;
   }
   document.addEventListener("click", (e) => {
     var inbox = document.getElementById("inbox");
-    if (!holding || !inbox || !e.target?.closest?.("#inbox-badge")) return;
-    e.preventDefault(); // the badge sits in the Inbox link: stay here, just show what is new
+    if (!ringing || !inbox || !e.target?.closest?.(".ringing")) return;
+    e.preventDefault(); // the card is a link: stay here, just show what is new
     hideHeld();
     heldSince = 0;
     forceNext = true; // this refresh goes through, even while typing
     htmx.trigger(inbox, "sse:changed");
   });
   document.body.addEventListener("htmx:afterSwap", (e) => {
-    var id = e.detail?.target?.id;
-    if (id === "inbox") hideHeld();
-    else if (id === "inbox-badge") markBadge(); // the badge was replaced: keep its pulse
+    if (e.detail?.target?.id === "inbox") hideHeld();
   });
   document.body.addEventListener("htmx:afterSwap", (e) => {
     var el = e.detail?.target;

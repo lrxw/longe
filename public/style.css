@@ -1023,17 +1023,33 @@ ul.commits {
 ul.commits li {
   margin: 0.2rem 0;
 }
-/* the inbox holds its refresh while you use it: the header's Inbox badge pulses */
-.state-badge.held {
-  animation: held-pulse 1.6s ease-in-out infinite;
+/* the inbox holds its refresh while you use it: the project's card rings like a phone,
+   a short wiggle every 2 s (a transform: nothing around it moves) */
+.ringing {
+  animation: ring 2s ease-in-out infinite;
+  transform-origin: 50% 50%;
 }
-@keyframes held-pulse {
+@keyframes ring {
   0%,
+  30%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+    transform: rotate(0);
   }
-  50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent);
+  4%,
+  12%,
+  20% {
+    transform: rotate(-4deg);
+  }
+  8%,
+  16%,
+  24% {
+    transform: rotate(4deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ringing {
+    animation: none;
+    outline: 2px solid var(--accent);
   }
 }
 /* reordering todo: a line where the dragged card would land */
