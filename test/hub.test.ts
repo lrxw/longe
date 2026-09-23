@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { serve } from "@hono/node-server";
@@ -281,5 +281,48 @@ describe("registry hub", () => {
     const s2 = Date.now();
     while (hub.get("shop") && Date.now() - s2 < 8000) await new Promise((r) => setTimeout(r, 50));
     expect(hub.get("shop")).toBeUndefined();
+  }, 20000);
+
+  it("New project: creates the folder with .ai/, registers it, opens its board", async () => {
+    await registerRepo(shop);
+    hub = await createRegistryHub({ index: { debounceMs: 20, usePolling: true } });
+    const home = path.join(base, "home");
+    await mkdir(home);
+    const app = createHttpApp(hub, { port: 1, home });
+    expect(await (await app.request("/")).text()).toContain('href="/repos/new"');
+    expect(await (await app.request("/repos/new")).text()).toContain('action="/repos/new"');
+
+    const post = (data: Record<string, string>, origin: string | null = "http://localhost") =>
+      app.request("http://localhost/repos/new", {
+        method: "POST",
+        body: new URLSearchParams(data),
+        headers: origin ? { origin } : {},
+      });
+    // another site, or no origin: refused
+    expect((await post({ path: "~/a" }, "http://evil.example")).status).toBe(403);
+    expect((await post({ path: "~/a" }, null)).status).toBe(403);
+    // outside home, relative, home itself, or a symlink that leads out: refused
+    for (const p of [path.join(base, "elsewhere"), "projects/x", "~", "~/../escape"]) {
+      const res = await post({ path: p });
+      expect(res.status, p).toBe(400);
+      expect(await res.text()).toMatch(/class="error">(Use an absolute path|The folder must be)/);
+    }
+    await symlink(base, path.join(home, "link"));
+    expect((await post({ path: "~/link/out" })).status).toBe(400);
+    await expect(stat(path.join(base, "out"))).rejects.toThrow();
+
+    const res = await post({ path: "~/code/fresh", name: "Fresh Idea" });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/r/fresh-idea/board");
+    const root = path.join(home, "code/fresh");
+    expect(await readFile(path.join(root, ".ai/config.yml"), "utf8")).toContain(
+      'project: "Fresh Idea"',
+    );
+    expect((await readRegistry()).map((r) => r.name)).toContain("fresh-idea");
+    expect(hub.get("fresh-idea")?.ctx).toBeDefined();
+    expect((await app.request("/r/fresh-idea/board")).status).toBe(200);
+    // an existing folder with .ai/ already: kept, same entry
+    expect((await post({ path: "~/code/fresh" })).status).toBe(303);
+    expect(hub.list().filter((r) => r.root.endsWith("fresh"))).toHaveLength(1);
   }, 20000);
 });

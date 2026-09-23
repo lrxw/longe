@@ -36,7 +36,8 @@ The files are the source of truth.
   choice, context and cost display. "Work on board" sends the agent through the active topics,
   then the todo queue.
 - **One server, many repositories.** A single `longe serve` shows every registered repository:
-  one shared inbox, one board and chat per repository.
+  one shared inbox, one board and chat per repository. "+ New project" on the inbox creates a
+  folder under your home folder (or takes an existing one), adds `.ai/` and opens its board.
 - **Any agent.** A standard MCP server (stdio and Streamable HTTP) plus a REST API with an
   OpenAPI document. Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline and others.
 - **Wake-up hooks.** Run a command when you answer a question, or feed new answers into the

@@ -21,9 +21,10 @@ async function exists(p: string): Promise<boolean> {
 
 /**
  * Creates the .ai/ layout (§3.1). Idempotent: existing files and folders are
- * left untouched and reported under `skipped`.
+ * left untouched and reported under `skipped`. `projectName` goes into a new
+ * config.yml (default: the folder name).
  */
-export async function runInit(repoRoot: string): Promise<InitResult> {
+export async function runInit(repoRoot: string, projectName?: string): Promise<InitResult> {
   const root = path.join(repoRoot, AI_DIR);
   const result: InitResult = { created: [], skipped: [] };
 
@@ -39,7 +40,7 @@ export async function runInit(repoRoot: string): Promise<InitResult> {
   }
 
   const files: Array<[string, string]> = [
-    [path.join(root, "config.yml"), defaultConfigText(path.basename(repoRoot))],
+    [path.join(root, "config.yml"), defaultConfigText(projectName ?? path.basename(repoRoot))],
     [path.join(root, "AGENT-INSTRUCTIONS.md"), AGENT_INSTRUCTIONS],
   ];
   for (const [file, content] of files) {

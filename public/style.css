@@ -784,6 +784,24 @@ form.prompt.compact {
 .tile.missing {
   opacity: 0.6;
 }
+.tile.new {
+  border-style: dashed;
+  box-shadow: none;
+  justify-content: center;
+}
+.new-project {
+  max-width: 36rem;
+}
+.new-project form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.new-project label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
 .tile strong {
   font-size: 1.02em;
   display: flex;

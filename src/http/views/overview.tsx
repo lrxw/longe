@@ -13,8 +13,8 @@ export function OverviewStrip({ repos }: { repos: RepoOverview[] }) {
   if (repos.length === 0) {
     return (
       <p class="empty">
-        No repos registered. Run <code>longe init</code> in a project, or{" "}
-        <code>longe repos add &lt;dir&gt;</code>.
+        No repos registered. <a href="/repos/new">Create a project</a>, run <code>longe init</code>{" "}
+        in a project, or <code>longe repos add &lt;dir&gt;</code>.
       </p>
     );
   }
@@ -54,6 +54,54 @@ export function OverviewStrip({ repos }: { repos: RepoOverview[] }) {
           )}
         </a>
       ))}
+      <a
+        class="tile new"
+        href="/repos/new"
+        title="Create a folder (or use an existing one) with .ai/"
+      >
+        <strong>+ New project</strong>
+        <span class="meta">folder, .ai/, board</span>
+      </a>
+    </section>
+  );
+}
+
+/** The "New project" form: a folder under home, an optional name. */
+export function NewProjectForm({
+  home,
+  path,
+  name,
+  error,
+}: {
+  home: string;
+  path?: string | undefined;
+  name?: string | undefined;
+  error?: string | undefined;
+}) {
+  return (
+    <section class="card new-project">
+      <h1>New project</h1>
+      <p class="meta">
+        Creates the folder if it is missing and adds <code>.ai/</code> (like <code>longe init</code>
+        ), then opens its board. An existing folder works too. Only folders inside {home}.
+      </p>
+      <form method="post" action="/repos/new">
+        <label>
+          Folder
+          <input name="path" value={path ?? "~/projects/"} required autocomplete="off" />
+        </label>
+        <label>
+          Name <span class="meta">(optional, default: the folder name)</span>
+          <input name="name" value={name ?? ""} autocomplete="off" />
+        </label>
+        {error ? <p class="error">{error}</p> : null}
+        <div class="row">
+          <a href="/">Cancel</a>
+          <button type="submit" class="primary">
+            Create
+          </button>
+        </div>
+      </form>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { type Context, Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -6,6 +7,7 @@ import { streamSSE } from "hono/streaming";
 import { CONTINUE_PROMPT, WORK_PROMPT } from "../app/agent.js";
 import type { AppContext } from "../app/context.js";
 import { Hub, type HubRepo } from "../app/hub.js";
+import { createProject } from "../app/new-project.js";
 import { DomainError } from "../domain/errors.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
 import { answerQuestion, human, setTopicStatus } from "../tools/ops.js";
@@ -19,7 +21,7 @@ import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./vi
 import { BoardFragment } from "./views/board.js";
 import { AnsweredStub, InboxFragment, type InboxItem, QuestionCard } from "./views/inbox.js";
 import { Layout, type RepoNav, ReposNav } from "./views/layout.js";
-import { OverviewStrip, type RepoOverview } from "./views/overview.js";
+import { NewProjectForm, OverviewStrip, type RepoOverview } from "./views/overview.js";
 import { StatusActions, TopicFragment } from "./views/topic.js";
 
 export const PUBLIC_DIR = path.resolve(import.meta.dirname, "../../public");
@@ -30,6 +32,8 @@ export const CHANGED_WINDOW_MS = 100;
 export interface HttpOptions {
   /** Port the server listens on; only used for the OpenAPI `servers` entry. */
   port?: number;
+  /** "New project" only creates folders in here (default: the home folder). */
+  home?: string;
 }
 
 function nav(hub: Hub, r: HubRepo): RepoNav {
@@ -249,6 +253,45 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       </Layout>,
     ),
   );
+  // ---- new project (hub mode): folder + .ai/ + registry, then its board ---------
+  const home = opts.home ?? os.homedir();
+  const newProjectPage = (
+    c: Context,
+    form: { path?: string; name?: string | undefined; error?: string } = {},
+    status: 200 | 400 | 403 = 200,
+  ) =>
+    c.html(
+      <Layout
+        title="New project"
+        project={projectLabel()}
+        inbox={inboxCounts()}
+        active="inbox"
+        repos={switcher()}
+      >
+        <NewProjectForm home={home} {...form} />
+      </Layout>,
+      status,
+    );
+  if (hub.mode === "hub") {
+    app.get("/repos/new", (c) => newProjectPage(c));
+    app.post("/repos/new", async (c) => {
+      const form = await c.req.parseBody();
+      const values = { path: str(form.path) ?? "", name: str(form.name) };
+      // any page open in the browser can post to 127.0.0.1: only accept our own
+      const origin = c.req.header("origin");
+      if (!origin || safeHost(origin) !== new URL(c.req.url).host)
+        return newProjectPage(c, { ...values, error: "Refused: not sent from this page." }, 403);
+      try {
+        const { entry, repo } = await createProject(hub, values, home);
+        if (repo?.missing) throw new Error(repo.missing);
+        return c.redirect(`${hub.base(entry.name)}/board`, 303);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return newProjectPage(c, { ...values, error: msg }, 400);
+      }
+    });
+  }
+
   app.get("/fragments/inbox", (c) => c.html(inboxFragment()));
   app.get("/fragments/inbox-badge", (c) => c.html(<InboxBadge counts={inboxCounts()} />));
   app.get("/fragments/repos", (c) =>
@@ -617,4 +660,13 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
 
 function str(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
+}
+
+/** `host[:port]` of an Origin header; undefined when it does not parse. */
+function safeHost(origin: string): string | undefined {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return undefined;
+  }
 }

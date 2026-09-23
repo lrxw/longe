@@ -90,6 +90,21 @@ export class Hub extends EventEmitter<HubEvents> {
     if (changed) this.emit("changed", { repo: "", kind: "repos", id: "" });
   }
 
+  /**
+   * Serves a repo that was just registered, without waiting for the registry
+   * watcher. Queued behind a running sync, so the two never add it twice.
+   */
+  async ensure(name: string, root: string): Promise<HubRepo | undefined> {
+    const run = this.syncing.then(async () => {
+      if (!this.repos.has(name)) await this.add(name, root, this.opts);
+    });
+    this.syncing = run.catch(() => {});
+    await run;
+    const r = this.repos.get(name);
+    if (r) this.emit("changed", { repo: "", kind: "repos", id: "" });
+    return r;
+  }
+
   get(name: string): HubRepo | undefined {
     return this.repos.get(name);
   }
