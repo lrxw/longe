@@ -529,6 +529,44 @@
       el.classList.remove("flash");
     }, 600);
   }
+  // Hold the inbox still while you are using it. A live refresh that puts a new question
+  // on top shifts every card down, and the button under your pointer turns into a
+  // different one just as you click. So while the pointer moves over the inbox, or you
+  // type in it, refreshes wait until you pause (HOLD_MS), for at most HOLD_MAX_MS.
+  var HOLD_MS = 1500;
+  var HOLD_MAX_MS = 20000;
+  var lastMove = 0;
+  var overInbox = false;
+  var heldSince = 0;
+  var retry = null;
+  document.addEventListener("pointermove", (e) => {
+    lastMove = Date.now();
+    overInbox = !!e.target?.closest?.("#inbox");
+  });
+  function usingInbox() {
+    var a = document.activeElement;
+    var typing = !!a?.closest?.("#inbox") && inField(a);
+    return typing || (overInbox && Date.now() - lastMove < HOLD_MS);
+  }
+  document.body.addEventListener("htmx:beforeRequest", (e) => {
+    var el = e.detail?.elt;
+    if (el?.id !== "inbox" || e.detail.requestConfig?.verb !== "get") return;
+    if (!usingInbox()) {
+      heldSince = 0;
+      return;
+    }
+    heldSince = heldSince || Date.now();
+    if (Date.now() - heldSince > HOLD_MAX_MS) {
+      heldSince = 0;
+      return; // held long enough: refresh anyway
+    }
+    e.preventDefault();
+    if (!retry)
+      retry = setTimeout(() => {
+        retry = null;
+        htmx.trigger(el, "sse:changed");
+      }, 700);
+  });
   document.body.addEventListener("htmx:afterSwap", (e) => {
     var el = e.detail?.target;
     // an outerHTML swap replaced the target: work on the live element, not the old one
