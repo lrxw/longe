@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { closeAppContext, createAppContext } from "../src/app/context.js";
 import { runInit } from "../src/cli/init.js";
-import { migrateBoardDir, staleMentions } from "../src/store/migrate.js";
+import { AGENT_INSTRUCTIONS } from "../src/domain/agent-instructions.js";
+import { migrateBoardDir, refreshInstructions, staleMentions } from "../src/store/migrate.js";
 import { hasBoardDir } from "../src/store/registry.js";
 
 let dir: string;
@@ -71,6 +72,20 @@ describe("board folder migration (.ai/ → .longe/)", () => {
     const r = await runInit(third);
     expect(r.skipped).toContain(`.longe${path.sep}`); // moved, not created fresh
     expect(await readFile(path.join(third, ".longe/config.yml"), "utf8")).toContain("Old");
+  });
+
+  it("keeps AGENT-INSTRUCTIONS.md at the current protocol", async () => {
+    await runInit(dir);
+    const file = path.join(dir, ".longe/AGENT-INSTRUCTIONS.md");
+    await writeFile(file, "old protocol text\n");
+    const ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
+    await closeAppContext(ctx);
+    expect(await readFile(file, "utf8")).toBe(AGENT_INSTRUCTIONS);
+    expect(await refreshInstructions(dir, AGENT_INSTRUCTIONS)).toBe(false); // already current
+    // no board, nothing written
+    const empty = path.join(dir, "empty");
+    await mkdir(empty);
+    expect(await refreshInstructions(empty, AGENT_INSTRUCTIONS)).toBe(false);
   });
 
   it("lists agent instruction files that still mention .ai/", async () => {

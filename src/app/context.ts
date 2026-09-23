@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
 import { EffectRunner, type Notifier, type EffectRunner as Runner } from "../index/effects.js";
 import { AiIndex, type IndexOptions } from "../index/index.js";
 import { type Config, parseConfig } from "../store/config.js";
-import { migrateBoardDir } from "../store/migrate.js";
+import { migrateBoardDir, refreshInstructions } from "../store/migrate.js";
 import { configPath } from "../store/paths.js";
 import { Repo } from "../store/repo.js";
 import { AgentRunner } from "./agent.js";
@@ -37,6 +38,8 @@ export interface AppOptions {
 /** Loads config, starts the index and wires external-change side effects. */
 export async function createAppContext(root: string, opts: AppOptions = {}): Promise<AppContext> {
   await migrateBoardDir(root); // an old .ai/ board becomes .longe/
+  // the protocol changes with longe: every repo gets the current text
+  await refreshInstructions(root, AGENT_INSTRUCTIONS).catch(() => false);
   let config: Config = { version: 1 };
   try {
     config = parseConfig(await readFile(configPath(root), "utf8"), "config.yml");

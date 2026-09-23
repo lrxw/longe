@@ -1,7 +1,7 @@
-import { readFile, rename, stat } from "node:fs/promises";
+import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseConfig } from "./config.js";
-import { BOARD_DIR, boardDir } from "./paths.js";
+import { BOARD_DIR, boardDir, instructionsPath } from "./paths.js";
 
 /** Where the board lived before it was renamed to `.longe/`. */
 export const LEGACY_DIR = ".ai";
@@ -36,6 +36,20 @@ export async function migrateBoardDir(root: string): Promise<boolean> {
     process.stderr.write(
       `longe: these files still mention .ai/; change them to .longe/: ${stale.join(", ")}\n`,
     );
+  return true;
+}
+
+/**
+ * Keeps `.longe/AGENT-INSTRUCTIONS.md` at the current protocol: `longe init` writes it
+ * once, and the protocol changes with longe. Rewritten when it differs (or is
+ * missing while the board exists). Returns true when it wrote the file.
+ */
+export async function refreshInstructions(root: string, text: string): Promise<boolean> {
+  if (!(await isDir(boardDir(root)))) return false;
+  const file = instructionsPath(root);
+  const current = await readFile(file, "utf8").catch(() => undefined);
+  if (current === text) return false;
+  await writeFile(file, text);
   return true;
 }
 

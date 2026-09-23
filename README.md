@@ -148,7 +148,7 @@ Everything lives in the repository's `.longe/` folder:
 ```
 .longe/
   config.yml                     # project name, color, hooks, chat settings
-  AGENT-INSTRUCTIONS.md          # the protocol agents follow (written by longe init)
+  AGENT-INSTRUCTIONS.md          # the protocol agents follow (kept current by longe; do not edit)
   topics/<slug>.md               # one topic: frontmatter + Goal, Plan, Decisions, Log
   questions/q-YYYYMMDD-xxxx.md   # one question and its answer
   messages/m-YYYYMMDD-xxxx.md    # messages you sent in the chat
