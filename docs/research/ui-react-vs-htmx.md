@@ -5,10 +5,10 @@ browser (topic `morph-swaps-for-live-refreshes-htmx-idiomorph`). Board topic:
 `research-react-vs-htmx-idiomorph-for-the-longe-ui`.
 
 **Sources.** Facts about longe come from the codebase and the board's topic history, with
-file references. Web search was not available when this was written. Claims about idiomorph
-are now checked against its source (`node_modules/idiomorph`, version 0.8.0) and against the
-implementation, and are marked *(verified)*. Claims about React and the other options are from
-general knowledge and stay *(unverified)*.
+file references. Claims about idiomorph are checked against its source (`node_modules/idiomorph`,
+version 0.8.0) and against the implementation, and are marked *(verified)*. Claims about React,
+Alpine.js and Datastar were checked on the web on 2026-09-23 and link their source. What is left
+*(unverified)* is general knowledge that did not matter for the decision.
 
 ## Recommendation
 
@@ -64,7 +64,8 @@ morphing addresses it.
 - The markup barely changes. The routes and the server stay as they are.
 
 **What it fixes.** Idiomorph matches existing elements by `id` and updates them in place instead
-of replacing them *(unverified)*. The elements that survive keep:
+of replacing them *(verified; see the soft-match risk below for elements without an `id`)*.
+The elements that survive keep:
 - focus, caret and selection,
 - the scroll position of the transcript,
 - the element identity, so the "detached target" workaround goes away.
@@ -115,7 +116,10 @@ response versioning. The server-side bugs remain.
 
 **Cost.**
 - Weeks rather than a day.
-- About 45 KB gzipped of React *(unverified figure; Preact is a much smaller alternative)*.
+- About 59 KB gzipped (186 KB minified) for React 19.0 in a Vite production build, up from
+  about 46 KB for React 18.3 *(verified: [test-react-bundle-size](https://github.com/guoyunhe/test-react-bundle-size))*.
+  Bundlephobia's figure for `react-dom` (1.4 KB) counts only the entry stub, not the client
+  build. Preact is a much smaller alternative.
 - Two rendering stacks during the migration, and tests that change from HTML assertions to
   component tests.
 
@@ -125,9 +129,16 @@ complex drag and drop, or offline mode.
 ## Options named for completeness
 
 - **Alpine.js next to htmx:** local UI state such as disclosures and drafts, declaratively.
-  It has a morph plugin *(unverified)*.
-- **Datastar:** SSE plus morphing as its core model, close to what longe does *(unverified)*.
-  It would replace htmx rather than add to it.
+  Its morph plugin updates an element from new HTML "while preserving any browser or Alpine
+  state" ([Alpine docs](https://alpinejs.dev/plugins/morph)). The htmx extension
+  `alpine-morph` (`hx-ext="alpine-morph"`, `hx-swap="morph"`) uses it as the swap, so Alpine
+  state survives htmx swaps ([htmx-extensions](https://github.com/bigskysoftware/htmx-extensions/tree/main/src/alpine-morph);
+  published as `htmx-ext-alpine-morph@2.0.0`) *(verified; the page does not state htmx 2
+  support in words, only the 2.x version number)*.
+- **Datastar:** a single 11.9 KiB file. It accepts plain HTML or an SSE stream
+  (`text/event-stream`) from the server, and the server patches elements into the page
+  ([data-star.dev](https://data-star.dev/)) *(verified)*. That is close to what longe does. It
+  would replace htmx rather than add to it.
 - **Preact:** React's model at a fraction of the size. It still needs a build step and the
   same data layer as option B.
 
@@ -137,6 +148,6 @@ complex drag and drop, or offline mode.
    (`/vendor/<name>`). The `app.js` review kept the live-element lookup (the badges still use
    outerHTML), the transcript follow-to-end, and the carry-over of typed text; the old details
    restore is gone.
-2. Open: verify the remaining *(unverified)* claims about React, Alpine.js and Datastar once
-   web tools are allowed. They would not change the decision unless the UI moves to heavy
-   client-side interaction.
+2. Done: the claims about React, Alpine.js and Datastar are checked on the web (2026-09-23).
+   React 19 is larger than first stated (about 59 KB gzipped, not 45 KB), which strengthens
+   option A. None of the checks changes the decision.
