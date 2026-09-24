@@ -63,7 +63,7 @@ export interface AgentStatus {
 }
 
 /** Choices offered on the chat page; the config default and a custom id are added when set. */
-export const MODEL_CHOICES = ["opus", "sonnet", "haiku"];
+export const MODEL_CHOICES = ["fable", "opus", "sonnet", "haiku"];
 
 function shellQuote(s: string): string {
   return /^[A-Za-z0-9_\-./~]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`;
