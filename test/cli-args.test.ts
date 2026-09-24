@@ -68,4 +68,17 @@ describe("parseCli", () => {
       expect((e as CliError).exitCode).toBe(0);
     }
   });
+
+  it("--version and -v print the package version and exit 0", () => {
+    for (const flag of ["--version", "-v"]) {
+      try {
+        parseCli([flag]);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(CliError);
+        expect((e as CliError).exitCode).toBe(0);
+        expect((e as CliError).message).toMatch(/^longe \d+\.\d+\.\d+/);
+      }
+    }
+  });
 });

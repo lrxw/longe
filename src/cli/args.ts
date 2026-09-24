@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { parseArgs } from "node:util";
 
 export type Command = "init" | "serve" | "mcp" | "answers" | "status" | "stop" | "repos" | "hooks";
@@ -36,6 +38,7 @@ Options:
   --daemon, -d   Run serve in the background (log in ~/.cache/longe/serve/)
   --name   With repos add: display name
   -h, --help
+  -v, --version
 `;
 
 const OPTIONS = {
@@ -47,7 +50,18 @@ const OPTIONS = {
   all: { type: "boolean", default: false },
   name: { type: "string" },
   help: { type: "boolean", short: "h", default: false },
+  version: { type: "boolean", short: "v", default: false },
 } as const;
+
+/** The version from package.json, two levels up from this file in src/ and in dist/ alike. */
+export function packageVersion(): string {
+  try {
+    const text = readFileSync(path.resolve(import.meta.dirname, "../../package.json"), "utf8");
+    return (JSON.parse(text) as { version?: string }).version ?? "?";
+  } catch {
+    return "?";
+  }
+}
 
 export class CliError extends Error {
   constructor(
@@ -77,6 +91,7 @@ export function parseCli(argv: string[]): ParsedCli {
   const { values, positionals } = parsed;
 
   if (values.help) throw new CliError(USAGE, 0);
+  if (values.version) throw new CliError(`longe ${packageVersion()}`, 0);
 
   const command = positionals[0];
   const commands: Command[] = [
