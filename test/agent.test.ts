@@ -1,3 +1,5 @@
+import type { spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -737,6 +739,41 @@ done
     expect(idle).toBe(1);
     await runner.close();
   }, 10000);
+
+  it("a reply that lands while its message is still being booked still frees the chat", async () => {
+    // an in-process stand-in that answers on the same tick the message is written, so
+    // the result arrives before say() has finished its bookkeeping (a fast claude on CI)
+    const child = Object.assign(new EventEmitter(), {
+      pid: 1,
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      stdin: Object.assign(new EventEmitter(), {
+        write: () => {
+          child.stdout.emit(
+            "data",
+            Buffer.from(
+              '{"type":"system","subtype":"init","session_id":"s","model":"m"}\n{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"s"}\n',
+            ),
+          );
+          return true;
+        },
+        end: () => {},
+      }),
+      kill: () => {
+        setImmediate(() => child.emit("close", 0));
+        return true;
+      },
+    });
+    const runner = new AgentRunner(dir, {}, "instant", (() => child) as unknown as typeof spawn);
+    let idle = 0;
+    runner.on("agent:idle", () => idle++);
+    await runner.say("human", "hi");
+    await waitFor(() => !runner.busy());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(runner.status().events.some((e) => e.kind === "result")).toBe(true);
+    expect(idle).toBe(1);
+    await runner.close();
+  });
 
   it("answersPrompt: one answer reads like before, several are listed", () => {
     const one = { question_id: "q-1", topic_id: "t", answer: "yes" };

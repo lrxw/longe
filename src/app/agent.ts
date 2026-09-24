@@ -367,6 +367,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       .catch(() => {})
       .finally(() => {
         this.queued--;
+        // a fast reply can end the turn while the message is still being booked
+        // (see deliver): the result saw the chat as busy, so idle is announced here
+        if (this.child && !this.busy()) this.emit("agent:idle");
       });
     return m;
   }
