@@ -533,7 +533,8 @@ dialog.confirm p {
   margin: 0 0 0.9rem;
   line-height: 1.45;
 }
-dialog.confirm input {
+dialog.confirm input,
+dialog.confirm textarea {
   width: 100%;
   margin-bottom: 0.9rem;
 }
@@ -602,8 +603,13 @@ form.answer {
   display: flex;
   gap: 0.5rem;
 }
-.row input {
+.row input,
+.row textarea {
   flex: 1;
+}
+/* the note grows with what you type; the button stays at its own height, at the bottom */
+form.answer .row {
+  align-items: flex-end;
 }
 .hookstatus {
   margin: 0 0 1rem;
@@ -1135,8 +1141,13 @@ ul.commits li {
   gap: 0.4rem;
   margin: 0;
 }
+/* the reject form takes a row of its own: a reason is more than a few words */
 .actions form.reject {
-  margin-left: auto;
+  flex: 1 1 100%;
+  align-items: flex-end;
+}
+.actions form.reject textarea {
+  flex: 1;
 }
 .status {
   font-weight: 600;

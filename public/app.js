@@ -194,13 +194,15 @@
         },
       );
     if (from === "review" && to === "active") {
-      ask("Reason for rejecting (required):", { input: true, ok: "Reject", danger: true }).then(
-        (note) => {
-          if (!note?.trim()) return;
-          body.set("note", note.trim());
-          send();
-        },
-      );
+      ask("Reason for rejecting (required):", {
+        input: "multiline",
+        ok: "Reject",
+        danger: true,
+      }).then((note) => {
+        if (!note?.trim()) return;
+        body.set("note", note.trim());
+        send();
+      });
       return;
     }
     if (to === "cancelled") {
@@ -213,7 +215,8 @@
   });
 
   // A dialog in the page's style instead of the browser's confirm()/prompt(). Resolves
-  // with true (or the typed text) on OK, null on cancel or Escape.
+  // with true (or the typed text) on OK, null on cancel or Escape. `input: true` asks
+  // for a line, `input: "multiline"` for a text (Enter breaks the line, Cmd/Ctrl+Enter is OK).
   function ask(message, opts) {
     var o = opts || {};
     return new Promise((resolve) => {
@@ -226,8 +229,17 @@
       form.appendChild(p);
       var input = null;
       if (o.input) {
-        input = document.createElement("input");
+        input = document.createElement(o.input === "multiline" ? "textarea" : "input");
         input.autocomplete = "off";
+        if (o.input === "multiline") {
+          input.rows = 3;
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              ok.click();
+            }
+          });
+        }
         form.appendChild(input);
       }
       var row = document.createElement("div");

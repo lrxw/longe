@@ -103,7 +103,11 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
           placeholder={options.length ? "Or answer in your own words…" : "Answer…"}
         />
         <div class="row">
-          <input name="note" placeholder="Note (optional)" />
+          <textarea
+            name="note"
+            rows={2}
+            placeholder="Note (optional): details, a reason, next steps…"
+          />
           <button type="submit" class="primary">
             Answer
           </button>

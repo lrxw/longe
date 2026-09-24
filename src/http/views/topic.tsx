@@ -53,7 +53,7 @@ export function StatusActions({
           class="reject"
         >
           <input type="hidden" name="status" value="active" />
-          <input name="note" placeholder="Reason for rejecting (required)" required />
+          <textarea name="note" rows={2} placeholder="Reason for rejecting (required)" required />
           <button type="submit" class="danger">
             Reject
           </button>
