@@ -652,7 +652,7 @@ describe("agent over HTTP", () => {
     expect(msgs).toHaveLength(3);
     expect(msgs[2]?.text).toContain("q-20260922-bbbb");
     expect(msgs[2]?.text).not.toContain("q-20260922-aaaa");
-  });
+  }, 20000); // three turns of the fake agent plus a polling watcher: slow on CI runners
 
   it("an answer given mid-turn waits and is handed over when the turn ends", async () => {
     // a slow agent: every turn takes 0.6 s
