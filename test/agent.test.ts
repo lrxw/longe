@@ -191,7 +191,8 @@ describe("AgentRunner", () => {
 
     // stop kills the process; the session survives a restart of the runner
     expect(runner.stop()).toBe(true);
-    await waitFor(() => !runner.status().alive);
+    await runner.close();
+    expect(runner.status().alive).toBe(false);
     const again = new AgentRunner(dir, { command: fake }, "test");
     await new Promise((r) => setTimeout(r, 50));
     expect(again.status().sessionId).toBe("sess-1");
@@ -305,8 +306,7 @@ done
     expect(await inputLines()).toEqual(["by hand", "now"]);
     const m = (await runner.messages()).find((x) => x.fm.id === early.fm.id);
     expect(m?.fm.delivered_at).toBeDefined();
-    runner.stop();
-    await waitFor(() => !runner.status().alive);
+    await runner.close();
   });
 
   it("reads the old sessions file that stored one id per key", async () => {
@@ -377,8 +377,8 @@ done
     await later.setModel("");
     expect(later.status().model).toBe("sonnet");
     expect(later.status().modelOverride).toBeUndefined();
-    runner.stop();
-    await waitFor(() => !runner.status().alive);
+    await runner.close();
+    await later.close();
   });
 
   it("close waits for the process to end; a process that ignores SIGTERM is killed", async () => {
@@ -427,8 +427,7 @@ while IFS= read -r line; do :; done
     expect(answeredPrompt(vars)).toContain(
       "Question q-20260922-aaaa on topic `t1` was answered: yes",
     );
-    runner.stop();
-    await waitFor(() => !runner.status().alive);
+    await runner.close();
   });
 
   it("notifyActivated starts the chat even without a session", async () => {
@@ -442,8 +441,7 @@ while IFS= read -r line; do :; done
       'moved topic `t1` ("T one") to active (from review; note: tests missing)',
     );
     expect(activatedPrompt({ id: "t1", title: "T", from: "backlog" })).toContain("(from backlog)");
-    runner.stop();
-    await waitFor(() => !runner.status().alive);
+    await runner.close();
   });
 
   it("reports a missing binary instead of throwing; the message waits", async () => {
@@ -453,6 +451,7 @@ while IFS= read -r line; do :; done
     expect(runner.status().events[0]?.text).toMatch(/not found|ENOENT/);
     await waitFor(() => !runner.status().alive);
     expect((await runner.messages())[0]?.fm.delivered_at).toBeUndefined();
+    await runner.close();
   });
 });
 

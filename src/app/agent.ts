@@ -225,6 +225,10 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private notifyTimer: NodeJS.Timeout | undefined;
   private idleTimer: NodeJS.Timeout | undefined;
   private sending: Promise<void> = Promise.resolve();
+  /** The last file write (log, sessions); see write(). */
+  private writes: Promise<void> = Promise.resolve();
+  /** The exit bookkeeping of the last process; close() waits for it. */
+  private closing: Promise<void> = Promise.resolve();
   readonly logFile: string;
   private readonly sessionsFile: string;
   readonly idleMinutes: number;
@@ -285,20 +289,17 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
   }
 
-  private async saveSession(): Promise<void> {
-    try {
+  private saveSession(): Promise<void> {
+    // the state is taken now, the write waits its turn (losing it only costs continuity)
+    const text = JSON.stringify(
+      { ...(this.session ? { chat: this.session } : {}), model: this.modelOverride },
+      null,
+      2,
+    );
+    return this.write(async () => {
       await mkdir(agentLogDir(), { recursive: true });
-      await writeFile(
-        this.sessionsFile,
-        JSON.stringify(
-          { ...(this.session ? { chat: this.session } : {}), model: this.modelOverride },
-          null,
-          2,
-        ),
-      );
-    } catch {
-      // losing the session only costs continuity
-    }
+      await writeFile(this.sessionsFile, text);
+    });
   }
 
   status(): AgentStatus {
@@ -420,15 +421,19 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    */
   async close(graceMs = 3000): Promise<void> {
     const child = this.child;
-    if (!child) return;
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(() => child.kill("SIGKILL"), graceMs);
-      child.once("close", () => {
-        clearTimeout(timer);
-        resolve();
+    if (child) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => child.kill("SIGKILL"), graceMs);
+        child.once("close", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        this.stop();
       });
-      this.stop();
-    });
+    }
+    // the exit bookkeeping and the last file writes: after this nothing touches the disk
+    await this.closing;
+    await this.writes;
   }
 
   /**
@@ -560,12 +565,12 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         err.message.includes("ENOENT") ? `${command}: command not found` : err.message,
       );
       void this.log(`error: ${err.message}\n`);
-      if (this.child === child) void this.closed(null);
+      if (this.child === child) this.closing = this.closed(null);
     });
     child.on("close", (code) => {
       if (buf.trim()) this.ingest(buf);
       buf = "";
-      if (this.child === child) void this.closed(code);
+      if (this.child === child) this.closing = this.closed(code);
     });
     return child.pid !== undefined;
   }
@@ -612,13 +617,23 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     this.idleTimer = undefined;
   }
 
-  private async log(line: string): Promise<void> {
-    try {
+  private log(line: string): Promise<void> {
+    return this.write(async () => {
       await mkdir(path.dirname(this.logFile), { recursive: true });
       await appendFile(this.logFile, line);
-    } catch {
-      // logging must never break the run
-    }
+    });
+  }
+
+  /**
+   * File writes (log, sessions) run one after the other, in order, and never
+   * throw; close() waits for the last one so nothing lands after the runner is gone.
+   */
+  private write(work: () => Promise<void>): Promise<void> {
+    const next = this.writes.then(work).catch(() => {
+      // logging and session bookkeeping must never break the run
+    });
+    this.writes = next;
+    return next;
   }
 
   private push(kind: AgentEvent["kind"], text: string): void {
