@@ -16,10 +16,10 @@ async function main(argv: string[]): Promise<number> {
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
       const { askInInboxEnabled, installHook } = await import("./hooks.js");
       if (await askInInboxEnabled(repo)) {
-        const added = await installHook(repo).catch(() => false);
+        const added = await installHook(repo, cli.local).catch(() => false);
         if (added)
           process.stdout.write(
-            "hook     .claude/settings.json: Claude Code questions go to the inbox (ask_in_inbox; `longe hooks remove` undoes it)\n",
+            `hook     .claude/${cli.local ? "settings.local.json" : "settings.json"}: Claude Code questions go to the inbox (ask_in_inbox; \`longe hooks remove${cli.local ? " --local" : ""}\` undoes it)\n`,
           );
       }
       process.stdout.write(
@@ -57,7 +57,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "hooks": {
       const { runHooks } = await import("./hooks.js");
-      return runHooks(cli.rest, repo);
+      return runHooks(cli.rest, repo, cli.local);
     }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");

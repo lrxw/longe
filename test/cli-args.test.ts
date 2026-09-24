@@ -10,6 +10,7 @@ describe("parseCli", () => {
       open: false,
       json: false,
       daemon: false,
+      local: false,
       repoGiven: false,
       rest: [],
     });
@@ -23,6 +24,7 @@ describe("parseCli", () => {
       open: true,
       json: false,
       daemon: false,
+      local: false,
       repoGiven: true,
       rest: [],
     });
@@ -39,6 +41,12 @@ describe("parseCli", () => {
       rest: ["add", "/x"],
       name: "X",
     });
+    expect(parseCli(["hooks", "install", "--local"])).toMatchObject({
+      command: "hooks",
+      rest: ["install"],
+      local: true,
+    });
+    expect(parseCli(["init", "--local"])).toMatchObject({ command: "init", local: true });
   });
 
   it("reports missing option values and unknown flags with usage", () => {

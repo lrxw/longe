@@ -139,6 +139,9 @@ Claude Code has its own way to ask you, the AskUserQuestion tool. With the optio
   question lands in the inbox (blocking, with its options) instead of the terminal. The
   agent is told the question id, so it can wait for the answer or continue on an
   assumption. The hook calls `longe`, so it must be on your PATH.
+- `--local` on `longe init` or `longe hooks install` puts the hook into
+  `.claude/settings.local.json` (your own, git-ignored) instead of the shared file, for
+  a repository where not everyone uses longe. `longe hooks remove --local` undoes it.
 
 To turn it all off, set this in `.longe/config.yml`; the hook then lets questions through:
 
