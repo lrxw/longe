@@ -310,16 +310,12 @@ full design is in [SPEC.md](./SPEC.md).
 
 ### Releasing
 
-Bump `version` in `package.json`, commit, and push a matching tag:
-
-```sh
-git tag v0.1.1 && git push origin main v0.1.1
-```
-
+On GitHub, open *Actions → Release → Run workflow* and pick `patch`, `minor` or `major`.
 The [release workflow](.github/workflows/release.yml) runs lint, typecheck and tests, builds,
-packs `longe-<version>.tgz` and publishes a GitHub release with that file plus `longe.tgz`
-(the stable name behind the `releases/latest/download/` URL). It fails if the tag does not
-match `package.json`.
+bumps `version` in `package.json` (commit `chore: release x.y.z` plus tag `vx.y.z`, pushed
+to the branch it ran on), packs `longe-<version>.tgz` and publishes a GitHub release with
+that file plus `longe.tgz` (the stable name behind the `releases/latest/download/` URL).
+Pull afterwards to get the version commit.
 
 ## Roadmap
 
