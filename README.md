@@ -53,10 +53,13 @@ The files are the source of truth.
 ## Install
 
 ```sh
-npm install -g github:lrxw/longe
+npm install -g https://github.com/lrxw/longe/releases/latest/download/longe.tgz
 ```
 
-npm clones the repository, builds it (the `prepare` script runs `tsc`) and installs the result.
+That is the built tarball of the latest [release](https://github.com/lrxw/longe/releases);
+nothing is compiled on your machine. Run the same command again to update. To pin a version,
+take the versioned file from the release page, for example
+`.../releases/download/v0.1.0/longe-0.1.0.tgz`.
 
 Or from a clone:
 
@@ -305,11 +308,24 @@ with JSX and updated live over server-sent events with [htmx](https://htmx.org) 
 [idiomorph](https://github.com/bigskysoftware/idiomorph); there is no client build step. The
 full design is in [SPEC.md](./SPEC.md).
 
+### Releasing
+
+Bump `version` in `package.json`, commit, and push a matching tag:
+
+```sh
+git tag v0.1.1 && git push origin main v0.1.1
+```
+
+The [release workflow](.github/workflows/release.yml) runs lint, typecheck and tests, builds,
+packs `longe-<version>.tgz` and publishes a GitHub release with that file plus `longe.tgz`
+(the stable name behind the `releases/latest/download/` URL). It fails if the tag does not
+match `package.json`.
+
 ## Roadmap
 
 Planned or under consideration:
 
-- A release on the npm registry (`npm install -g longe`)
+- A release on the npm registry (`npm install -g longe`) instead of the GitHub tarball
 - Editing topic text directly in the UI
 - Search and an archive view
 - Chat with other coding agents besides Claude Code
