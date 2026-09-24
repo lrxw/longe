@@ -32,6 +32,9 @@ dependencies:
   node-notifier:
     specifier: ^10.0.1
     version: 10.0.1
+  typescript:
+    specifier: ^7.0.2
+    version: 7.0.2
   yaml:
     specifier: ^2.9.1
     version: 2.9.1
@@ -55,9 +58,6 @@ devDependencies:
   tsx:
     specifier: ^4.23.15
     version: 4.23.15
-  typescript:
-    specifier: ^7.0.2
-    version: 7.0.2
   vitest:
     specifier: ^5.0.1
     version: 5.0.1(@types/node@26.6.2)(vite@8.3.0)
@@ -632,7 +632,7 @@ packages:
     cpu: [ppc64]
     os: [aix]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-darwin-arm64@7.0.2:
@@ -641,7 +641,7 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-darwin-x64@7.0.2:
@@ -650,7 +650,7 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-freebsd-arm64@7.0.2:
@@ -659,7 +659,7 @@ packages:
     cpu: [arm64]
     os: [freebsd]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-freebsd-x64@7.0.2:
@@ -668,7 +668,7 @@ packages:
     cpu: [x64]
     os: [freebsd]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-arm64@7.0.2:
@@ -677,7 +677,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-arm@7.0.2:
@@ -686,7 +686,7 @@ packages:
     cpu: [arm]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-loong64@7.0.2:
@@ -695,7 +695,7 @@ packages:
     cpu: [loong64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-mips64el@7.0.2:
@@ -704,7 +704,7 @@ packages:
     cpu: [mips64el]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-ppc64@7.0.2:
@@ -713,7 +713,7 @@ packages:
     cpu: [ppc64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-riscv64@7.0.2:
@@ -722,7 +722,7 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-s390x@7.0.2:
@@ -731,7 +731,7 @@ packages:
     cpu: [s390x]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-linux-x64@7.0.2:
@@ -740,7 +740,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-netbsd-arm64@7.0.2:
@@ -749,7 +749,7 @@ packages:
     cpu: [arm64]
     os: [netbsd]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-netbsd-x64@7.0.2:
@@ -758,7 +758,7 @@ packages:
     cpu: [x64]
     os: [netbsd]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-openbsd-arm64@7.0.2:
@@ -767,7 +767,7 @@ packages:
     cpu: [arm64]
     os: [openbsd]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-openbsd-x64@7.0.2:
@@ -776,7 +776,7 @@ packages:
     cpu: [x64]
     os: [openbsd]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-sunos-x64@7.0.2:
@@ -785,7 +785,7 @@ packages:
     cpu: [x64]
     os: [sunos]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-win32-arm64@7.0.2:
@@ -794,7 +794,7 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@typescript/typescript-win32-x64@7.0.2:
@@ -803,7 +803,7 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@vitest/mocker@5.0.1(vite@8.3.0):
@@ -1863,7 +1863,7 @@ packages:
       '@typescript/typescript-sunos-x64': 7.0.2
       '@typescript/typescript-win32-arm64': 7.0.2
       '@typescript/typescript-win32-x64': 7.0.2
-    dev: true
+    dev: false
 
   /uc.micro@3.0.0:
     resolution: {integrity: sha512-U3PppEkleoTnIfi8BozMx3yju3qc/L6SwqWo2Sw+54PX+PX0q9I+r1Um5HCmqD7n9VDX5/v3vQH/AjA6deDdtw==}

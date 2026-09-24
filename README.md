@@ -56,6 +56,8 @@ The files are the source of truth.
 npm install -g github:lrxw/longe
 ```
 
+npm clones the repository, builds it (the `prepare` script runs `tsc`) and installs the result.
+
 Or from a clone:
 
 ```sh

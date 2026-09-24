@@ -39,6 +39,7 @@
     "idiomorph": "^0.8.0",
     "markdown-it": "^15.0.2",
     "node-notifier": "^10.0.1",
+    "typescript": "^7.0.2",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
@@ -48,7 +49,6 @@
     "@types/node": "^26.6.2",
     "@types/node-notifier": "^8.0.5",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   },
   "repository": {
