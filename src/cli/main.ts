@@ -13,7 +13,9 @@ async function main(argv: string[]): Promise<number> {
       await registerRepo(repo).catch(() => undefined);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
       for (const line of result.updated)
-        process.stdout.write(`updated  ${line}: points to .longe/AGENT-INSTRUCTIONS.md\n`);
+        process.stdout.write(
+          `updated  ${line}: points to ${line === "CLAUDE.md" ? "AGENTS.md" : ".longe/AGENT-INSTRUCTIONS.md"}\n`,
+        );
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
       const { askInInboxEnabled, installHook } = await import("./hooks.js");
@@ -28,7 +30,7 @@ async function main(argv: string[]): Promise<number> {
         `\n.longe/ ready in ${repo}\n\nNext:\n` +
           "  1. Connect your agent, e.g.:  claude mcp add longe -- longe mcp --repo .\n" +
           "  2. Open the board:             longe serve --open\n" +
-          "  Other agents (.cursorrules, GEMINI.md, …) need the line from CLAUDE.md / AGENTS.md.\n",
+          "  Agents that do not read AGENTS.md (.cursorrules, GEMINI.md, …) need its line in their own file.\n",
       );
       return 0;
     }

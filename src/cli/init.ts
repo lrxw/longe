@@ -12,11 +12,15 @@ export interface InitResult {
   updated: string[];
 }
 
-/** The one line an agent's instruction file needs; init writes it, the README shows it. */
+/** The one line AGENTS.md needs; init writes it, the README shows it. */
 export const POINTER_LINE =
   "Follow .longe/AGENT-INSTRUCTIONS.md for tracking work and asking questions.";
-/** Repo-root files agents read; existing ones get the pointer, else both are created. */
-const INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md"];
+/**
+ * CLAUDE.md gets a link, not the protocol: AGENTS.md is the provider-agnostic file, and
+ * Claude reads it when told to (progressive disclosure, no `@import` that inlines it).
+ */
+export const CLAUDE_LINE =
+  "Read AGENTS.md first: the instructions for every agent working in this repository.";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -68,29 +72,28 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
 }
 
 /**
- * CLAUDE.md and AGENTS.md in the repo root get the pointer line: appended to each one
- * that exists and does not mention the instructions yet; when neither exists, both
- * are created with just that line (Claude Code reads only CLAUDE.md, most other
- * agents AGENTS.md).
+ * AGENTS.md (every agent) points at the protocol; CLAUDE.md (Claude Code reads only
+ * that one) points at AGENTS.md. Each file is created with its line when missing,
+ * gets the line appended when it does not mention the target yet, and is left alone
+ * otherwise. A CLAUDE.md that already names the protocol directly counts as linked.
  */
 async function linkInstructions(repoRoot: string, result: InitResult): Promise<void> {
-  const existing: string[] = [];
-  for (const name of INSTRUCTION_FILES) {
+  const files: Array<[name: string, line: string, mentions: string[]]> = [
+    ["AGENTS.md", POINTER_LINE, [".longe/AGENT-INSTRUCTIONS.md"]],
+    ["CLAUDE.md", CLAUDE_LINE, ["AGENTS.md", ".longe/AGENT-INSTRUCTIONS.md"]],
+  ];
+  for (const [name, line, mentions] of files) {
     const file = path.join(repoRoot, name);
     const text = await readFile(file, "utf8").catch(() => undefined);
-    if (text === undefined) continue;
-    existing.push(name);
-    if (text.includes(".longe/AGENT-INSTRUCTIONS.md")) {
+    if (text === undefined) {
+      await writeFile(file, `${line}\n`, { flag: "wx" });
+      result.created.push(name);
+    } else if (mentions.some((m) => text.includes(m))) {
       result.skipped.push(name);
-      continue;
+    } else {
+      const gap = text === "" || text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
+      await appendFile(file, `${gap}${line}\n`);
+      result.updated.push(name);
     }
-    const gap = text === "" || text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
-    await appendFile(file, `${gap}${POINTER_LINE}\n`);
-    result.updated.push(name);
-  }
-  if (existing.length > 0) return;
-  for (const name of INSTRUCTION_FILES) {
-    await writeFile(path.join(repoRoot, name), `${POINTER_LINE}\n`, { flag: "wx" });
-    result.created.push(name);
   }
 }
