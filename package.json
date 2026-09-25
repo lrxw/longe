@@ -1,6 +1,6 @@
 {
   "name": "longe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local-first board for tracking work done by AI coding agents: topics, decisions, and a question inbox, stored as markdown in your repo. MCP + REST + htmx UI.",
   "type": "module",
   "license": "MIT",
