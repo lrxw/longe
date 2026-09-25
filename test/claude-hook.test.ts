@@ -38,22 +38,6 @@ describe("AskUserQuestion → inbox hook", () => {
     expect(await settings()).toEqual({ permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [] } });
   });
 
-  it("--local puts the hook into settings.local.json and leaves the shared file alone", async () => {
-    const local = path.join(dir, ".claude/settings.local.json");
-    expect(await installHook(dir)).toBe(true); // the shared file, as `longe init` does it
-    expect(await installHook(dir, true)).toBe(true);
-    expect(await installHook(dir, true)).toBe(false);
-    expect(JSON.parse(await readFile(local, "utf8")).hooks.PreToolUse).toEqual([
-      { matcher: "AskUserQuestion", hooks: [{ type: "command", command: HOOK_COMMAND }] },
-    ]);
-    // the two files are independent: the shared one keeps its copy until removed itself
-    expect((await settings()).hooks.PreToolUse).toHaveLength(1);
-    expect(await removeHook(dir)).toBe(true);
-    expect(await removeHook(dir, true)).toBe(true);
-    expect(await removeHook(dir, true)).toBe(false);
-    expect(JSON.parse(await readFile(local, "utf8"))).toEqual({});
-  });
-
   it("the hook turns the question into a blocking inbox question and denies the tool", async () => {
     const sub = path.join(dir, "src/deep");
     await mkdir(sub, { recursive: true });

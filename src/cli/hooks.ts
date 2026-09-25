@@ -32,9 +32,8 @@ interface Settings {
   [key: string]: unknown;
 }
 
-/** `settings.json` is shared through git; `settings.local.json` is the user's own copy. */
-function settingsPath(repo: string, local = false): string {
-  return path.join(repo, ".claude", local ? "settings.local.json" : "settings.json");
+function settingsPath(repo: string): string {
+  return path.join(repo, ".claude", "settings.json");
 }
 
 async function readSettings(file: string): Promise<Settings> {
@@ -50,8 +49,8 @@ const isOurs = (m: MatcherEntry) =>
   m.matcher === MATCHER && (m.hooks ?? []).some((h) => h.command === HOOK_COMMAND);
 
 /** Adds the hook; keeps everything else in the file. Returns false when it was there. */
-export async function installHook(repo: string, local = false): Promise<boolean> {
-  const file = settingsPath(repo, local);
+export async function installHook(repo: string): Promise<boolean> {
+  const file = settingsPath(repo);
   const settings = await readSettings(file);
   const pre = settings.hooks?.PreToolUse ?? [];
   if (pre.some(isOurs)) return false;
@@ -65,8 +64,8 @@ export async function installHook(repo: string, local = false): Promise<boolean>
 }
 
 /** Removes the hook again. Returns false when it was not there. */
-export async function removeHook(repo: string, local = false): Promise<boolean> {
-  const file = settingsPath(repo, local);
+export async function removeHook(repo: string): Promise<boolean> {
+  const file = settingsPath(repo);
   const settings = await readSettings(file);
   const pre = settings.hooks?.PreToolUse ?? [];
   if (!pre.some(isOurs)) return false;
@@ -171,12 +170,12 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function runHooks(rest: string[], repo: string, local = false): Promise<number> {
+export async function runHooks(rest: string[], repo: string): Promise<number> {
   const [sub] = rest;
-  const file = settingsPath(repo, local);
+  const file = settingsPath(repo);
   switch (sub) {
     case "install": {
-      const added = await installHook(repo, local);
+      const added = await installHook(repo);
       process.stdout.write(
         added
           ? `added the AskUserQuestion hook to ${file}\nClaude Code sessions in this repo now ask through the longe inbox (restart running sessions).\n`
@@ -185,7 +184,7 @@ export async function runHooks(rest: string[], repo: string, local = false): Pro
       return 0;
     }
     case "remove": {
-      const removed = await removeHook(repo, local);
+      const removed = await removeHook(repo);
       process.stdout.write(
         removed ? `removed the hook from ${file}\n` : `the hook is not in ${file}\n`,
       );
@@ -202,9 +201,7 @@ export async function runHooks(rest: string[], repo: string, local = false): Pro
       return 0;
     }
     default:
-      process.stderr.write(
-        "Usage: longe hooks install | remove [--local]   (ask is run by Claude Code)\n",
-      );
+      process.stderr.write("Usage: longe hooks install | remove   (ask is run by Claude Code)\n");
       return 2;
   }
 }

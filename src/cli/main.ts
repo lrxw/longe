@@ -8,7 +8,7 @@ async function main(argv: string[]): Promise<number> {
 
   switch (cli.command) {
     case "init": {
-      const result = await initProject(repo, { local: cli.local });
+      const result = await initProject(repo);
       const { registerRepo } = await import("../store/registry.js");
       await registerRepo(repo).catch(() => undefined);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
@@ -20,7 +20,7 @@ async function main(argv: string[]): Promise<number> {
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
       if (result.hook)
         process.stdout.write(
-          `hook     .claude/${cli.local ? "settings.local.json" : "settings.json"}: Claude Code questions go to the inbox (ask_in_inbox; \`longe hooks remove${cli.local ? " --local" : ""}\` undoes it)\n`,
+          "hook     .claude/settings.json: Claude Code questions go to the inbox (ask_in_inbox; `longe hooks remove` undoes it)\n",
         );
       process.stdout.write(
         `\n.longe/ ready in ${repo}\n\nNext:\n` +
@@ -57,7 +57,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "hooks": {
       const { runHooks } = await import("./hooks.js");
-      return runHooks(cli.rest, repo, cli.local);
+      return runHooks(cli.rest, repo);
     }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");

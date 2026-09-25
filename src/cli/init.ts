@@ -83,12 +83,12 @@ export interface InitProjectResult extends InitResult {
  */
 export async function initProject(
   repoRoot: string,
-  opts: { name?: string | undefined; local?: boolean } = {},
+  opts: { name?: string | undefined } = {},
 ): Promise<InitProjectResult> {
   const result = await runInit(repoRoot, opts.name);
   const { askInInboxEnabled, installHook } = await import("./hooks.js");
   const hook = (await askInInboxEnabled(repoRoot))
-    ? await installHook(repoRoot, opts.local ?? false).catch(() => false)
+    ? await installHook(repoRoot).catch(() => false)
     : false;
   return { ...result, hook };
 }
