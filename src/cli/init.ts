@@ -74,6 +74,8 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
 export interface InitProjectResult extends InitResult {
   /** The Claude Code hook was added (ask_in_inbox on, and it was not there yet). */
   hook: boolean;
+  /** Where the hook went (or already was). */
+  hookFile: string;
 }
 
 /**
@@ -83,14 +85,15 @@ export interface InitProjectResult extends InitResult {
  */
 export async function initProject(
   repoRoot: string,
-  opts: { name?: string | undefined } = {},
+  opts: { name?: string | undefined; shared?: boolean } = {},
 ): Promise<InitProjectResult> {
   const result = await runInit(repoRoot, opts.name);
-  const { askInInboxEnabled, installHook } = await import("./hooks.js");
+  const { askInInboxEnabled, installHook, settingsPath } = await import("./hooks.js");
+  const shared = opts.shared ?? false;
   const hook = (await askInInboxEnabled(repoRoot))
-    ? await installHook(repoRoot).catch(() => false)
+    ? await installHook(repoRoot, shared).catch(() => false)
     : false;
-  return { ...result, hook };
+  return { ...result, hook, hookFile: path.relative(repoRoot, settingsPath(repoRoot, shared)) };
 }
 
 /**

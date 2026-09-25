@@ -329,7 +329,7 @@ describe("registry hub", () => {
       ".longe/AGENT-INSTRUCTIONS.md",
     );
     expect(await readFile(path.join(root, "CLAUDE.md"), "utf8")).toContain("AGENTS.md");
-    expect(await readFile(path.join(root, ".claude/settings.json"), "utf8")).toContain(
+    expect(await readFile(path.join(root, ".claude/settings.local.json"), "utf8")).toContain(
       "AskUserQuestion",
     );
     expect((await readRegistry()).map((r) => r.name)).toContain("fresh-idea");

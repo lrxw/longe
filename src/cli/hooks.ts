@@ -9,7 +9,8 @@ import { Repo } from "../store/repo.js";
  * Claude Code hooks that route the harness's own questions to the longe inbox.
  *
  * `longe hooks install` adds a PreToolUse hook for AskUserQuestion to the repo's
- * `.claude/settings.json`. When an interactive Claude Code session wants to ask the
+ * `.claude/settings.local.json` (or `settings.json` with `--shared`). When an
+ * interactive Claude Code session wants to ask the
  * user, the hook (`longe hooks ask`) writes the question into `.longe/questions/`
  * instead and denies the tool with a reason that tells the agent where the question
  * went and how to get the answer. The web chat does not need it: it runs claude
@@ -32,8 +33,12 @@ interface Settings {
   [key: string]: unknown;
 }
 
-function settingsPath(repo: string): string {
-  return path.join(repo, ".claude", "settings.json");
+/**
+ * `settings.local.json` is the user's own file (Claude Code keeps it out of git);
+ * `settings.json` is shared through the repo. The hook goes local unless asked otherwise.
+ */
+export function settingsPath(repo: string, shared = false): string {
+  return path.join(repo, ".claude", shared ? "settings.json" : "settings.local.json");
 }
 
 async function readSettings(file: string): Promise<Settings> {
@@ -49,8 +54,8 @@ const isOurs = (m: MatcherEntry) =>
   m.matcher === MATCHER && (m.hooks ?? []).some((h) => h.command === HOOK_COMMAND);
 
 /** Adds the hook; keeps everything else in the file. Returns false when it was there. */
-export async function installHook(repo: string): Promise<boolean> {
-  const file = settingsPath(repo);
+export async function installHook(repo: string, shared = false): Promise<boolean> {
+  const file = settingsPath(repo, shared);
   const settings = await readSettings(file);
   const pre = settings.hooks?.PreToolUse ?? [];
   if (pre.some(isOurs)) return false;
@@ -64,8 +69,8 @@ export async function installHook(repo: string): Promise<boolean> {
 }
 
 /** Removes the hook again. Returns false when it was not there. */
-export async function removeHook(repo: string): Promise<boolean> {
-  const file = settingsPath(repo);
+export async function removeHook(repo: string, shared = false): Promise<boolean> {
+  const file = settingsPath(repo, shared);
   const settings = await readSettings(file);
   const pre = settings.hooks?.PreToolUse ?? [];
   if (!pre.some(isOurs)) return false;
@@ -170,12 +175,12 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function runHooks(rest: string[], repo: string): Promise<number> {
+export async function runHooks(rest: string[], repo: string, shared = false): Promise<number> {
   const [sub] = rest;
-  const file = settingsPath(repo);
   switch (sub) {
     case "install": {
-      const added = await installHook(repo);
+      const file = settingsPath(repo, shared);
+      const added = await installHook(repo, shared);
       process.stdout.write(
         added
           ? `added the AskUserQuestion hook to ${file}\nClaude Code sessions in this repo now ask through the longe inbox (restart running sessions).\n`
@@ -184,10 +189,14 @@ export async function runHooks(rest: string[], repo: string): Promise<number> {
       return 0;
     }
     case "remove": {
-      const removed = await removeHook(repo);
-      process.stdout.write(
-        removed ? `removed the hook from ${file}\n` : `the hook is not in ${file}\n`,
-      );
+      // without --shared the hook goes out of both files: "remove" means gone
+      let found = false;
+      for (const s of shared ? [true] : [false, true]) {
+        if (!(await removeHook(repo, s))) continue;
+        found = true;
+        process.stdout.write(`removed the hook from ${settingsPath(repo, s)}\n`);
+      }
+      if (!found) process.stdout.write("the hook was not installed\n");
       return 0;
     }
     case "ask": {
@@ -201,7 +210,9 @@ export async function runHooks(rest: string[], repo: string): Promise<number> {
       return 0;
     }
     default:
-      process.stderr.write("Usage: longe hooks install | remove   (ask is run by Claude Code)\n");
+      process.stderr.write(
+        "Usage: longe hooks install | remove [--shared]   (ask is run by Claude Code)\n",
+      );
       return 2;
   }
 }

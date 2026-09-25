@@ -75,9 +75,13 @@ describe("longe init", () => {
   it("initProject adds the Claude Code hook too, unless ask_in_inbox is off", async () => {
     const first = await initProject(dir, { name: "P" });
     expect(first.hook).toBe(true);
+    expect(first.hookFile).toBe(".claude/settings.local.json");
     expect(first.created).toContain("AGENTS.md");
-    const settings = JSON.parse(await readFile(path.join(dir, ".claude/settings.json"), "utf8"));
+    const settings = JSON.parse(
+      await readFile(path.join(dir, ".claude/settings.local.json"), "utf8"),
+    );
     expect(settings.hooks.PreToolUse[0].matcher).toBe("AskUserQuestion");
+    await expect(stat(path.join(dir, ".claude/settings.json"))).rejects.toThrow();
     expect(await readFile(path.join(dir, ".longe/config.yml"), "utf8")).toContain('project: "P"');
     expect((await initProject(dir)).hook).toBe(false); // already there
 
@@ -86,7 +90,10 @@ describe("longe init", () => {
       await runInit(other);
       await writeFile(path.join(other, ".longe/config.yml"), "version: 1\nask_in_inbox: false\n");
       expect((await initProject(other)).hook).toBe(false);
-      await expect(stat(path.join(other, ".claude/settings.json"))).rejects.toThrow();
+      await expect(stat(path.join(other, ".claude/settings.local.json"))).rejects.toThrow();
+      // --shared: the committed file
+      const shared = await initProject(other, { shared: true });
+      expect(shared.hookFile).toBe(".claude/settings.json");
     } finally {
       await rm(other, { recursive: true, force: true });
     }

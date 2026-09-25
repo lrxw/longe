@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -15,14 +15,14 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const settings = async () =>
-  JSON.parse(await readFile(path.join(dir, ".claude/settings.json"), "utf8"));
+const settings = async (file = ".claude/settings.local.json") =>
+  JSON.parse(await readFile(path.join(dir, file), "utf8"));
 
 describe("AskUserQuestion → inbox hook", () => {
-  it("install adds the hook once and keeps other settings; remove takes it out again", async () => {
+  it("install adds the hook once to settings.local.json and keeps other settings; remove takes it out again", async () => {
     await mkdir(path.join(dir, ".claude"));
     await writeFile(
-      path.join(dir, ".claude/settings.json"),
+      path.join(dir, ".claude/settings.local.json"),
       JSON.stringify({ permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [] } }),
     );
     expect(await installHook(dir)).toBe(true);
@@ -33,9 +33,23 @@ describe("AskUserQuestion → inbox hook", () => {
     expect(s.hooks.PreToolUse).toEqual([
       { matcher: "AskUserQuestion", hooks: [{ type: "command", command: HOOK_COMMAND }] },
     ]);
+    await expect(stat(path.join(dir, ".claude/settings.json"))).rejects.toThrow();
     expect(await removeHook(dir)).toBe(true);
     expect(await removeHook(dir)).toBe(false);
     expect(await settings()).toEqual({ permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [] } });
+  });
+
+  it("--shared uses settings.json; the two files are independent", async () => {
+    expect(await installHook(dir, true)).toBe(true);
+    expect(await installHook(dir, true)).toBe(false);
+    expect((await settings(".claude/settings.json")).hooks.PreToolUse).toEqual([
+      { matcher: "AskUserQuestion", hooks: [{ type: "command", command: HOOK_COMMAND }] },
+    ]);
+    await expect(stat(path.join(dir, ".claude/settings.local.json"))).rejects.toThrow();
+    expect(await removeHook(dir)).toBe(false); // not in the local file
+    expect(await removeHook(dir, true)).toBe(true);
+    expect(await removeHook(dir, true)).toBe(false);
+    expect(await settings(".claude/settings.json")).toEqual({});
   });
 
   it("the hook turns the question into a blocking inbox question and denies the tool", async () => {

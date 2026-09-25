@@ -136,12 +136,14 @@ Claude Code has its own way to ask you, the AskUserQuestion tool. With the optio
 
 - The chat in the web UI may not use AskUserQuestion. When it leaves a question in its
   reply text, longe reminds it once to use the inbox.
-- `longe init` adds a PreToolUse hook to the repository's `.claude/settings.json`. For
-  repositories set up before this, run `longe hooks install`; `longe hooks remove`
-  takes the hook out again. When a terminal session wants to ask you something, the
-  question lands in the inbox (blocking, with its options) instead of the terminal. The
-  agent is told the question id, so it can wait for the answer or continue on an
-  assumption. The hook calls `longe`, so it must be on your PATH.
+- `longe init` adds a PreToolUse hook to `.claude/settings.local.json`, your own
+  settings file (Claude Code keeps it out of git). For repositories set up before this,
+  run `longe hooks install`; `longe hooks remove` takes the hook out again. With
+  `--shared`, both commands use `.claude/settings.json` instead, the file committed with
+  the repository, for a team that uses longe together. When a terminal session wants to
+  ask you something, the question lands in the inbox (blocking, with its options)
+  instead of the terminal. The agent is told the question id, so it can wait for the
+  answer or continue on an assumption. The hook calls `longe`, so it must be on your PATH.
 
 To turn it all off, set this in `.longe/config.yml`; the hook then lets questions through:
 

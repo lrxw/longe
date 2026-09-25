@@ -64,7 +64,7 @@ project: ${JSON.stringify(projectName)}
 
 # Agents' questions go to the inbox (default: true). The chat may not use Claude
 # Code's own question prompt and is reminded when it leaves a question in its reply;
-# terminal sessions get a hook (in .claude/settings.json, see \`longe hooks\`) that
+# terminal sessions get a hook (in .claude/settings.local.json, see \`longe hooks\`) that
 # sends their AskUserQuestion calls to the inbox. Set to false to turn this off.
 # ask_in_inbox: true
 
