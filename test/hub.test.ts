@@ -324,6 +324,14 @@ describe("registry hub", () => {
     expect(await readFile(path.join(root, ".longe/config.yml"), "utf8")).toContain(
       'project: "Fresh Idea"',
     );
+    // the same init as `longe init`: agent files and the Claude Code hook
+    expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain(
+      ".longe/AGENT-INSTRUCTIONS.md",
+    );
+    expect(await readFile(path.join(root, "CLAUDE.md"), "utf8")).toContain("AGENTS.md");
+    expect(await readFile(path.join(root, ".claude/settings.json"), "utf8")).toContain(
+      "AskUserQuestion",
+    );
     expect((await readRegistry()).map((r) => r.name)).toContain("fresh-idea");
     expect(hub.get("fresh-idea")?.ctx).toBeDefined();
     expect((await app.request("/r/fresh-idea/board")).status).toBe(200);

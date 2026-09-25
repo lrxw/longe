@@ -1,6 +1,6 @@
 import path from "node:path";
 import { CliError, parseCli } from "./args.js";
-import { runInit } from "./init.js";
+import { initProject } from "./init.js";
 
 async function main(argv: string[]): Promise<number> {
   const cli = parseCli(argv);
@@ -8,7 +8,7 @@ async function main(argv: string[]): Promise<number> {
 
   switch (cli.command) {
     case "init": {
-      const result = await runInit(repo);
+      const result = await initProject(repo, { local: cli.local });
       const { registerRepo } = await import("../store/registry.js");
       await registerRepo(repo).catch(() => undefined);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
@@ -18,14 +18,10 @@ async function main(argv: string[]): Promise<number> {
         );
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
-      const { askInInboxEnabled, installHook } = await import("./hooks.js");
-      if (await askInInboxEnabled(repo)) {
-        const added = await installHook(repo, cli.local).catch(() => false);
-        if (added)
-          process.stdout.write(
-            `hook     .claude/${cli.local ? "settings.local.json" : "settings.json"}: Claude Code questions go to the inbox (ask_in_inbox; \`longe hooks remove${cli.local ? " --local" : ""}\` undoes it)\n`,
-          );
-      }
+      if (result.hook)
+        process.stdout.write(
+          `hook     .claude/${cli.local ? "settings.local.json" : "settings.json"}: Claude Code questions go to the inbox (ask_in_inbox; \`longe hooks remove${cli.local ? " --local" : ""}\` undoes it)\n`,
+        );
       process.stdout.write(
         `\n.longe/ ready in ${repo}\n\nNext:\n` +
           "  1. Connect your agent, e.g.:  claude mcp add longe -- longe mcp --repo .\n" +

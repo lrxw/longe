@@ -71,6 +71,28 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
   return result;
 }
 
+export interface InitProjectResult extends InitResult {
+  /** The Claude Code hook was added (ask_in_inbox on, and it was not there yet). */
+  hook: boolean;
+}
+
+/**
+ * Everything `longe init` does: the board, the agent files, and (with `ask_in_inbox`
+ * on) the Claude Code hook that sends questions to the inbox. The CLI and "+ New
+ * project" in the web UI both go through here, so a project set up either way is the same.
+ */
+export async function initProject(
+  repoRoot: string,
+  opts: { name?: string | undefined; local?: boolean } = {},
+): Promise<InitProjectResult> {
+  const result = await runInit(repoRoot, opts.name);
+  const { askInInboxEnabled, installHook } = await import("./hooks.js");
+  const hook = (await askInInboxEnabled(repoRoot))
+    ? await installHook(repoRoot, opts.local ?? false).catch(() => false)
+    : false;
+  return { ...result, hook };
+}
+
 /**
  * AGENTS.md (every agent) points at the protocol; CLAUDE.md (Claude Code reads only
  * that one) points at AGENTS.md. Each file is created with its line when missing,

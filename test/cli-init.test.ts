@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promise
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CLAUDE_LINE, POINTER_LINE, runInit } from "../src/cli/init.js";
+import { CLAUDE_LINE, initProject, POINTER_LINE, runInit } from "../src/cli/init.js";
 import { AGENT_INSTRUCTIONS } from "../src/domain/agent-instructions.js";
 
 let dir: string;
@@ -70,6 +70,26 @@ describe("longe init", () => {
     expect(again.updated).toEqual([]);
     expect(again.skipped).toEqual(expect.arrayContaining(["AGENTS.md", "CLAUDE.md"]));
     expect(await readFile(claude, "utf8")).toBe(linked);
+  });
+
+  it("initProject adds the Claude Code hook too, unless ask_in_inbox is off", async () => {
+    const first = await initProject(dir, { name: "P" });
+    expect(first.hook).toBe(true);
+    expect(first.created).toContain("AGENTS.md");
+    const settings = JSON.parse(await readFile(path.join(dir, ".claude/settings.json"), "utf8"));
+    expect(settings.hooks.PreToolUse[0].matcher).toBe("AskUserQuestion");
+    expect(await readFile(path.join(dir, ".longe/config.yml"), "utf8")).toContain('project: "P"');
+    expect((await initProject(dir)).hook).toBe(false); // already there
+
+    const other = await mkdtemp(path.join(os.tmpdir(), "longe-init-"));
+    try {
+      await runInit(other);
+      await writeFile(path.join(other, ".longe/config.yml"), "version: 1\nask_in_inbox: false\n");
+      expect((await initProject(other)).hook).toBe(false);
+      await expect(stat(path.join(other, ".claude/settings.json"))).rejects.toThrow();
+    } finally {
+      await rm(other, { recursive: true, force: true });
+    }
   });
 
   it("a CLAUDE.md that already names the protocol directly counts as linked", async () => {

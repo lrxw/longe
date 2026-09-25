@@ -1,6 +1,6 @@
 import { mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
-import { runInit } from "../cli/init.js";
+import { initProject } from "../cli/init.js";
 import { DomainError } from "../domain/errors.js";
 import { type RepoEntry, registerRepo } from "../store/registry.js";
 import type { Hub, HubRepo } from "./hub.js";
@@ -44,9 +44,10 @@ async function realOrAncestor(p: string): Promise<string> {
 }
 
 /**
- * Creates the folder if missing, adds `.longe/` (like `longe init`), registers the
- * repo and has the hub serve it. The home check is repeated on the real path
- * before anything is created, so a symlink cannot lead outside.
+ * Creates the folder if missing, runs the same init as `longe init` (board, agent
+ * files, Claude Code hook), registers the repo and has the hub serve it. The home
+ * check is repeated on the real path before anything is created, so a symlink
+ * cannot lead outside.
  */
 export async function createProject(
   hub: Hub,
@@ -59,7 +60,7 @@ export async function createProject(
   await mkdir(root, { recursive: true });
   const real = await realpath(root);
   const name = input.name?.trim() || undefined;
-  await runInit(real, name);
+  await initProject(real, { name });
   const entry = await registerRepo(real, name);
   const repo = await hub.ensure(entry.name, entry.path);
   return { entry, repo };
