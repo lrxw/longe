@@ -79,14 +79,15 @@ longe serve -d --open          # starts the server in the background and opens t
 
 The board runs at <http://127.0.0.1:7311>. Commit `.longe/` with your code.
 
-Then point your agent at the protocol. Add this line to `CLAUDE.md`, `AGENTS.md`, `.cursorrules`
-or your agent's equivalent:
+`longe init` also points your agent at the protocol: it appends one line to the `CLAUDE.md` and
+`AGENTS.md` in the repository root, or creates both when there are none:
 
 ```
 Follow .longe/AGENT-INSTRUCTIONS.md for tracking work and asking questions.
 ```
 
-`longe init` is idempotent and never overwrites existing files.
+Agents that read another file (`.cursorrules`, `GEMINI.md`, …) need the same line there.
+`longe init` is idempotent: it never overwrites a file and adds the line only once.
 
 ## Connect your agent
 
