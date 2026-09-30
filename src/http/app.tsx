@@ -9,6 +9,7 @@ import type { AppContext } from "../app/context.js";
 import { topicCommits, uncommittedFiles } from "../app/git.js";
 import { Hub, type HubRepo } from "../app/hub.js";
 import { createProject } from "../app/new-project.js";
+import { isProvider } from "../app/providers/index.js";
 import { DomainError } from "../domain/errors.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
 import { answerQuestion, deleteQuestion, human, setTopicStatus } from "../tools/ops.js";
@@ -648,8 +649,8 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
         return c.html(await panel(w, "Refused: not sent from this page."), 403);
       const form = await c.req.parseBody();
       const provider = str(form.provider);
-      if (provider !== "claude" && provider !== "codex")
-        return c.html(await panel(w, "Choose Claude Code or Codex."), 400);
+      if (!isProvider(provider))
+        return c.html(await panel(w, "Choose a provider from the list."), 400);
       return agentAction(c, w, async () => {
         w.ctx.config.agent = await w.ctx.agent.setProvider(provider);
       });

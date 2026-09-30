@@ -14,7 +14,14 @@ import {
   writeMessage,
 } from "../store/messages.js";
 import { saveProvider } from "../store/provider.js";
-import { CodexTransport } from "./codex.js";
+import {
+  type ChatProvider,
+  isProvider,
+  PROVIDERS,
+  type ProviderContext,
+  type ProviderProcess,
+  providerLabel,
+} from "./providers/index.js";
 
 /** One line of the live transcript (what the agent process printed). */
 export interface AgentEvent {
@@ -69,17 +76,7 @@ export interface AgentStatus {
   slashCommands?: string[] | undefined;
 }
 
-/** Choices offered on the chat page; the config default and a custom id are added when set. */
-export const MODEL_CHOICES = ["fable", "opus", "sonnet", "haiku"];
-
-function shellQuote(s: string): string {
-  return /^[A-Za-z0-9_\-./~]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`;
-}
-
-/** `cd <repo> && claude --resume <id>`: continue the chat's session in a terminal. */
-export function resumeCommand(root: string, sessionId: string, command = "claude"): string {
-  return `cd ${shellQuote(root)} && ${shellQuote(command)} --resume ${shellQuote(sessionId)}`;
-}
+export { MODEL_CHOICES, resumeCommand } from "./providers/claude.js";
 
 export interface AgentEvents {
   "agent:changed": [];
@@ -140,6 +137,14 @@ Call check_answers, then get_topic and work on it. Report on the board when you 
 /** What the chat is told when it is free and the todo queue has a topic for it. */
 export function todoPrompt(v: { id: string; title: string }): string {
   return `Next in the todo queue: topic \`${v.id}\` ("${v.title}"). Call check_answers, then set_status active on it, get_topic and work on it until it is in review or blocked on a question. Report on the board when you stop.`;
+}
+
+/**
+ * Waiting for the first turn after the human switched provider in Chat: the new agent
+ * inherits everything the previous one left on the board and in the working tree.
+ */
+export function handoffPrompt(from: AgentProvider, to: AgentProvider): string {
+  return `The human switched this chat from ${providerLabel(from)} to ${providerLabel(to)}. You take over everything ${providerLabel(from)} left: call check_answers and acknowledge every answer (also to questions it asked), list_topics with status active and read each topic's Plan and Log, and run git status to find uncommitted work belonging to those topics. Continue that work as your own. Report on the board when you stop.`;
 }
 
 /** Sent when a turn ends with a question in its text and no ask_question call. */
@@ -209,8 +214,8 @@ function withTopic(text: string, opts: SayOptions): string {
  */
 export class AgentRunner extends EventEmitter<AgentEvents> {
   private child: ChildProcess | undefined;
-  private codex: CodexTransport | undefined;
-  private codexReady: Promise<void> = Promise.resolve();
+  /** The provider's handle on the live process (how messages go in, output comes out). */
+  private proc: ProviderProcess | undefined;
   private modelChoices: string[] = [];
   private streamed = new Map<string, AgentEvent>();
   private switchingProvider = false;
@@ -218,6 +223,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   private get provider(): AgentProvider {
     return this.config.provider ?? "claude";
+  }
+  private get chat(): ChatProvider {
+    return PROVIDERS[this.provider];
   }
   private session: SessionInfo | undefined;
   private events: AgentEvent[] = [];
@@ -280,10 +288,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   }
 
   private providerFile(suffix: string, name = this.logName): string {
-    return path.join(
-      agentLogDir(),
-      `${name}${this.provider === "codex" ? ".codex" : ""}.${suffix}`,
-    );
+    return path.join(agentLogDir(), `${name}${this.chat.fileTag}.${suffix}`);
   }
 
   private loadProviderSession(): Promise<void> {
@@ -340,7 +345,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       provider: this.provider,
       canSwitchProvider: !this.busy(),
       switchingProvider: this.switchingProvider,
-      modelChoices: this.provider === "codex" ? this.modelChoices : MODEL_CHOICES,
+      modelChoices: this.chat.staticModels ?? this.modelChoices,
       alive: this.child !== undefined,
       pending: this.pending,
       working: this.pending > 0,
@@ -357,9 +362,11 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       logFile: this.logFile,
       idleMinutes: this.idleMinutes,
       resumeCommand: this.session
-        ? this.provider === "codex"
-          ? `cd ${shellQuote(this.root)} && ${shellQuote(this.config.command ?? "codex")} resume ${shellQuote(this.session.id)}`
-          : resumeCommand(this.root, this.session.id, this.config.command ?? "claude")
+        ? this.chat.resumeCommand(
+            this.root,
+            this.config.command ?? this.chat.defaultCommand,
+            this.session.id,
+          )
         : undefined,
       model: this.modelOverride ?? this.config.model,
       modelOverride: this.modelOverride,
@@ -405,8 +412,13 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   /** Changes this runner in place, retaining queue and SSE listeners and both sessions. */
   async setProvider(provider: AgentProvider): Promise<AgentConfig> {
-    if (provider !== "claude" && provider !== "codex")
-      throw new DomainError("validation", "Choose Claude Code or Codex.");
+    if (!isProvider(provider))
+      throw new DomainError(
+        "validation",
+        `Choose ${Object.values(PROVIDERS)
+          .map((p) => p.label)
+          .join(" or ")}.`,
+      );
     this.assertNotSwitching();
     if (provider === this.provider) return this.config;
     if (this.busy())
@@ -414,6 +426,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         "conflict",
         "Wait for the current turn to finish, or Stop it before switching provider.",
       );
+    const previous = this.provider;
     this.switchingProvider = true;
     this.emit("agent:changed");
     try {
@@ -438,6 +451,12 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       this.settleTimer = undefined;
       this.loaded = this.loadProviderSession();
       await this.loaded;
+      // waits in .longe/messages/ and goes out first with the new provider's next turn
+      await writeMessage(this.root, {
+        from: "board",
+        text: handoffPrompt(previous, provider),
+        now: new Date(),
+      }).catch(() => undefined);
       return config;
     } finally {
       this.switchingProvider = false;
@@ -590,84 +609,46 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
     for (const m of messages) {
       if (!this.child || generation !== this.deliveryGeneration) break;
-      const line = JSON.stringify({
-        type: "user",
-        message: { role: "user", content: [{ type: "text", text: m.text }] },
-      });
       // count the turn before the write: a fast answer must not arrive first
       this.pending++;
-      if (this.provider === "codex") {
-        try {
-          await this.codexReady;
-          if (!this.codex) throw new Error("Codex process is closed");
-          await this.codex.send(m.text);
-        } catch (error) {
-          this.pending = Math.max(0, this.pending - 1);
-          this.push("error", error instanceof Error ? error.message : String(error));
-          this.stop();
-          break;
-        }
-      }
       try {
         await markDelivered(this.root, m.fm.id, new Date());
       } catch {
         // the flag is bookkeeping; the message still goes out
       }
-      if (this.provider !== "codex") this.child?.stdin?.write(`${line}\n`);
-      await this.log(`>>> ${m.fm.id}\n${line}\n`);
+      try {
+        if (!this.proc) throw new Error(`${this.chat.label} process is closed`);
+        await this.proc.send(m.text);
+      } catch (error) {
+        this.pending = Math.max(0, this.pending - 1);
+        this.push("error", error instanceof Error ? error.message : String(error));
+        this.stop();
+        break;
+      }
+      await this.log(`>>> ${m.fm.id}\n${JSON.stringify(m.text)}\n`);
     }
     this.armIdle();
     this.emit("agent:changed");
   }
 
-  private args(): string[] {
-    const mcpUrl = this.mcpUrl;
-    if (this.provider === "codex")
-      return [
-        "app-server",
-        // Like Claude's mcp__longe allowlist: the headless chat must be able to
-        // use its board without interactive approval. Only our endpoint gets this default.
-        ...(mcpUrl
-          ? [
-              "-c",
-              `mcp_servers.longe.url=${JSON.stringify(mcpUrl)}`,
-              "-c",
-              'mcp_servers.longe.default_tools_approval_mode="approve"',
-            ]
-          : []),
-        ...(this.config.args ?? []),
-      ];
-    const mcp = mcpUrl
-      ? ["--mcp-config", JSON.stringify({ mcpServers: { longe: { type: "http", url: mcpUrl } } })]
-      : [];
-    // headless: nobody answers permission prompts, so what the chat may run is listed up front
-    const allowed = [...(mcpUrl ? ["mcp__longe"] : []), ...(this.config.allowed_tools ?? [])];
-    const model = this.modelOverride ?? this.config.model;
-    return [
-      "-p",
-      "--input-format",
-      "stream-json",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--permission-mode",
-      this.config.permission_mode ?? "acceptEdits",
-      ...(model ? ["--model", model] : []),
-      ...(this.session ? ["--resume", this.session.id] : []),
-      ...mcp,
-      ...(allowed.length > 0 ? ["--allowedTools", ...allowed] : []),
-      // questions go to the inbox (ask_question), never to a prompt nobody sees
-      ...(this.askInInbox ? ["--disallowedTools", "AskUserQuestion"] : []),
-      "--append-system-prompt",
-      SYSTEM_PROMPT,
-      ...(this.config.args ?? []),
-    ];
+  private providerContext(): ProviderContext {
+    return {
+      root: this.root,
+      config: this.config,
+      mcpUrl: this.mcpUrl,
+      askInInbox: this.askInInbox,
+      model: this.modelOverride ?? this.config.model,
+      sessionId: this.session?.id,
+      instructions: SYSTEM_PROMPT,
+    };
   }
 
   /** Starts the process. False when it could not be spawned (an error event says why). */
   private spawn(): boolean {
-    const command = this.config.command ?? this.provider;
-    const args = this.args();
+    const chat = this.chat;
+    const ctx = this.providerContext();
+    const command = this.config.command ?? chat.defaultCommand;
+    const args = chat.args(ctx);
     this.startedAt = new Date().toISOString();
     this.exitCode = undefined;
     this.initSeen = false;
@@ -688,14 +669,20 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
     // ENOENT and friends: no pid, an "error" event follows on the next tick
     if (child.pid !== undefined) this.child = child;
-    if (this.provider === "codex" && this.child) {
+    if (this.child) {
       this.streamed.clear();
-      const transport = new CodexTransport(child, {
-        session: (id, model, models) => {
-          this.modelChoices = models;
-          this.ingest(JSON.stringify({ type: "system", subtype: "init", session_id: id, model }));
+      this.proc = chat.attach(child, ctx, {
+        ingest: (line) => {
+          // a result ends the turn: streamed texts are final from here on
+          if (line.includes('"type":"result"')) this.streamed.clear();
+          this.ingest(line);
         },
-        text: (id, text) => {
+        error: (text) => this.push("error", text),
+        tool: (name, input) => {
+          this.push("tool", `${name} ${summarize(input)}`);
+          if (name.endsWith("ask_question")) this.askedThisTurn = true;
+        },
+        streamText: (id, text) => {
           const event = this.streamed.get(id);
           if (event) {
             event.text = text;
@@ -706,9 +693,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
             if (latest) this.streamed.set(id, latest);
           }
         },
-        tool: (name, input) => {
-          this.push("tool", `${name} ${summarize(input)}`);
-          if (name.endsWith("ask_question")) this.askedThisTurn = true;
+        models: (list) => {
+          this.modelChoices = list;
         },
         usage: (tokens, window) => {
           if (this.session) {
@@ -717,23 +703,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
             void this.saveSession();
           }
         },
-        result: (text, error) => {
-          this.streamed.clear();
-          this.ingest(JSON.stringify({ type: "result", result: text, is_error: error }));
-        },
-        error: (text) => this.push("error", text),
       });
-      this.codex = transport;
-      this.codexReady = transport.initialize({
-        root: this.root,
-        sessionId: this.session?.id,
-        model: this.modelOverride ?? this.config.model,
-        instructions: SYSTEM_PROMPT,
-        sandbox: this.config.sandbox ?? "workspace-write",
-      });
-      // Delivery observes the failure; keep initialization from becoming an unhandled rejection.
-      void this.codexReady.catch(() => {});
     }
+    const proc = this.proc;
     child.stdin?.on("error", () => {
       // EPIPE after the process died: the close handler reports it
     });
@@ -744,11 +716,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       buf += s;
       const lines = buf.split("\n");
       buf = lines.pop() ?? "";
-      for (const l of lines)
-        if (l.trim()) {
-          if (this.provider === "codex") this.codex?.ingest(l);
-          else this.ingest(l);
-        }
+      for (const l of lines) if (l.trim()) proc?.ingest(l);
     });
     child.stderr?.on("data", (d: Buffer) => {
       const s = d.toString();
@@ -764,10 +732,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       if (this.child === child) this.closing = this.closed(null);
     });
     child.on("close", (code) => {
-      if (buf.trim()) {
-        if (this.provider === "codex") this.codex?.ingest(buf);
-        else this.ingest(buf);
-      }
+      if (buf.trim()) proc?.ingest(buf);
       buf = "";
       if (this.child === child) this.closing = this.closed(code);
     });
@@ -775,8 +740,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   }
 
   private async closed(code: number | null): Promise<void> {
-    this.codex?.close();
-    this.codex = undefined;
+    this.proc?.close();
+    this.proc = undefined;
     this.child = undefined;
     this.exitCode = code;
     this.clearIdle();
@@ -786,7 +751,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         `agent exited (${code ?? "?"}) with ${this.pending} message(s) unanswered`,
       );
     this.pending = 0;
-    if (this.session && this.provider !== "codex") {
+    if (this.session && this.chat.tracksCost) {
       this.session.costUsd = (this.session.costUsd ?? 0) + this.processCost;
       this.processCost = 0;
       await this.saveSession();
@@ -978,7 +943,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         this.armIdle();
         this.flushNotify();
         if (!this.busy()) this.emit("agent:idle");
-        else if (this.provider !== "codex") this.armSettle();
+        else if (this.chat.foldsMessages) this.armSettle();
         break;
       }
       default:

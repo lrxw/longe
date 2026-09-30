@@ -2,6 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { handoffPrompt } from "../src/app/agent.js";
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
 import { attachChatQueue } from "../src/app/todo-queue.js";
 import { runInit } from "../src/cli/init.js";
@@ -155,7 +156,12 @@ describe("UI provider switching", () => {
     expect(args).toContain("--claude-only");
     expect(args).toContain("--resume");
     expect(args).toContain("claude-session");
-    expect((await ctx.agent.messages()).length).toBe(3);
+    // three prompts, and before each first turn after a switch a handoff from the board
+    const msgs = await ctx.agent.messages();
+    expect(msgs.map((m) => m.fm.from)).toEqual(["human", "board", "human", "board", "human"]);
+    expect(msgs[1]?.text).toBe(handoffPrompt("claude", "codex"));
+    expect(msgs[3]?.text).toContain("from Codex to Claude Code");
+    expect(msgs.every((m) => m.fm.delivered_at)).toBe(true);
   });
 
   it("rejects invalid, cross-origin, queued and active-turn switches without changing config", async () => {
@@ -222,7 +228,9 @@ describe("UI provider switching", () => {
     }
     expect((await switching).status).toBe(200);
     expect(ctx.agent.status().modelOverride).toBe("codex-user");
-    await vi.waitFor(async () => expect(await ctx.agent.messages()).toHaveLength(1));
+    // the handoff, then the todo topic that arrived during the switch
+    await vi.waitFor(async () => expect(await ctx.agent.messages()).toHaveLength(2));
+    expect((await ctx.agent.messages())[0]?.text).toBe(handoffPrompt("claude", "codex"));
     await idle();
     expect(await readFile(path.join(dir, "codex-input"), "utf8")).toContain(
       '"method":"turn/start"',

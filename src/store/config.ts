@@ -13,27 +13,31 @@ export const hooksSchema = z.object({
   on_answer: z.string().trim().min(1).optional(),
 });
 
+/**
+ * The chat providers longe can run. A new one is added here and gets its file in
+ * src/app/providers/ (the registry there must cover every id, the compiler checks).
+ */
+export const PROVIDER_IDS = ["claude", "codex"] as const;
+
+const providerOverrides = z
+  .object({
+    command: z.string().trim().min(1).optional(),
+    model: z.string().trim().min(1).optional(),
+    args: z.array(z.string()).optional(),
+  })
+  .optional();
+
 /** How the board starts the coding agent (Claude Code by default). */
 export const agentSchema = z.object({
-  provider: z.enum(["claude", "codex"]).optional(),
+  provider: z.enum(PROVIDER_IDS).optional(),
   /** CLI/model overrides saved separately when switching providers in Chat. */
   providers: z
-    .object({
-      claude: z
-        .object({
-          command: z.string().trim().min(1).optional(),
-          model: z.string().trim().min(1).optional(),
-          args: z.array(z.string()).optional(),
-        })
-        .optional(),
-      codex: z
-        .object({
-          command: z.string().trim().min(1).optional(),
-          model: z.string().trim().min(1).optional(),
-          args: z.array(z.string()).optional(),
-        })
-        .optional(),
-    })
+    .object(
+      Object.fromEntries(PROVIDER_IDS.map((id) => [id, providerOverrides])) as Record<
+        (typeof PROVIDER_IDS)[number],
+        typeof providerOverrides
+      >,
+    )
     .optional(),
   /** Codex filesystem sandbox; shell approval policy is never. */
   sandbox: z.enum(["read-only", "workspace-write"]).optional(),

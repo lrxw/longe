@@ -5,6 +5,7 @@ import {
   MODEL_CHOICES,
   STALL_AFTER_MS,
 } from "../../app/agent.js";
+import { PROVIDERS } from "../../app/providers/index.js";
 import type { Message } from "../../store/messages.js";
 import { ago, renderMarkdown } from "../format.js";
 import { StateBadge } from "./badge.js";
@@ -109,12 +110,11 @@ export function ProviderSelect({ status, base }: { status: AgentStatus; base: st
             : "Wait for the current turn to finish, or Stop it before switching provider."
         }
       >
-        <option value="claude" selected={status.provider !== "codex"}>
-          Claude Code
-        </option>
-        <option value="codex" selected={status.provider === "codex"}>
-          Codex
-        </option>
+        {Object.values(PROVIDERS).map((p) => (
+          <option value={p.id} selected={(status.provider ?? "claude") === p.id}>
+            {p.label}
+          </option>
+        ))}
       </select>
     </label>
   );
