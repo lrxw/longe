@@ -2,18 +2,18 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { askInInboxOff, askInInboxOn } from "../src/cli/ask-in-inbox.js";
 import {
   CODEX_ASK_PROMPT,
   CODEX_STOP_COMMAND,
   codexHooksPath,
   codexStop,
 } from "../src/cli/codex-hooks.js";
-import { connect, disconnect } from "../src/cli/connect.js";
 import { runInit } from "../src/cli/init.js";
 
 let dir: string;
 beforeEach(async () => {
-  dir = await mkdtemp(path.join(os.tmpdir(), "longe-connect-"));
+  dir = await mkdtemp(path.join(os.tmpdir(), "longe-ask-in-inbox-"));
   await rm(path.join(process.env.CODEX_HOME as string, "hooks.json"), { force: true });
   await runInit(dir);
 });
@@ -23,9 +23,9 @@ afterEach(async () => {
 
 const json = async (file: string) => JSON.parse(await readFile(file, "utf8"));
 
-describe("longe connect", () => {
-  it("each provider gets what it supports, in the user's own files; disconnect clears them", async () => {
-    const results = await connect(dir);
+describe("longe ask-in-inbox", () => {
+  it("on: each provider gets what it supports, in the user's own files; off clears them", async () => {
+    const results = await askInInboxOn(dir);
     expect(results.map((r) => [r.provider, r.changed])).toEqual([
       ["claude", true],
       ["codex", true],
@@ -38,12 +38,12 @@ describe("longe connect", () => {
     expect(
       (await json(path.join(dir, ".claude/settings.local.json"))).hooks.PreToolUse,
     ).toHaveLength(1);
-    expect((await connect(dir)).every((r) => !r.changed)).toBe(true);
+    expect((await askInInboxOn(dir)).every((r) => !r.changed)).toBe(true);
 
-    const removed = await disconnect(dir);
+    const removed = await askInInboxOff(dir);
     expect(removed.map((r) => r.provider)).toEqual(["claude", "codex"]);
     expect(await json(codexFile)).toEqual({});
-    expect(await disconnect(dir)).toEqual([]);
+    expect(await askInInboxOff(dir)).toEqual([]);
   });
 
   it("a named provider only; other hooks in the file stay; --shared uses the repo's files", async () => {
@@ -52,16 +52,16 @@ describe("longe connect", () => {
       path.join(dir, ".codex/hooks.json"),
       JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "mine" }] }] } }),
     );
-    const results = await connect(dir, { providers: ["codex"], shared: true });
+    const results = await askInInboxOn(dir, { providers: ["codex"], shared: true });
     expect(results.map((r) => r.file)).toEqual([".codex/hooks.json"]);
     const stop = (await json(path.join(dir, ".codex/hooks.json"))).hooks.Stop;
     expect(stop).toHaveLength(2);
     await expect(stat(path.join(dir, ".claude/settings.json"))).rejects.toThrow();
-    await disconnect(dir, { providers: ["codex"], shared: true });
+    await askInInboxOff(dir, { providers: ["codex"], shared: true });
     expect((await json(path.join(dir, ".codex/hooks.json"))).hooks.Stop).toEqual([
       { hooks: [{ type: "command", command: "mine" }] },
     ]);
-    await expect(connect(dir, { providers: ["gemini"] })).rejects.toThrow(/unknown provider/);
+    await expect(askInInboxOn(dir, { providers: ["gemini"] })).rejects.toThrow(/unknown provider/);
   });
 });
 

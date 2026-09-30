@@ -72,9 +72,9 @@ describe("longe init", () => {
     expect(await readFile(claude, "utf8")).toBe(linked);
   });
 
-  it("initProject connects every provider too, unless ask_in_inbox is off", async () => {
+  it("initProject turns ask-in-inbox on for every provider, unless ask_in_inbox is off", async () => {
     const first = await initProject(dir, { name: "P" });
-    expect(first.connected.map((r) => [r.provider, r.file, r.changed])).toEqual([
+    expect(first.inboxHooks.map((r) => [r.provider, r.file, r.changed])).toEqual([
       ["claude", ".claude/settings.local.json", true],
       ["codex", path.join(process.env.CODEX_HOME as string, "hooks.json"), true],
     ]);
@@ -86,22 +86,22 @@ describe("longe init", () => {
     await expect(stat(path.join(dir, ".claude/settings.json"))).rejects.toThrow();
     expect(await readFile(path.join(dir, ".longe/config.yml"), "utf8")).toContain('project: "P"');
     // already there
-    expect((await initProject(dir)).connected.every((r) => !r.changed)).toBe(true);
+    expect((await initProject(dir)).inboxHooks.every((r) => !r.changed)).toBe(true);
 
     const other = await mkdtemp(path.join(os.tmpdir(), "longe-init-"));
     try {
       await runInit(other);
       await writeFile(path.join(other, ".longe/config.yml"), "version: 1\nask_in_inbox: false\n");
-      expect((await initProject(other)).connected).toEqual([]);
+      expect((await initProject(other)).inboxHooks).toEqual([]);
       await expect(stat(path.join(other, ".claude/settings.local.json"))).rejects.toThrow();
     } finally {
       await rm(other, { recursive: true, force: true });
     }
   });
 
-  it("--shared connects through the files committed with the repo", async () => {
+  it("--shared puts the inbox hooks into the files committed with the repo", async () => {
     const shared = await initProject(dir, { shared: true });
-    expect(shared.connected.map((r) => r.file)).toEqual([
+    expect(shared.inboxHooks.map((r) => r.file)).toEqual([
       ".claude/settings.json",
       ".codex/hooks.json",
     ]);

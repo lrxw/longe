@@ -43,11 +43,11 @@ export interface ProviderProcess {
 }
 
 /**
- * What `longe connect` sets up so the provider's own sessions (terminal, IDE) ask
+ * What `longe ask-in-inbox on` sets up so the provider's own sessions (terminal, IDE) ask
  * through the inbox. Each provider does what its CLI supports.
  */
 export interface TerminalIntegration {
-  /** One line for `longe connect` output. */
+  /** One line for `longe ask-in-inbox` output. */
   what: string;
   /** The file it writes: the user's own (default) or the committed one (`shared`). */
   file(repo: string, shared: boolean): string;

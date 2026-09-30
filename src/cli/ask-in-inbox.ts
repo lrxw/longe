@@ -3,11 +3,11 @@ import { isProvider, PROVIDERS } from "../app/providers/index.js";
 import type { AgentProvider } from "../store/config.js";
 import { CliError } from "./args.js";
 
-export interface ConnectResult {
+export interface InboxHookResult {
   provider: AgentProvider;
-  /** Where the integration lives (relative to the repo when inside it). */
+  /** Where the hook lives (relative to the repo when inside it). */
   file: string;
-  /** Changed now (added by connect, removed by disconnect). */
+  /** Changed now (added by on, removed by off). */
   changed: boolean;
   what: string;
 }
@@ -27,16 +27,17 @@ function shown(repo: string, file: string): string {
 }
 
 /**
- * `longe connect`: every provider (or the named ones) gets what its CLI supports so
- * its own sessions ask through the inbox. Default is the user's own settings file;
- * `shared` writes the one committed with the repo.
+ * `longe ask-in-inbox on`: the agents' own sessions (terminal, IDE) ask through the
+ * inbox, as far as each agent's CLI allows (see ChatProvider.terminal). Default is
+ * the user's own settings files; `shared` writes the ones committed with the repo.
+ * Using an agent with longe does not need this: MCP and AGENTS.md do that.
  */
-export async function connect(
+export async function askInInboxOn(
   repo: string,
   opts: { shared?: boolean; providers?: string[] } = {},
-): Promise<ConnectResult[]> {
+): Promise<InboxHookResult[]> {
   const shared = opts.shared ?? false;
-  const out: ConnectResult[] = [];
+  const out: InboxHookResult[] = [];
   for (const id of which(opts.providers ?? [])) {
     const t = PROVIDERS[id].terminal;
     if (!t) continue;
@@ -51,14 +52,14 @@ export async function connect(
 }
 
 /**
- * `longe disconnect`: takes the integrations out again, from the user's own file and
- * the shared one (only the shared one with `shared`), so "disconnect" means gone.
+ * `longe ask-in-inbox off`: takes the hooks out again, from the user's own files and
+ * the shared ones (only the shared ones with `shared`), so "off" means gone.
  */
-export async function disconnect(
+export async function askInInboxOff(
   repo: string,
   opts: { shared?: boolean; providers?: string[] } = {},
-): Promise<ConnectResult[]> {
-  const out: ConnectResult[] = [];
+): Promise<InboxHookResult[]> {
+  const out: InboxHookResult[] = [];
   for (const id of which(opts.providers ?? [])) {
     const t = PROVIDERS[id].terminal;
     if (!t) continue;
@@ -70,23 +71,27 @@ export async function disconnect(
   return out;
 }
 
-export async function runConnect(
-  command: "connect" | "disconnect",
-  providers: string[],
+export async function runAskInInbox(
+  rest: string[],
   repo: string,
   shared: boolean,
 ): Promise<number> {
-  if (command === "connect") {
-    for (const r of await connect(repo, { shared, providers }))
+  const [sub, ...providers] = rest;
+  if (sub === "on") {
+    for (const r of await askInInboxOn(repo, { shared, providers }))
       process.stdout.write(
         `${r.provider.padEnd(7)}${r.changed ? "added to" : "already in"} ${r.file}: ${r.what}\n`,
       );
     process.stdout.write("Restart running sessions to pick it up.\n");
-  } else {
-    const removed = await disconnect(repo, { shared, providers });
+    return 0;
+  }
+  if (sub === "off") {
+    const removed = await askInInboxOff(repo, { shared, providers });
     for (const r of removed)
       process.stdout.write(`${r.provider.padEnd(7)}removed from ${r.file}\n`);
-    if (removed.length === 0) process.stdout.write("nothing was connected\n");
+    if (removed.length === 0) process.stdout.write("no inbox hooks were installed\n");
+    return 0;
   }
-  return 0;
+  process.stderr.write("Usage: longe ask-in-inbox on | off [claude|codex …] [--shared]\n");
+  return 2;
 }

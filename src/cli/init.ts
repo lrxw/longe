@@ -4,7 +4,7 @@ import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
 import { defaultConfigText } from "../store/config.js";
 import { migrateBoardDir } from "../store/migrate.js";
 import { BOARD_DIR } from "../store/paths.js";
-import type { ConnectResult } from "./connect.js";
+import type { InboxHookResult } from "./ask-in-inbox.js";
 
 export interface InitResult {
   created: string[];
@@ -73,13 +73,13 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
 }
 
 export interface InitProjectResult extends InitResult {
-  /** What `longe connect` did per provider; empty when ask_in_inbox is off. */
-  connected: ConnectResult[];
+  /** What `longe ask-in-inbox on` did per provider; empty when ask_in_inbox is off. */
+  inboxHooks: InboxHookResult[];
 }
 
 /**
  * Everything `longe init` does: the board, the agent files, and (with `ask_in_inbox`
- * on) `longe connect` for every provider, so their own sessions ask through the inbox.
+ * on) `longe ask-in-inbox on` for every provider, so their own sessions ask through the inbox.
  * The CLI and "+ New project" in the web UI both go through here, so a project set up
  * either way is the same.
  */
@@ -89,11 +89,11 @@ export async function initProject(
 ): Promise<InitProjectResult> {
   const result = await runInit(repoRoot, opts.name);
   const { askInInboxEnabled } = await import("./hooks.js");
-  const { connect } = await import("./connect.js");
-  const connected = (await askInInboxEnabled(repoRoot))
-    ? await connect(repoRoot, { shared: opts.shared ?? false }).catch(() => [])
+  const { askInInboxOn } = await import("./ask-in-inbox.js");
+  const inboxHooks = (await askInInboxEnabled(repoRoot))
+    ? await askInInboxOn(repoRoot, { shared: opts.shared ?? false }).catch(() => [])
     : [];
-  return { ...result, connected };
+  return { ...result, inboxHooks };
 }
 
 /**

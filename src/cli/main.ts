@@ -18,10 +18,10 @@ async function main(argv: string[]): Promise<number> {
         );
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
-      for (const r of result.connected)
-        if (r.changed) process.stdout.write(`connect  ${r.provider} → ${r.file}: ${r.what}\n`);
-      if (result.connected.some((r) => r.changed))
-        process.stdout.write("         (ask_in_inbox; `longe disconnect` undoes it)\n");
+      for (const r of result.inboxHooks)
+        if (r.changed) process.stdout.write(`hook     ${r.provider} → ${r.file}: ${r.what}\n`);
+      if (result.inboxHooks.some((r) => r.changed))
+        process.stdout.write("         (ask_in_inbox; `longe ask-in-inbox off` undoes it)\n");
       process.stdout.write(
         `\n.longe/ ready in ${repo}\n\nNext:\n` +
           "  1. Give your agent the MCP tools, e.g.:  claude mcp add longe -- longe mcp --repo .\n" +
@@ -59,10 +59,9 @@ async function main(argv: string[]): Promise<number> {
       const { runHooks } = await import("./hooks.js");
       return runHooks(cli.rest, repo, cli.shared);
     }
-    case "connect":
-    case "disconnect": {
-      const { runConnect } = await import("./connect.js");
-      return runConnect(cli.command, cli.rest, repo, cli.shared);
+    case "ask-in-inbox": {
+      const { runAskInInbox } = await import("./ask-in-inbox.js");
+      return runAskInInbox(cli.rest, repo, cli.shared);
     }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");

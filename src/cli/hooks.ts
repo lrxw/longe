@@ -178,11 +178,11 @@ async function readStdin(): Promise<string> {
 export async function runHooks(rest: string[], repo: string, shared = false): Promise<number> {
   const [sub] = rest;
   switch (sub) {
-    // older names of `longe connect` / `longe disconnect`
+    // older names of `longe ask-in-inbox on` / `off`
     case "install":
     case "remove": {
-      const { runConnect } = await import("./connect.js");
-      return runConnect(sub === "install" ? "connect" : "disconnect", rest.slice(1), repo, shared);
+      const { runAskInInbox } = await import("./ask-in-inbox.js");
+      return runAskInInbox([sub === "install" ? "on" : "off", ...rest.slice(1)], repo, shared);
     }
     case "stop": {
       // Codex's Stop hook (see codex-hooks.ts); like ask, it must never break the session
@@ -207,7 +207,7 @@ export async function runHooks(rest: string[], repo: string, shared = false): Pr
     }
     default:
       process.stderr.write(
-        "Usage: longe connect | disconnect [provider…] [--shared]   (hooks ask / stop are run by the agents)\n",
+        "Usage: longe ask-in-inbox on | off [provider…] [--shared]   (hooks ask / stop are run by the agents)\n",
       );
       return 2;
   }
