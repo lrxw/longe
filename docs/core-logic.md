@@ -50,9 +50,12 @@ Messages and questions have different jobs:
 
 | Record | Meaning | Location |
 | --- | --- | --- |
-| **Message** | A request from you, or a board-generated notice sent to the chat | `.longe/messages/` |
-| **Question + answer** | A decision requested by an agent, your response, and whether it has been read | `.longe/questions/` |
-| **Topic** | The goal, plan, decisions, log and current work status | `.longe/topics/` |
+| **Message** | A request from you, or a board-generated notice sent to the chat | `messages/` |
+| **Question + answer** | A decision requested by an agent, your response, and whether it has been read | `questions/` |
+| **Topic** | The goal, plan, decisions, log and current work status | `topics/` |
+
+All three live in the project's board folder, `~/.longe/projects/<id>/`, outside the
+repository; the `id` is in the repository's `.longe/config.yml`.
 
 A question moves through **open → answered → acknowledged**. Answering saves your response;
 acknowledging records that the agent has read it. Until then it remains available through
@@ -73,8 +76,8 @@ it automatic push delivery.
 ## What survives a restart
 
 Requests, questions, answers and topic records are markdown files. The UI watches those files;
-they are the source of truth, not a separate database. You can inspect them, edit them and
-commit them with the code. Unacknowledged answers remain available after restarting longe.
+they are the source of truth, not a separate database. You can inspect and edit them in the
+board folder. Unacknowledged answers remain available after restarting longe.
 
 The live assistant transcript is a runtime view. Chat message files store what you or the
 board sent to the agent; they are not a complete archive of its streamed replies. The agent

@@ -27,6 +27,7 @@ import {
   parseMessage,
   writeMessage,
 } from "../src/store/messages.js";
+import { messagesDir, questionsDir, topicsDir } from "../src/store/paths.js";
 import { newQuestionText } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 import { answerQuestion, setTopicStatus } from "../src/tools/ops.js";
@@ -87,12 +88,12 @@ describe("message store", () => {
     const m = await writeMessage(dir, { from: "human", text: "hi there", topic: "t1", now });
     expect(m.fm.id).toMatch(/^m-20260922-[0-9a-z]{4}$/);
     expect(m.text).toBe("hi there");
-    const text = await readFile(path.join(dir, ".longe/messages", `${m.fm.id}.md`), "utf8");
+    const text = await readFile(path.join(messagesDir(dir), `${m.fm.id}.md`), "utf8");
     expect(text).toContain("from: human");
     expect(text).toContain("topic: t1");
     expect(text).toContain("## Message\nhi there");
     expect(parseMessage(text).fm.delivered_at).toBeUndefined();
-    await writeFile(path.join(dir, ".longe/messages/m-20260922-zzzz.md"), "garbage");
+    await writeFile(path.join(messagesDir(dir), "m-20260922-zzzz.md"), "garbage");
     await writeMessage(dir, { from: "board", text: "later", now: new Date(now.getTime() + 1000) });
     const all = await listMessages(dir);
     expect(all.map((x) => x.text)).toEqual(["hi there", "later"]);
@@ -468,7 +469,7 @@ describe("agent over HTTP", () => {
     );
     const topic = (id: string, status: string, at: string) =>
       writeFile(
-        path.join(dir, `.longe/topics/${id}.md`),
+        path.join(topicsDir(dir), `${id}.md`),
         newTopicText({ id, title: id.toUpperCase(), goal: "g", now: new Date(at) }).replace(
           "status: backlog",
           `status: ${status}`,
@@ -502,7 +503,7 @@ describe("agent over HTTP", () => {
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     await writeFile(
-      path.join(dir, ".longe/topics/t1.md"),
+      path.join(topicsDir(dir), "t1.md"),
       newTopicText({ id: "t1", title: "Topic one", goal: "g", now: new Date() }),
     );
     ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
@@ -606,7 +607,7 @@ describe("agent over HTTP", () => {
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     await writeFile(
-      path.join(dir, ".longe/topics/t1.md"),
+      path.join(topicsDir(dir), "t1.md"),
       newTopicText({ id: "t1", title: "Topic one", goal: "g", now: new Date() }),
     );
     const q = (id: string, question: string) =>
@@ -620,7 +621,7 @@ describe("agent over HTTP", () => {
         now: new Date(),
       });
     await writeFile(
-      path.join(dir, ".longe/questions/q-20260922-aaaa.md"),
+      path.join(questionsDir(dir), "q-20260922-aaaa.md"),
       q("q-20260922-aaaa", "Which?"),
     );
     ctx = await createAppContext(dir, {
@@ -642,7 +643,7 @@ describe("agent over HTTP", () => {
     );
     // a later answer is announced once; the one already told is not repeated
     await writeFile(
-      path.join(dir, ".longe/questions/q-20260922-bbbb.md"),
+      path.join(questionsDir(dir), "q-20260922-bbbb.md"),
       q("q-20260922-bbbb", "And?"),
     );
     await ctx.index.refresh("question", "q-20260922-bbbb");
@@ -675,7 +676,7 @@ done
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(slow)}\n`,
     );
     await writeFile(
-      path.join(dir, ".longe/questions/q-20260922-cccc.md"),
+      path.join(questionsDir(dir), "q-20260922-cccc.md"),
       newQuestionText({
         id: "q-20260922-cccc",
         asked_by: "agent",
@@ -789,7 +790,7 @@ done
       `version: 1\nproject: P\nagent:\n  command: ${JSON.stringify(fake)}\n`,
     );
     await writeFile(
-      path.join(dir, ".longe/topics/t1.md"),
+      path.join(topicsDir(dir), "t1.md"),
       newTopicText({ id: "t1", title: "T", goal: "g", status: "todo", now: new Date() }),
     );
     ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });

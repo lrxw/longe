@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import { closeAppContext, createAppContext } from "../src/app/context.js";
 import { runInit } from "../src/cli/init.js";
 import { AGENT_INSTRUCTIONS } from "../src/domain/agent-instructions.js";
 import { migrateBoardDir, refreshInstructions, staleMentions } from "../src/store/migrate.js";
+import { dataDir, projectDir, projectIdOf, topicsDir } from "../src/store/paths.js";
 import { hasBoardDir } from "../src/store/registry.js";
 
 let dir: string;
@@ -35,7 +36,7 @@ describe("board folder migration (.ai/ → .longe/)", () => {
     await oldBoard();
     expect(await migrateBoardDir(dir)).toBe(true);
     expect(await exists(".ai")).toBe(false);
-    expect(await readFile(path.join(dir, ".longe/topics/t.md"), "utf8")).toBe("x");
+    expect(await readFile(path.join(topicsDir(dir), "t.md"), "utf8")).toBe("x");
     expect(await migrateBoardDir(dir)).toBe(false);
   });
 
@@ -57,7 +58,7 @@ describe("board folder migration (.ai/ → .longe/)", () => {
     const ctx = await createAppContext(dir, { index: { debounceMs: 20, usePolling: true } });
     expect(ctx.config.project).toBe("Old");
     expect(ctx.index.topics.size).toBe(0); // "x" is not a valid topic, but it was found
-    expect(await exists(".longe/topics/t.md")).toBe(true);
+    expect(await readFile(path.join(topicsDir(dir), "t.md"), "utf8")).toBe("x");
     await closeAppContext(ctx);
 
     const other = path.join(dir, "other");
@@ -86,6 +87,62 @@ describe("board folder migration (.ai/ → .longe/)", () => {
     const empty = path.join(dir, "empty");
     await mkdir(empty);
     expect(await refreshInstructions(empty, AGENT_INSTRUCTIONS)).toBe(false);
+  });
+
+  it("moves a board that still lives in .longe/ to ~/.longe/projects/<id>/, keeping every file", async () => {
+    // a board from before: no id, topics, questions, messages and archive inside the repo
+    await mkdir(path.join(dir, ".longe/topics"), { recursive: true });
+    await mkdir(path.join(dir, ".longe/questions"), { recursive: true });
+    await mkdir(path.join(dir, ".longe/messages"), { recursive: true });
+    await mkdir(path.join(dir, ".longe/archive/topics"), { recursive: true });
+    await writeFile(
+      path.join(dir, ".longe/config.yml"),
+      "version: 1\n# a comment\nproject: My App\n",
+    );
+    await writeFile(path.join(dir, ".longe/topics/a.md"), "topic a");
+    await writeFile(path.join(dir, ".longe/questions/q-1.md"), "question");
+    await writeFile(path.join(dir, ".longe/messages/m-1.md"), "message");
+    await writeFile(path.join(dir, ".longe/archive/topics/old.md"), "archived");
+
+    expect(await migrateBoardDir(dir)).toBe(true);
+    const config = await readFile(path.join(dir, ".longe/config.yml"), "utf8");
+    const id = /^id: (\S+)$/m.exec(config)?.[1] as string;
+    expect(id).toMatch(/^my-app-[0-9a-z]{4}$/);
+    expect(config).toMatch(/^version: 1\nid: my-app-[0-9a-z]{4}\n# a comment\nproject: My App\n$/);
+    const home = projectDir(id);
+    expect(dataDir(dir)).toBe(home);
+    expect(await readFile(path.join(home, "topics/a.md"), "utf8")).toBe("topic a");
+    expect(await readFile(path.join(home, "questions/q-1.md"), "utf8")).toBe("question");
+    expect(await readFile(path.join(home, "messages/m-1.md"), "utf8")).toBe("message");
+    expect(await readFile(path.join(home, "archive/topics/old.md"), "utf8")).toBe("archived");
+    // only settings stay in the repo
+    expect((await readdir(path.join(dir, ".longe"))).sort()).toEqual(["config.yml"]);
+    expect(JSON.parse(await readFile(path.join(home, "project.json"), "utf8"))).toEqual({
+      root: await realpath(dir),
+      name: "My App",
+    });
+    expect(await migrateBoardDir(dir)).toBe(false); // done: nothing left to move
+  });
+
+  it("finds the board again when config.yml loses its id, and keeps both copies of a clash", async () => {
+    await runInit(dir);
+    const id = projectIdOf(dir) as string;
+    await writeFile(path.join(topicsDir(dir), "same.md"), "home version");
+    // config rewritten without the id; a stale copy of the board comes in through git
+    await writeFile(path.join(dir, ".longe/config.yml"), "version: 1\nproject: P\n");
+    await mkdir(path.join(dir, ".longe/topics"), { recursive: true });
+    await writeFile(path.join(dir, ".longe/topics/same.md"), "repo version");
+    await writeFile(path.join(dir, ".longe/topics/new.md"), "only in repo");
+
+    expect(dataDir(dir)).toBe(projectDir(id)); // found by project.json before migration
+    await migrateBoardDir(dir);
+    expect(projectIdOf(dir)).toBe(id); // written back
+    expect(await readFile(path.join(topicsDir(dir), "same.md"), "utf8")).toBe("home version");
+    expect(await readFile(path.join(topicsDir(dir), "new.md"), "utf8")).toBe("only in repo");
+    expect(await readFile(path.join(projectDir(id), "conflicts/topics/same.md"), "utf8")).toBe(
+      "repo version",
+    );
+    expect(await exists(".longe/topics")).toBe(false);
   });
 
   it("lists agent instruction files that still mention .ai/", async () => {

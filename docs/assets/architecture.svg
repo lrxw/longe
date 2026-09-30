@@ -30,7 +30,7 @@
 
   <rect width="1200" height="640" rx="18" fill="#fff"/>
   <text x="40" y="46" class="h" style="font-size:24px">Agents keep working. Their questions wait for you in one inbox.</text>
-  <text x="40" y="72" class="t">A question is a file in the repository, not a prompt in some terminal: it waits until you answer, and the answer finds its way back.</text>
+  <text x="40" y="72" class="t">A question is a file on your machine, not a prompt in some terminal: it waits until you answer, and the answer finds its way back.</text>
 
   <!-- agents -->
   <rect x="30" y="100" width="300" height="390" rx="14" class="zone"/>
@@ -52,7 +52,7 @@
 
   <!-- question file -->
   <rect x="420" y="150" width="360" height="290" rx="12" class="file"/>
-  <text x="440" y="180" class="b">.longe/questions/q-20260930-a1b2.md</text>
+  <text x="440" y="180" class="b">questions/q-20260930-a1b2.md</text>
   <text x="440" y="212" class="k">topic: billing</text>
   <text x="440" y="234" class="k">blocking: true</text>
   <text x="440" y="256" class="k">options: [monthly, yearly]</text>
@@ -61,8 +61,8 @@
   <text x="440" y="332" class="m">Bill monthly or yearly?</text>
   <text x="440" y="362" class="m">## Answer</text>
   <text x="440" y="382" class="m">yearly</text>
-  <text x="440" y="416" class="s">Markdown in the repo, committed with the code:</text>
-  <text x="440" y="432" class="s">the decision and why stay with the work.</text>
+  <text x="440" y="416" class="s">Markdown in ~/.longe/projects/&lt;id&gt;/, beside the repo:</text>
+  <text x="440" y="432" class="s">the decision and why are kept, the code stays code.</text>
 
   <!-- inbox -->
   <rect x="870" y="100" width="300" height="390" rx="14" class="inbox"/>

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { dataDir, questionsDir, topicsDir } from "../src/store/paths.js";
 import { newQuestionText } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
@@ -14,8 +15,8 @@ let app: ReturnType<typeof createHttpApp>;
 const notifications: string[] = [];
 const now = new Date();
 
-const topicFile = (id: string) => path.join(dir, ".longe/topics", `${id}.md`);
-const questionFile = (id: string) => path.join(dir, ".longe/questions", `${id}.md`);
+const topicFile = (id: string) => path.join(topicsDir(dir), `${id}.md`);
+const questionFile = (id: string) => path.join(questionsDir(dir), `${id}.md`);
 
 // below vitest's 5s test timeout, so a hang names the condition instead of the whole test
 async function waitFor(fn: () => boolean, ms = 4000): Promise<void> {
@@ -306,7 +307,7 @@ describe("actions", () => {
     expect(ctx.index.topics.has("dropped")).toBe(false);
     expect(ctx.index.questions.has("q-20260922-dn0q")).toBe(false);
     expect(ctx.index.topics.has("billing")).toBe(true);
-    const archive = path.join(dir, ".longe/archive");
+    const archive = path.join(dataDir(dir), "archive");
     expect(await readFile(path.join(archive, "topics/shipped.md"), "utf8")).toContain(
       "status: done",
     );

@@ -8,6 +8,7 @@ import { collectAnswers, formatAnswersForAgent } from "../src/cli/answers.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
 import { parseConfig } from "../src/store/config.js";
+import { questionsDir, topicsDir } from "../src/store/paths.js";
 import { newQuestionText } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
@@ -94,12 +95,12 @@ describe("on_answer end to end", () => {
       `version: 1\nhooks:\n  on_answer: echo "{question_id}|{topic_id}|{answer}" >> ${shellQuote(marker)}\n`,
     );
     await writeFile(
-      path.join(dir, ".longe/topics/t.md"),
+      path.join(topicsDir(dir), "t.md"),
       newTopicText({ id: "t", title: "T", goal: "g", now: new Date() }),
     );
     for (const id of ["q-20260922-aaaa", "q-20260922-bbbb"]) {
       await writeFile(
-        path.join(dir, ".longe/questions", `${id}.md`),
+        path.join(questionsDir(dir), `${id}.md`),
         newQuestionText({
           id,
           question: `Q ${id}?`,
@@ -123,7 +124,7 @@ describe("on_answer end to end", () => {
     expect(await readFile(marker, "utf8")).toBe("q-20260922-aaaa|t|Yes.\n");
 
     // hand edit the second one
-    const f = path.join(dir, ".longe/questions/q-20260922-bbbb.md");
+    const f = path.join(questionsDir(dir), "q-20260922-bbbb.md");
     const text = await readFile(f, "utf8");
     await writeFile(
       f,

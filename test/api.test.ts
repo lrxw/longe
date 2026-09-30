@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { questionsDir, topicsDir } from "../src/store/paths.js";
 
 let dir: string;
 let ctx: AppContext;
@@ -100,7 +101,7 @@ describe("REST /api/v1", () => {
     expect(notifications).toEqual([
       `${path.basename(dir)} · Webhooks or polling?: Blocking · Billing refactor`,
     ]);
-    expect(await readFile(path.join(dir, ".longe/topics/billing-refactor.md"), "utf8")).toMatch(
+    expect(await readFile(path.join(topicsDir(dir), "billing-refactor.md"), "utf8")).toMatch(
       /system — blocked on q-/,
     );
 
@@ -168,7 +169,7 @@ describe("REST /api/v1", () => {
 
     await post("withdraw_question", { id: q1, reason: "found it" });
     expect(ctx.index.topics.get("t")?.fm.status).toBe("needs-decision"); // q2 still open
-    expect(await readFile(path.join(dir, ".longe/questions", `${q1}.md`), "utf8")).toMatch(
+    expect(await readFile(path.join(questionsDir(dir), `${q1}.md`), "utf8")).toMatch(
       /Withdrawn .* — found it/,
     );
 
@@ -211,7 +212,7 @@ describe("REST /api/v1", () => {
 
     await post("answer_question", { id: qid, option_index: 1, note: "menu never opens" });
     expect(ctx.index.topics.get("t")?.fm.status).toBe("active");
-    expect(await readFile(path.join(dir, ".longe/topics/t.md"), "utf8")).toMatch(
+    expect(await readFile(path.join(topicsDir(dir), "t.md"), "utf8")).toMatch(
       /system — rejected in q-.*: Broken menu never opens/,
     );
 
@@ -242,7 +243,7 @@ describe("REST /api/v1", () => {
     );
     await post("answer_question", { id: r.body.id, option_index: 0 });
     expect(ctx.index.topics.get("t")?.fm.status).toBe("done");
-    expect(await readFile(path.join(dir, ".longe/topics/t.md"), "utf8")).toMatch(
+    expect(await readFile(path.join(topicsDir(dir), "t.md"), "utf8")).toMatch(
       /system — approved in q-.*: Good/,
     );
   });
@@ -262,9 +263,7 @@ describe("REST /api/v1", () => {
     expect(r.body).toEqual({ id: qid, deleted: true });
     expect(ctx.index.topics.get("t")?.fm.status).toBe("active");
     expect(ctx.index.questions.has(qid)).toBe(false);
-    await expect(
-      readFile(path.join(dir, ".longe/questions", `${qid}.md`), "utf8"),
-    ).rejects.toThrow();
+    await expect(readFile(path.join(questionsDir(dir), `${qid}.md`), "utf8")).rejects.toThrow();
     expect((await post("delete_question", { id: qid })).status).toBe(404);
     // the UI route answers with nothing, so the card disappears
     const q2 = (

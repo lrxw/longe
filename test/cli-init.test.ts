@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CLAUDE_LINE, initProject, POINTER_LINE, runInit } from "../src/cli/init.js";
 import { AGENT_INSTRUCTIONS } from "../src/domain/agent-instructions.js";
+import { questionsDir, topicsDir } from "../src/store/paths.js";
 
 let dir: string;
 
@@ -19,12 +20,19 @@ describe("longe init", () => {
   it("creates the .longe layout", async () => {
     const result = await runInit(dir);
 
-    expect((await stat(path.join(dir, ".longe/topics"))).isDirectory()).toBe(true);
-    expect((await stat(path.join(dir, ".longe/questions"))).isDirectory()).toBe(true);
-    expect(await readdir(path.join(dir, ".longe/topics"))).toEqual([]);
-    expect(await readdir(path.join(dir, ".longe/questions"))).toEqual([]);
-
+    // the board lives outside the repo, in ~/.longe/projects/<id>/
     const config = await readFile(path.join(dir, ".longe/config.yml"), "utf8");
+    const id = /^id: (\S+)$/m.exec(config)?.[1];
+    expect(id).toMatch(new RegExp(`^${path.basename(dir).toLowerCase()}-[0-9a-z]{4}$`));
+    expect(topicsDir(dir)).toBe(
+      path.join(process.env.LONGE_HOME as string, "projects", id as string, "topics"),
+    );
+    expect(await readdir(topicsDir(dir))).toEqual([]);
+    expect(await readdir(questionsDir(dir))).toEqual([]);
+    expect((await readdir(path.join(dir, ".longe"))).sort()).toEqual([
+      "AGENT-INSTRUCTIONS.md",
+      "config.yml",
+    ]);
     expect(config).toMatch(/^version: 1\n/);
     expect(config).toContain(`project: "${path.basename(dir)}"`);
 
@@ -44,7 +52,8 @@ describe("longe init", () => {
   it("is idempotent and never overwrites", async () => {
     await runInit(dir);
     const configPath = path.join(dir, ".longe/config.yml");
-    const custom = "version: 1\nproject: Custom Name\n";
+    const id = /^id: (\S+)$/m.exec(await readFile(configPath, "utf8"))?.[1];
+    const custom = `version: 1\nid: ${id}\nproject: Custom Name\n`;
     await writeFile(configPath, custom);
 
     const second = await runInit(dir);

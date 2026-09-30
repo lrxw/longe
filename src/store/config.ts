@@ -84,6 +84,11 @@ export function providerConfig(
 
 export const configSchema = z.looseObject({
   version: z.literal(1),
+  /** The board's folder: ~/.longe/projects/<id>/ (see store/paths.ts). */
+  id: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]*$/)
+    .optional(),
   project: z.string().trim().min(1).optional(),
   /** Accent color for this repo in the UI (any CSS color). Default: derived from the name. */
   color: z.string().trim().min(1).optional(),
@@ -107,8 +112,11 @@ export function parseConfig(text: string, file?: string): Config {
 }
 
 /** Template written by `longe init`. */
-export function defaultConfigText(projectName: string): string {
+export function defaultConfigText(projectName: string, id: string): string {
   return `version: 1
+# Where this project's board lives: ~/.longe/projects/<id>/ (topics, questions,
+# messages). Keep it when you move or rename the folder.
+id: ${id}
 project: ${JSON.stringify(projectName)}
 
 # Agents' questions go to the inbox (default: true). The chat may not use the agent's

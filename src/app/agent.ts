@@ -198,8 +198,8 @@ function withTopic(text: string, opts: SayOptions): string {
  * The repo's conversation with the coding agent (Claude Code). One long-lived
  * `claude -p --input-format stream-json` process takes messages on stdin at any
  * time, also mid-turn; its session id is stored and the next process after an
- * idle close, a stop or a server restart `--resume`s it. Messages are files under
- * `.longe/messages/` (see store/messages.ts), so the chat outlives the process.
+ * idle close, a stop or a server restart `--resume`s it. Messages are files in the
+ * board's `messages/` (see store/messages.ts), so the chat outlives the process.
  */
 export class AgentRunner extends EventEmitter<AgentEvents> {
   private child: ChildProcess | undefined;
@@ -476,7 +476,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       this.settleTimer = undefined;
       this.loaded = this.loadProviderSession();
       await this.loaded;
-      // waits in .longe/messages/ and goes out first with the new provider's next turn
+      // waits in the board's messages/ and goes out first with the new provider's next turn
       await writeMessage(this.root, {
         from: "board",
         text: handoffPrompt(previous, provider),

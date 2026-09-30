@@ -13,13 +13,13 @@ import {
   serializeMarkdown,
   setField,
 } from "./markdown.js";
-import { BOARD_DIR, stemOf } from "./paths.js";
+import { messagesDir, stemOf } from "./paths.js";
 import { yamlString } from "./topic.js";
 
 /**
- * Chat messages to the agent, one file each under `.longe/messages/`. The chat
- * page is a view over these files plus the live transcript, so the
- * conversation survives a server restart and is committed with the code.
+ * Chat messages to the agent, one file each under the project's `messages/` (see
+ * paths.ts; outside the repo). The chat page is a view over these files plus the
+ * live transcript, so the conversation survives a server restart.
  * Only what the human (or the board on their behalf) says is stored; what the
  * agent has to say goes to the board through the longe tools.
  */
@@ -40,9 +40,7 @@ export interface Message {
   text: string;
 }
 
-export function messagesDir(root: string): string {
-  return path.join(root, BOARD_DIR, "messages");
-}
+export { messagesDir };
 export function messagePath(root: string, id: string): string {
   return path.join(messagesDir(root), `${id}.md`);
 }

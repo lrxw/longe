@@ -6,6 +6,7 @@ import { type AppContext, closeAppContext, createAppContext } from "../src/app/c
 import { runInit } from "../src/cli/init.js";
 import { todoOrder } from "../src/domain/topic-ops.js";
 import { createHttpApp } from "../src/http/app.js";
+import { topicsDir } from "../src/store/paths.js";
 import { human, setTopicStatus } from "../src/tools/ops.js";
 
 const t = (id: string, updated: string, rank?: number) => ({
@@ -56,12 +57,12 @@ describe("reordering the todo queue", () => {
     });
     expect(res.status).toBe(200);
     expect(await column()).toEqual(["gamma", "alpha", "beta"]);
-    expect(await readFile(path.join(dir, ".longe/topics/gamma.md"), "utf8")).toContain("rank: 1");
+    expect(await readFile(path.join(topicsDir(dir), "gamma.md"), "utf8")).toContain("rank: 1");
 
     // Gamma leaves todo and comes back: it joins at the end, without its old rank
     await setTopicStatus(ctx, "gamma", "backlog", "human");
     await setTopicStatus(ctx, "gamma", "todo", "human");
     expect(await column()).toEqual(["alpha", "beta", "gamma"]);
-    expect(await readFile(path.join(dir, ".longe/topics/gamma.md"), "utf8")).not.toContain("rank:");
+    expect(await readFile(path.join(topicsDir(dir), "gamma.md"), "utf8")).not.toContain("rank:");
   });
 });

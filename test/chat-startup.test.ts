@@ -8,6 +8,7 @@ import { runInit } from "../src/cli/init.js";
 import { answerQuestion } from "../src/domain/question-ops.js";
 import { createHttpApp } from "../src/http/app.js";
 import type { Message } from "../src/store/messages.js";
+import { questionsDir, topicsDir } from "../src/store/paths.js";
 import { newQuestionText, parseQuestion, serializeQuestion } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
@@ -42,7 +43,7 @@ async function repo(name: string, work: "todo" | "answer") {
   await runInit(root);
   if (work === "todo") {
     await writeFile(
-      path.join(root, ".longe/topics/task.md"),
+      path.join(topicsDir(root), "task.md"),
       newTopicText({ id: "task", title: "Task", goal: "Work", now: new Date() }).replace(
         "status: backlog",
         "status: todo",
@@ -59,7 +60,7 @@ async function repo(name: string, work: "todo" | "answer") {
       }),
     );
     answerQuestion(q, { answer: "yes" }, new Date());
-    await writeFile(path.join(root, ".longe/questions/q-20260929-test.md"), serializeQuestion(q));
+    await writeFile(path.join(questionsDir(root), "q-20260929-test.md"), serializeQuestion(q));
   }
   return root;
 }

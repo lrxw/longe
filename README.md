@@ -4,14 +4,15 @@
 
 <p align="center">
   <strong>Your agent works. Decisions land in your inbox.</strong><br>
-  An inbox and work board for AI coding agents, with the record kept in your repository.
+  An inbox and work board for AI coding agents, running on your machine.
 </p>
 
 ---
 
 Give a coding agent a task. When it needs your input, it sends a question with options to longe's
 inbox. You answer when you are ready; the agent reads the answer, acknowledges it and continues.
-The request, decision and result stay in your repository as readable markdown.
+Requests, decisions and results are kept as readable markdown on your machine, next to the
+repository rather than in it: the repository stays code, the board is the conversation about it.
 
 ![Agents working on different topics ask with ask_question; each question becomes a markdown file that waits in one inbox; you pick an answer and it goes back to the agent that asked, which acknowledges it and continues.](docs/assets/architecture.svg)
 
@@ -29,7 +30,7 @@ the agent states its assumption and keeps working while your answer is pending.
 Three connected views keep that loop visible:
 
 - **Topics** hold the work: a goal, a plan, the decisions taken and a log. Each one is a markdown
-  file in `.longe/topics/`, committed together with the code it describes.
+  file on the project's board; commits carry a `Topic: <id>` line that links them back.
 - **The inbox** collects the questions agents ask you, with blocking ones first. You answer with
   one click, and the answer goes back to the agent.
 - **The chat** lets you talk to Claude Code or Codex from the board and send it through the open work.
@@ -88,11 +89,12 @@ npm link
 
 ```sh
 cd /path/to/your/project
-longe init                     # creates .longe/ with config, topics/, questions/ and the agent protocol
+longe init                     # creates .longe/ (config + agent protocol) and the project's board
 longe serve -d --open          # starts the server in the background and opens the board
 ```
 
-The board runs at <http://127.0.0.1:7311>. Commit `.longe/` with your code.
+The board runs at <http://127.0.0.1:7311>. Commit `.longe/` with your code: it holds only
+`config.yml` and the agent protocol. The board itself lives in `~/.longe/projects/<id>/`.
 
 `longe init` also points your agents at the protocol. `AGENTS.md` in the repository root, the
 file every agent reads, gets one line (appended, or the file is created):
@@ -178,20 +180,30 @@ ask_in_inbox: false
 
 ## How it works
 
-Everything lives in the repository's `.longe/` folder:
+The repository keeps what belongs with the code; the board, which is communication about the
+work, lives on your machine:
 
 ```
-.longe/
-  config.yml                     # project name, color, hooks, chat settings
+<repo>/.longe/                   # committed with the code
+  config.yml                     # id, project name, color, hooks, chat settings
   AGENT-INSTRUCTIONS.md          # the protocol agents follow (kept current by longe; do not edit)
+
+~/.longe/projects/<id>/          # the board ($LONGE_HOME instead of ~/.longe)
+  project.json                   # which repository it belongs to
   topics/<slug>.md               # one topic: frontmatter + Goal, Plan, Decisions, Log
   questions/q-YYYYMMDD-xxxx.md   # one question and its answer
   messages/m-YYYYMMDD-xxxx.md    # messages you sent in the chat
   archive/                       # archived topics and their questions
 ```
 
-You and your agents may edit these files directly. longe watches them, validates them, shows
-errors in the UI and applies the rules below.
+The `id` in `config.yml` links the two, so moving or renaming the folder keeps the board. A
+board from an older longe that still sits in `.longe/` is moved there on the next start;
+files that clash with ones already there are kept under `conflicts/`. The board is per
+machine and not shared through git; put docs or a knowledge base you want in the repository
+there on purpose.
+
+You and your agents may edit the board's files directly. longe watches them, validates them,
+shows errors in the UI and applies the rules below.
 
 **Statuses.** `backlog → todo → active → review → done`, plus `needs-decision` and `cancelled`.
 The backlog is parked; agents never pick it up on their own. Todo is your queue: whenever the
@@ -247,7 +259,7 @@ Codex queues them for the next turn. Provider sessions and model overrides are s
 - The process closes after a period without work and resumes the session with the next message.
   **New session** starts fresh, **Clear history** empties the page, **Copy resume command**
   continues the same session in a terminal.
-- Messages are stored as files in `.longe/messages/`, so the chat survives restarts.
+- Messages are stored as files in the board's `messages/`, so the chat survives restarts.
 - A small prompt box on each topic page sends a message about that topic.
 
 Headless runs cannot answer permission prompts. Edits are allowed by default

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { askToInbox, HOOK_COMMAND, installHook, removeHook } from "../src/cli/hooks.js";
 import { runInit } from "../src/cli/init.js";
+import { questionsDir } from "../src/store/paths.js";
 import { parseQuestion } from "../src/store/question.js";
 
 let dir: string;
@@ -69,10 +70,10 @@ describe("AskUserQuestion → inbox hook", () => {
         ],
       },
     });
-    const files = await readdir(path.join(dir, ".longe/questions"));
+    const files = await readdir(questionsDir(dir));
     expect(files).toHaveLength(1);
     const q = parseQuestion(
-      await readFile(path.join(dir, ".longe/questions", files[0] as string), "utf8"),
+      await readFile(path.join(questionsDir(dir), files[0] as string), "utf8"),
     );
     expect(q.fm.blocking).toBe(true);
     expect(q.fm.options).toEqual(["Postgres", "SQLite"]);
@@ -91,7 +92,7 @@ describe("AskUserQuestion → inbox hook", () => {
       tool_input: { questions: [{ question: "Q?" }] },
     });
     expect(out).toBeUndefined();
-    expect(await readdir(path.join(dir, ".longe/questions"))).toEqual([]);
+    expect(await readdir(questionsDir(dir))).toEqual([]);
   });
 
   it("lets the tool run when it is another tool, has no question, or no .longe/ is found", async () => {

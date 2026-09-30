@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createMultiHub, createRegistryHub, type Hub } from "../src/app/hub.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { questionsDir, topicsDir } from "../src/store/paths.js";
 import { newQuestionText } from "../src/store/question.js";
 import { readRegistry, registerRepo, renameRepo, unregisterRepo } from "../src/store/registry.js";
 import { newTopicText } from "../src/store/topic.js";
@@ -25,7 +26,7 @@ async function mkRepo(name: string, project: string): Promise<string> {
   await runInit(dir);
   await writeFile(path.join(dir, ".longe/config.yml"), `version: 1\nproject: ${project}\n`);
   await writeFile(
-    path.join(dir, ".longe/topics/t1.md"),
+    path.join(topicsDir(dir), "t1.md"),
     newTopicText({ id: "t1", title: `${project} topic`, goal: "g", now }).replace(
       "status: backlog",
       "status: active",
@@ -41,7 +42,7 @@ beforeEach(async () => {
   shop = await mkRepo("shop", "Shop");
   blog = await mkRepo("blog", "Blog");
   await writeFile(
-    path.join(blog, ".longe/questions/q-20260922-blog.md"),
+    path.join(questionsDir(blog), "q-20260922-blog.md"),
     newQuestionText({
       id: "q-20260922-blog",
       question: "Blog Q?",
@@ -151,7 +152,7 @@ describe("hub mode", () => {
     expect((await app.request("/r/shop/inbox")).status).toBe(404);
 
     // a topic page keeps the repo prefix: live refresh and the Reject form
-    const t1 = path.join(shop, ".longe/topics/t1.md");
+    const t1 = path.join(topicsDir(shop), "t1.md");
     await writeFile(t1, (await readFile(t1, "utf8")).replace("status: active", "status: review"));
     let topicPage = "";
     for (let i = 0; i < 80 && !topicPage.includes('class="reject"'); i++) {
@@ -188,7 +189,7 @@ describe("hub mode", () => {
 
     r = await post("/api/v1/create_topic", { repo: "shop", title: "Via hub", goal: "g" });
     expect((await json(r)).id).toBe("via-hub");
-    expect(await readFile(path.join(shop, ".longe/topics/via-hub.md"), "utf8")).toContain(
+    expect(await readFile(path.join(topicsDir(shop), "via-hub.md"), "utf8")).toContain(
       "title: Via hub",
     );
 

@@ -2,8 +2,8 @@ import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
 import { defaultConfigText } from "../store/config.js";
-import { migrateBoardDir } from "../store/migrate.js";
-import { BOARD_DIR } from "../store/paths.js";
+import { ensureProjectHome, migrateBoardDir, newProjectId } from "../store/migrate.js";
+import { BOARD_DIR, questionsDir, topicsDir } from "../store/paths.js";
 import type { DeepIntegrationResult } from "./deep-integrate.js";
 
 export interface InitResult {
@@ -39,23 +39,24 @@ async function exists(p: string): Promise<boolean> {
  * `projectName` goes into a new config.yml (default: the folder name).
  */
 export async function runInit(repoRoot: string, projectName?: string): Promise<InitResult> {
-  await migrateBoardDir(repoRoot); // an old .ai/ board is moved, not started over
+  // an old .ai/ board is moved, and a board still inside .longe/ goes to ~/.longe/projects/
+  await migrateBoardDir(repoRoot);
   const root = path.join(repoRoot, BOARD_DIR);
   const result: InitResult = { created: [], skipped: [], updated: [] };
+  const shown = (p: string) => {
+    const rel = path.relative(repoRoot, p);
+    return rel.startsWith("..") ? p : rel;
+  };
 
-  const dirs = [root, path.join(root, "topics"), path.join(root, "questions")];
-  for (const dir of dirs) {
-    const rel = path.relative(repoRoot, dir) + path.sep;
-    if (await exists(dir)) {
-      result.skipped.push(rel);
-    } else {
-      await mkdir(dir, { recursive: true });
-      result.created.push(rel);
-    }
+  if (await exists(root)) result.skipped.push(`${BOARD_DIR}${path.sep}`);
+  else {
+    await mkdir(root, { recursive: true });
+    result.created.push(`${BOARD_DIR}${path.sep}`);
   }
 
+  const name = projectName ?? path.basename(repoRoot);
   const files: Array<[string, string]> = [
-    [path.join(root, "config.yml"), defaultConfigText(projectName ?? path.basename(repoRoot))],
+    [path.join(root, "config.yml"), defaultConfigText(name, newProjectId(name))],
     [path.join(root, "AGENT-INSTRUCTIONS.md"), AGENT_INSTRUCTIONS],
   ];
   for (const [file, content] of files) {
@@ -65,6 +66,18 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
     } else {
       await writeFile(file, content, { encoding: "utf8", flag: "wx" });
       result.created.push(rel);
+    }
+  }
+  // a config.yml the human wrote without an id gets one now
+  await ensureProjectHome(repoRoot);
+
+  // the board itself lives outside the repo: ~/.longe/projects/<id>/
+  for (const dir of [topicsDir(repoRoot), questionsDir(repoRoot)]) {
+    if (await exists(dir)) {
+      result.skipped.push(shown(dir) + path.sep);
+    } else {
+      await mkdir(dir, { recursive: true });
+      result.created.push(shown(dir) + path.sep);
     }
   }
 

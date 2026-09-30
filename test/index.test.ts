@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runInit } from "../src/cli/init.js";
 import { EffectRunner } from "../src/index/effects.js";
 import { AiIndex, type QuestionChange, type TopicChange } from "../src/index/index.js";
+import { questionsDir, topicsDir } from "../src/store/paths.js";
 import { newQuestionText } from "../src/store/question.js";
 import { Repo } from "../src/store/repo.js";
 import { newTopicText } from "../src/store/topic.js";
@@ -21,8 +22,8 @@ async function waitFor(fn: () => boolean, ms = 10000): Promise<void> {
   }
 }
 
-const topicFile = (id: string) => path.join(dir, ".longe/topics", `${id}.md`);
-const questionFile = (id: string) => path.join(dir, ".longe/questions", `${id}.md`);
+const topicFile = (id: string) => path.join(topicsDir(dir), `${id}.md`);
+const questionFile = (id: string) => path.join(questionsDir(dir), `${id}.md`);
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "longe-index-"));

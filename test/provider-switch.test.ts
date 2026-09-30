@@ -7,6 +7,7 @@ import { type AppContext, closeAppContext, createAppContext } from "../src/app/c
 import { attachChatQueue } from "../src/app/todo-queue.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { topicsDir } from "../src/store/paths.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;
@@ -223,7 +224,7 @@ describe("UI provider switching", () => {
       // Board work arriving during the switch must wake on the new provider afterward.
       attachChatQueue(ctx.index, ctx.agent);
       await writeFile(
-        path.join(dir, ".longe/topics/next.md"),
+        path.join(topicsDir(dir), "next.md"),
         newTopicText({ id: "next", title: "Next", goal: "Work", now: new Date() }).replace(
           "status: backlog",
           "status: todo",
