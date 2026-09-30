@@ -1,7 +1,9 @@
 ## Working with the .longe board
 
-You track your work in this repository's `.longe/` folder, via the longe MCP tools
-(or REST at http://127.0.0.1:7311/api/v1, or by editing the files directly).
+You track your work on this repository's longe board, via the longe MCP tools (or REST
+at http://127.0.0.1:7311/api/v1). The board's files live outside the repository, in
+`~/.longe/projects/<id>/` (the `id` is in `.longe/config.yml`); prefer the tools, the
+files are there for when a tool fails.
 
 At the start of every session:
 1. Call `check_answers` and read every answer. Call `acknowledge_answers` for what you read.
