@@ -42,8 +42,25 @@ export interface ProviderProcess {
   close(): void;
 }
 
+/**
+ * What `longe connect` sets up so the provider's own sessions (terminal, IDE) ask
+ * through the inbox. Each provider does what its CLI supports.
+ */
+export interface TerminalIntegration {
+  /** One line for `longe connect` output. */
+  what: string;
+  /** The file it writes: the user's own (default) or the committed one (`shared`). */
+  file(repo: string, shared: boolean): string;
+  /** False when it was already there. */
+  install(repo: string, shared: boolean): Promise<boolean>;
+  /** False when it was not there. */
+  remove(repo: string, shared: boolean): Promise<boolean>;
+}
+
 /** A coding agent longe can chat with. One file per provider, listed in index.ts. */
 export interface ChatProvider {
+  /** Absent: the provider offers no hook longe can use. */
+  terminal?: TerminalIntegration;
   id: AgentProvider;
   /** Shown in the provider select and in handoff messages. */
   label: string;

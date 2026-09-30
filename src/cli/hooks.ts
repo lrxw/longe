@@ -93,7 +93,7 @@ export async function askInInboxEnabled(root: string): Promise<boolean> {
 }
 
 /** The nearest folder at or above `dir` that has `.longe/` (or an old `.ai/` board, moved now). */
-async function findRepo(dir: string): Promise<string | undefined> {
+export async function findRepo(dir: string): Promise<string | undefined> {
   let cur = path.resolve(dir);
   for (;;) {
     await migrateBoardDir(cur).catch(() => false);
@@ -178,25 +178,21 @@ async function readStdin(): Promise<string> {
 export async function runHooks(rest: string[], repo: string, shared = false): Promise<number> {
   const [sub] = rest;
   switch (sub) {
-    case "install": {
-      const file = settingsPath(repo, shared);
-      const added = await installHook(repo, shared);
-      process.stdout.write(
-        added
-          ? `added the AskUserQuestion hook to ${file}\nClaude Code sessions in this repo now ask through the longe inbox (restart running sessions).\n`
-          : `the hook is already in ${file}\n`,
-      );
-      return 0;
-    }
+    // older names of `longe connect` / `longe disconnect`
+    case "install":
     case "remove": {
-      // without --shared the hook goes out of both files: "remove" means gone
-      let found = false;
-      for (const s of shared ? [true] : [false, true]) {
-        if (!(await removeHook(repo, s))) continue;
-        found = true;
-        process.stdout.write(`removed the hook from ${settingsPath(repo, s)}\n`);
+      const { runConnect } = await import("./connect.js");
+      return runConnect(sub === "install" ? "connect" : "disconnect", rest.slice(1), repo, shared);
+    }
+    case "stop": {
+      // Codex's Stop hook (see codex-hooks.ts); like ask, it must never break the session
+      try {
+        const { codexStop } = await import("./codex-hooks.js");
+        const out = await codexStop(JSON.parse(await readStdin()));
+        if (out) process.stdout.write(`${out}\n`);
+      } catch (err) {
+        process.stderr.write(`longe hooks stop: ${String(err)}\n`);
       }
-      if (!found) process.stdout.write("the hook was not installed\n");
       return 0;
     }
     case "ask": {
@@ -211,7 +207,7 @@ export async function runHooks(rest: string[], repo: string, shared = false): Pr
     }
     default:
       process.stderr.write(
-        "Usage: longe hooks install | remove [--shared]   (ask is run by Claude Code)\n",
+        "Usage: longe connect | disconnect [provider…] [--shared]   (hooks ask / stop are run by the agents)\n",
       );
       return 2;
   }

@@ -1,3 +1,4 @@
+import { installHook, removeHook, settingsPath } from "../../cli/hooks.js";
 import { type ChatProvider, shellQuote } from "./types.js";
 
 /** Choices offered on the chat page; the config default and a custom id are added when set. */
@@ -62,4 +63,10 @@ export const claude: ChatProvider = {
     };
   },
   resumeCommand: (root, command, sessionId) => resumeCommand(root, sessionId, command),
+  terminal: {
+    what: "AskUserQuestion goes to the inbox (PreToolUse hook)",
+    file: settingsPath,
+    install: installHook,
+    remove: removeHook,
+  },
 };

@@ -4,6 +4,7 @@ import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
+import { endsWithQuestion } from "../domain/ends-with-question.js";
 import { DomainError } from "../domain/errors.js";
 import { type AgentConfig, type AgentProvider, providerConfig } from "../store/config.js";
 import {
@@ -151,19 +152,7 @@ export function handoffPrompt(from: AgentProvider, to: AgentProvider): string {
 export const ASK_IN_INBOX_PROMPT =
   "Your last reply ends with a question in the text. The human does not read the chat: if you need an answer, ask it with ask_question (2-4 options) now; if it was rhetorical, ignore this.";
 
-/**
- * The reply's last paragraph asks something: it ends with "?", or a sentence in it
- * does. Code blocks do not count.
- */
-export function endsWithQuestion(text: string): boolean {
-  const prose = text.replace(/```[\s\S]*?```/g, "").trim();
-  const last =
-    prose
-      .split(/\n\s*\n/)
-      .at(-1)
-      ?.trim() ?? "";
-  return /\?(\s|$|["'`)*_])/.test(last);
-}
+export { endsWithQuestion } from "../domain/ends-with-question.js";
 
 /** What the Continue button sends: pick the conversation up where it stopped (needs a session). */
 export const CONTINUE_PROMPT = "Continue where you left off. Report on the board when you stop.";

@@ -18,14 +18,14 @@ async function main(argv: string[]): Promise<number> {
         );
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
-      if (result.hook)
-        process.stdout.write(
-          `hook     ${result.hookFile}: Claude Code questions go to the inbox (ask_in_inbox; \`longe hooks remove\` undoes it)\n`,
-        );
+      for (const r of result.connected)
+        if (r.changed) process.stdout.write(`connect  ${r.provider} → ${r.file}: ${r.what}\n`);
+      if (result.connected.some((r) => r.changed))
+        process.stdout.write("         (ask_in_inbox; `longe disconnect` undoes it)\n");
       process.stdout.write(
         `\n.longe/ ready in ${repo}\n\nNext:\n` +
-          "  1. Connect your agent, e.g.:  claude mcp add longe -- longe mcp --repo .\n" +
-          "  2. Open the board:             longe serve --open\n" +
+          "  1. Give your agent the MCP tools, e.g.:  claude mcp add longe -- longe mcp --repo .\n" +
+          "  2. Open the board:                        longe serve --open\n" +
           "  Agents that do not read AGENTS.md (.cursorrules, GEMINI.md, …) need its line in their own file.\n",
       );
       return 0;
@@ -58,6 +58,11 @@ async function main(argv: string[]): Promise<number> {
     case "hooks": {
       const { runHooks } = await import("./hooks.js");
       return runHooks(cli.rest, repo, cli.shared);
+    }
+    case "connect":
+    case "disconnect": {
+      const { runConnect } = await import("./connect.js");
+      return runConnect(cli.command, cli.rest, repo, cli.shared);
     }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");

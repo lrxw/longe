@@ -72,10 +72,12 @@ describe("longe init", () => {
     expect(await readFile(claude, "utf8")).toBe(linked);
   });
 
-  it("initProject adds the Claude Code hook too, unless ask_in_inbox is off", async () => {
+  it("initProject connects every provider too, unless ask_in_inbox is off", async () => {
     const first = await initProject(dir, { name: "P" });
-    expect(first.hook).toBe(true);
-    expect(first.hookFile).toBe(".claude/settings.local.json");
+    expect(first.connected.map((r) => [r.provider, r.file, r.changed])).toEqual([
+      ["claude", ".claude/settings.local.json", true],
+      ["codex", path.join(process.env.CODEX_HOME as string, "hooks.json"), true],
+    ]);
     expect(first.created).toContain("AGENTS.md");
     const settings = JSON.parse(
       await readFile(path.join(dir, ".claude/settings.local.json"), "utf8"),
@@ -83,20 +85,26 @@ describe("longe init", () => {
     expect(settings.hooks.PreToolUse[0].matcher).toBe("AskUserQuestion");
     await expect(stat(path.join(dir, ".claude/settings.json"))).rejects.toThrow();
     expect(await readFile(path.join(dir, ".longe/config.yml"), "utf8")).toContain('project: "P"');
-    expect((await initProject(dir)).hook).toBe(false); // already there
+    // already there
+    expect((await initProject(dir)).connected.every((r) => !r.changed)).toBe(true);
 
     const other = await mkdtemp(path.join(os.tmpdir(), "longe-init-"));
     try {
       await runInit(other);
       await writeFile(path.join(other, ".longe/config.yml"), "version: 1\nask_in_inbox: false\n");
-      expect((await initProject(other)).hook).toBe(false);
+      expect((await initProject(other)).connected).toEqual([]);
       await expect(stat(path.join(other, ".claude/settings.local.json"))).rejects.toThrow();
-      // --shared: the committed file
-      const shared = await initProject(other, { shared: true });
-      expect(shared.hookFile).toBe(".claude/settings.json");
     } finally {
       await rm(other, { recursive: true, force: true });
     }
+  });
+
+  it("--shared connects through the files committed with the repo", async () => {
+    const shared = await initProject(dir, { shared: true });
+    expect(shared.connected.map((r) => r.file)).toEqual([
+      ".claude/settings.json",
+      ".codex/hooks.json",
+    ]);
   });
 
   it("a CLAUDE.md that already names the protocol directly counts as linked", async () => {

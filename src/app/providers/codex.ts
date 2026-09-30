@@ -1,3 +1,4 @@
+import { codexHooksPath, installCodexHook, removeCodexHook } from "../../cli/codex-hooks.js";
 import { CodexTransport } from "../codex.js";
 import { type ChatProvider, shellQuote } from "./types.js";
 
@@ -62,4 +63,10 @@ export const codex: ChatProvider = {
   },
   resumeCommand: (root, command, sessionId) =>
     `cd ${shellQuote(root)} && ${shellQuote(command)} resume ${shellQuote(sessionId)}`,
+  terminal: {
+    what: "a reply that ends with a question is sent back to ask it in the inbox (Stop hook; review it once with /hooks in Codex)",
+    file: codexHooksPath,
+    install: installCodexHook,
+    remove: removeCodexHook,
+  },
 };

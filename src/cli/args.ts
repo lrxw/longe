@@ -2,7 +2,17 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
-export type Command = "init" | "serve" | "mcp" | "answers" | "status" | "stop" | "repos" | "hooks";
+export type Command =
+  | "init"
+  | "serve"
+  | "mcp"
+  | "answers"
+  | "status"
+  | "stop"
+  | "repos"
+  | "hooks"
+  | "connect"
+  | "disconnect";
 
 export interface ParsedCli {
   command: Command;
@@ -11,7 +21,7 @@ export interface ParsedCli {
   open: boolean;
   json: boolean;
   daemon: boolean;
-  /** init, hooks: the Claude Code hook goes into the shared `.claude/settings.json`. */
+  /** init, connect, disconnect: the files committed with the repo, not the user's own. */
   shared: boolean;
   /** `--repo` was given explicitly (serve: single mode even without .longe/ in cwd). */
   repoGiven: boolean;
@@ -30,8 +40,10 @@ const USAGE = `Usage:
   longe status                              # is the server running, which repos
   longe stop                                # stop the background server
   longe mcp    [--repo <dir>]
-  longe hooks  [install | remove] [--repo <dir>] [--shared]
-               # Claude Code sessions in the repo ask through the longe inbox
+  longe connect    [claude|codex …] [--repo <dir>] [--shared]
+  longe disconnect [claude|codex …] [--repo <dir>] [--shared]
+               # the agents' own sessions (terminal, IDE) ask through the longe inbox,
+               # as far as each agent's CLI allows; no names: every agent
 
 Options:
   --repo   Repository root containing (or to receive) .longe/  (default: .)
@@ -39,8 +51,8 @@ Options:
   --open   Open the browser after serve starts
   --daemon, -d   Run serve in the background (log in ~/.cache/longe/serve/)
   --name   With repos add: display name
-  --shared With init and hooks: put the Claude Code hook into the shared .claude/settings.json
-           (committed with the repo) instead of your own .claude/settings.local.json
+  --shared With init and connect: write the files committed with the repo (.claude/settings.json,
+           .codex/hooks.json) instead of your own (.claude/settings.local.json, ~/.codex/hooks.json)
   -h, --help
   -v, --version
 `;
@@ -108,11 +120,14 @@ export function parseCli(argv: string[]): ParsedCli {
     "stop",
     "repos",
     "hooks",
+    "connect",
+    "disconnect",
   ];
   if (!commands.includes(command as Command)) {
     throw new CliError(`Unknown or missing command: ${command ?? "(none)"}\n\n${USAGE}`);
   }
-  if (positionals.length > 1 && command !== "repos" && command !== "hooks") {
+  const takesMore = ["repos", "hooks", "connect", "disconnect"];
+  if (positionals.length > 1 && !takesMore.includes(command as string)) {
     throw new CliError(`Unexpected argument: ${positionals[1]}\n\n${USAGE}`);
   }
 

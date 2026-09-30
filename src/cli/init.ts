@@ -4,6 +4,7 @@ import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
 import { defaultConfigText } from "../store/config.js";
 import { migrateBoardDir } from "../store/migrate.js";
 import { BOARD_DIR } from "../store/paths.js";
+import type { ConnectResult } from "./connect.js";
 
 export interface InitResult {
   created: string[];
@@ -72,28 +73,27 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
 }
 
 export interface InitProjectResult extends InitResult {
-  /** The Claude Code hook was added (ask_in_inbox on, and it was not there yet). */
-  hook: boolean;
-  /** Where the hook went (or already was). */
-  hookFile: string;
+  /** What `longe connect` did per provider; empty when ask_in_inbox is off. */
+  connected: ConnectResult[];
 }
 
 /**
  * Everything `longe init` does: the board, the agent files, and (with `ask_in_inbox`
- * on) the Claude Code hook that sends questions to the inbox. The CLI and "+ New
- * project" in the web UI both go through here, so a project set up either way is the same.
+ * on) `longe connect` for every provider, so their own sessions ask through the inbox.
+ * The CLI and "+ New project" in the web UI both go through here, so a project set up
+ * either way is the same.
  */
 export async function initProject(
   repoRoot: string,
   opts: { name?: string | undefined; shared?: boolean } = {},
 ): Promise<InitProjectResult> {
   const result = await runInit(repoRoot, opts.name);
-  const { askInInboxEnabled, installHook, settingsPath } = await import("./hooks.js");
-  const shared = opts.shared ?? false;
-  const hook = (await askInInboxEnabled(repoRoot))
-    ? await installHook(repoRoot, shared).catch(() => false)
-    : false;
-  return { ...result, hook, hookFile: path.relative(repoRoot, settingsPath(repoRoot, shared)) };
+  const { askInInboxEnabled } = await import("./hooks.js");
+  const { connect } = await import("./connect.js");
+  const connected = (await askInInboxEnabled(repoRoot))
+    ? await connect(repoRoot, { shared: opts.shared ?? false }).catch(() => [])
+    : [];
+  return { ...result, connected };
 }
 
 /**

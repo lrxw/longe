@@ -93,10 +93,10 @@ export function defaultConfigText(projectName: string): string {
   return `version: 1
 project: ${JSON.stringify(projectName)}
 
-# Agents' questions go to the inbox (default: true). The chat may not use Claude
-# Code's own question prompt and is reminded when it leaves a question in its reply;
-# terminal sessions get a hook (in .claude/settings.local.json, see \`longe hooks\`) that
-# sends their AskUserQuestion calls to the inbox. Set to false to turn this off.
+# Agents' questions go to the inbox (default: true). The chat may not use the agent's
+# own question prompt and is reminded when it leaves a question in its reply; terminal
+# sessions get hooks (see \`longe connect\`) that do the same as far as each agent
+# allows. Set to false to turn this off.
 # ask_in_inbox: true
 
 # Optional: wake an agent when you answer a question on the board.
