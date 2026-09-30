@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
+  <title id="title">The idea behind longe: agents keep working, their questions wait in one inbox</title>
+  <desc id="desc">Agents working on different topics of one repository ask with ask_question over MCP. Each question becomes a markdown file with status open, which the server shows in one inbox. You pick an answer; the file becomes answered and the answer is handed back to the agent, which acknowledges it and continues.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#4f46e5"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#15803d"/>
+    </marker>
+    <style>
+      text { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: #0f172a; }
+      .h { font-size: 18px; font-weight: 700; }
+      .b { font-size: 14px; font-weight: 650; }
+      .t { font-size: 13px; fill: #334155; }
+      .s { font-size: 12px; fill: #64748b; }
+      .m { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; fill: #334155; }
+      .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; fill: #7c2d12; }
+      .lb { font-size: 13px; font-weight: 650; fill: #4f46e5; }
+      .lg { font-size: 13px; font-weight: 650; fill: #15803d; }
+      .n { font-size: 13px; font-weight: 700; fill: #fff; }
+      .card { fill: #fff; stroke: #94a3b8; stroke-width: 1.2; }
+      .zone { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.5; }
+      .file { fill: #fff7ed; stroke: #fdba74; stroke-width: 1.5; }
+      .inbox { fill: #eef2ff; stroke: #818cf8; stroke-width: 1.5; }
+      .fa { fill: none; stroke: #4f46e5; stroke-width: 2; marker-end: url(#a); }
+      .fg { fill: none; stroke: #15803d; stroke-width: 2; marker-end: url(#g); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="640" rx="18" fill="#fff"/>
+  <text x="40" y="46" class="h" style="font-size:24px">Agents keep working. Their questions wait for you in one inbox.</text>
+  <text x="40" y="72" class="t">A question is a file in the repository, not a prompt in some terminal: it waits until you answer, and the answer finds its way back.</text>
+
+  <!-- agents -->
+  <rect x="30" y="100" width="300" height="390" rx="14" class="zone"/>
+  <text x="50" y="130" class="h">Agents on your project</text>
+  <rect x="50" y="146" width="260" height="104" rx="10" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
+  <text x="64" y="176" class="b" style="font-size:16px">Chat in longe</text>
+  <text x="64" y="200" class="t">Claude Code or Codex, run by longe</text>
+  <text x="64" y="222" class="s">working on topic "billing"</text>
+  <text x="64" y="240" class="s">gets answers without asking for them</text>
+  <text x="50" y="290" class="s">Also works with any agent over MCP:</text>
+  <rect x="50" y="300" width="260" height="48" rx="8" fill="#fff" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <text x="64" y="320" class="s" style="font-weight:600">Your terminal · Codex</text>
+  <text x="64" y="338" class="s">topic "search"</text>
+  <rect x="50" y="358" width="260" height="48" rx="8" fill="#fff" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <text x="64" y="378" class="s" style="font-weight:600">Your IDE · Cursor, Gemini CLI, …</text>
+  <text x="64" y="396" class="s">check for answers themselves</text>
+  <text x="50" y="456" class="s">They talk to longe over MCP and follow</text>
+  <text x="50" y="474" class="s">AGENTS.md → .longe/AGENT-INSTRUCTIONS.md</text>
+
+  <!-- question file -->
+  <rect x="420" y="150" width="360" height="290" rx="12" class="file"/>
+  <text x="440" y="180" class="b">.longe/questions/q-20260930-a1b2.md</text>
+  <text x="440" y="212" class="k">topic: billing</text>
+  <text x="440" y="234" class="k">blocking: true</text>
+  <text x="440" y="256" class="k">options: [monthly, yearly]</text>
+  <text x="440" y="278" class="k">status: <tspan font-weight="700">open</tspan> → <tspan font-weight="700">answered</tspan> → <tspan font-weight="700">acknowledged</tspan></text>
+  <text x="440" y="312" class="m">## Question</text>
+  <text x="440" y="332" class="m">Bill monthly or yearly?</text>
+  <text x="440" y="362" class="m">## Answer</text>
+  <text x="440" y="382" class="m">yearly</text>
+  <text x="440" y="416" class="s">Markdown in the repo, committed with the code:</text>
+  <text x="440" y="432" class="s">the decision and why stay with the work.</text>
+
+  <!-- inbox -->
+  <rect x="870" y="100" width="300" height="390" rx="14" class="inbox"/>
+  <text x="890" y="130" class="h">Your inbox</text>
+  <text x="890" y="150" class="s">every open question · blocking first</text>
+  <rect x="890" y="164" width="260" height="120" rx="10" class="card"/>
+  <text x="904" y="188" class="b">billing <tspan class="s">· blocking</tspan></text>
+  <text x="904" y="210" class="t">Bill monthly or yearly?</text>
+  <rect x="904" y="226" width="92" height="30" rx="7" fill="#fff" stroke="#4f46e5"/>
+  <text x="922" y="246" class="lb">monthly</text>
+  <rect x="1004" y="226" width="92" height="30" rx="7" fill="#4f46e5"/>
+  <text x="1026" y="246" class="n">yearly</text>
+  <text x="904" y="274" class="s">or answer in your own words</text>
+  <rect x="890" y="296" width="260" height="92" rx="10" class="card"/>
+  <text x="904" y="320" class="b">search</text>
+  <text x="904" y="342" class="t">Index titles only?</text>
+  <text x="904" y="364" class="s">non-blocking · assumption: yes,</text>
+  <text x="904" y="380" class="s">working on meanwhile</text>
+  <text x="890" y="420" class="t">Live: the server watches .longe/</text>
+  <text x="890" y="440" class="t">and pushes changes to the page (SSE).</text>
+  <text x="890" y="470" class="s">You answer when it suits you.</text>
+
+  <!-- ask: agents → file → inbox -->
+  <path d="M310 170 H 390 V 230 H 416" class="fa"/>
+  <circle cx="340" cy="170" r="12" fill="#4f46e5"/><text x="336" y="175" class="n">1</text>
+  <text x="318" y="152" class="lb">ask_question</text>
+  <path d="M780 230 H 866" class="fa"/>
+  <circle cx="822" cy="212" r="12" fill="#4f46e5"/><text x="818" y="217" class="n">2</text>
+  <text x="792" y="258" class="lb">shows up</text>
+
+  <!-- answer: inbox → file → agent -->
+  <path d="M866 370 H 784" class="fg"/>
+  <circle cx="824" cy="352" r="12" fill="#15803d"/><text x="820" y="357" class="n">3</text>
+  <text x="794" y="394" class="lg">you pick</text>
+  <path d="M416 370 H 345 V 214 H 314" class="fg"/>
+  <circle cx="345" cy="300" r="12" fill="#15803d"/><text x="341" y="305" class="n">4</text>
+
+  <!-- how the answer gets back -->
+  <rect x="30" y="512" width="1140" height="104" rx="14" class="zone"/>
+  <circle cx="58" cy="540" r="12" fill="#15803d"/><text x="54" y="545" class="n">4</text>
+  <text x="80" y="545" class="b">The answer goes back to the agent that asked</text>
+  <text x="80" y="570" class="t">Chat in longe: handed over as soon as its current turn ends (answers before new todo work).</text>
+  <text x="80" y="592" class="t">Terminal / IDE: the agent waits with <tspan class="m">wait_for_answer</tspan> or picks it up with <tspan class="m">check_answers</tspan>; it then calls</text>
+  <text x="80" y="610" class="t"><tspan class="m">acknowledge_answers</tspan> and continues. A blocking question pauses only its topic (needs-decision); the agent works on elsewhere.</text>
+</svg>

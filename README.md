@@ -3,15 +3,30 @@
 </p>
 
 <p align="center">
-  <strong>A local-first work board for AI coding agents.</strong><br>
-  Topics, decisions and a question inbox, stored as markdown in your repository.
+  <strong>Your agent works. Decisions land in your inbox.</strong><br>
+  An inbox and work board for AI coding agents, with the record kept in your repository.
 </p>
 
 ---
 
-AI coding agents do a lot of work, but it is hard to keep track of what they did and why, and
-what they are waiting on. longe gives every repository a small board that agents keep up to date
-themselves:
+Give a coding agent a task. When it needs your input, it sends a question with options to longe's
+inbox. You answer when you are ready; the agent reads the answer, acknowledges it and continues.
+The request, decision and result stay in your repository as readable markdown.
+
+![Agents working on different topics ask with ask_question; each question becomes a markdown file that waits in one inbox; you pick an answer and it goes back to the agent that asked, which acknowledges it and continues.](docs/assets/architecture.svg)
+
+1. **Send work.** Start from Chat or put a topic in the todo queue.
+2. **Decide in one place.** Questions from your repositories collect in one inbox, with blocking
+   ones first. Pick an option or write your own answer.
+3. **Keep moving.** The managed chat receives answers when it is free. The agent records what it
+   decided and did, then brings finished work back for your review.
+
+**A question can pause one topic without stopping everything.** When a safe default exists,
+the agent states its assumption and keeps working while your answer is pending.
+
+[How messages and the inbox work →](docs/core-logic.md)
+
+Three connected views keep that loop visible:
 
 - **Topics** hold the work: a goal, a plan, the decisions taken and a log. Each one is a markdown
   file in `.longe/topics/`, committed together with the code it describes.
@@ -132,18 +147,28 @@ HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, with the addres
 The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
 **Questions go to the inbox, also from the terminal** (`ask_in_inbox`, on by default).
-Claude Code has its own way to ask you, the AskUserQuestion tool. With the option on:
+Agents have their own ways to ask you in the terminal. With the option on:
 
-- The chat in the web UI may not use AskUserQuestion. When it leaves a question in its
-  reply text, longe reminds it once to use the inbox.
-- `longe init` adds a PreToolUse hook to `.claude/settings.local.json`, your own
-  settings file (Claude Code keeps it out of git). For repositories set up before this,
-  run `longe hooks install`; `longe hooks remove` takes the hook out again. With
-  `--shared`, both commands use `.claude/settings.json` instead, the file committed with
-  the repository, for a team that uses longe together. When a terminal session wants to
-  ask you something, the question lands in the inbox (blocking, with its options)
-  instead of the terminal. The agent is told the question id, so it can wait for the
-  answer or continue on an assumption. The hook calls `longe`, so it must be on your PATH.
+- The chat in the web UI may not use them. When it leaves a question in its reply text,
+  longe reminds it once to use the inbox.
+- `longe ask-in-inbox on` installs hooks so each agent's own sessions ask you through the
+  inbox, as far as its CLI allows; `longe init` runs it for you. Agents work with longe
+  without it (MCP and `AGENTS.md` do that); the hooks only catch the questions they would
+  otherwise ask in the terminal. `longe ask-in-inbox on claude` / `codex` picks one,
+  `longe ask-in-inbox off` undoes it.
+  - **Claude Code:** a PreToolUse hook sends AskUserQuestion to the inbox (blocking, with
+    its options) and tells the agent the question id, so it can wait for the answer or
+    continue on an assumption.
+  - **Codex** has no hook for its question tool. A Stop hook sends the turn back when a
+    reply ends with a question, telling Codex to ask it with `ask_question`. Review the
+    hook once with `/hooks` in Codex.
+
+  By default the hooks go into your own files (`.claude/settings.local.json`, which Claude
+  Code keeps out of git, and `~/.codex/hooks.json`, which only acts in repositories with
+  `.longe/`). With `--shared` they go into the files committed with the repository
+  (`.claude/settings.json`, `.codex/hooks.json`), for a team that uses longe together. The
+  hooks call `longe`, so it must be on your PATH. (`longe hooks install` / `remove` are the
+  older names.)
 
 To turn it all off, set this in `.longe/config.yml`; the hook then lets questions through:
 
