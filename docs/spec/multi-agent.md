@@ -27,19 +27,83 @@ never work on the same topic, and their changes do not collide in the working tr
 
 ## 3. Plan
 
-| Phase | What | Depends on |
-| --- | --- | --- |
-| 1 | **Agent identity:** agents as records on the board; every tool call knows its caller | – |
-| 2 | **Message system** (this spec): addressed messages, per-agent delivery, answer routing | 1 |
-| 3 | **Topic ownership:** `owner` on topics, claim on pickup, release and reassignment | 1 |
-| 4 | **Dispatcher:** the chat queue for N agents (answers, messages, todo to a free agent) | 2, 3 |
-| 5 | **Runners:** N `AgentRunner`s per repository, created and removed at runtime | 1, 4 |
-| 6 | **Workspaces:** one git worktree per managed agent, so parallel edits do not collide | 5 |
-| 7 | **UI:** agent list, one chat per agent, owner on cards, inbox by agent | 2–5 |
+Seven steps. Each one is usable on its own and builds on the ones before. For each: the
+problem it solves, what changes, and what you notice.
 
-Phases 1–4 also help today's single chat plus terminal agents, so they ship before N runners.
-Phase 6 is the one with the most unknowns (merging, tests per worktree, `.longe/` in each
-worktree) and gets its own spec.
+A running example: in repo *shop*, **Claude A** works on topic *billing* in longe's Chat,
+**Claude B** is a second chat that reviews, and **Codex** runs in your terminal on topic
+*search*.
+
+### Phase 1: agent identity (who is calling)
+
+- **Problem today:** longe cannot tell agents apart. A question says `asked_by: agent` or
+  whatever name the agent typed; a Log line says `agent`. With one chat that was enough.
+- **Change:** every agent gets an id (`a-chat`, `a-reviewer`, `a-ext-codex`) and a small record
+  (name, provider, managed or external). The server learns the caller of every tool call from
+  how it connected: longe gives each chat it runs its own MCP address; a terminal agent is named
+  by `longe mcp --agent codex` or by its MCP client name. The id then goes into `asked_by`, Log
+  lines and acknowledgments automatically.
+- **You notice:** Log lines and questions say *Claude A* or *Codex* instead of *agent*. Nothing
+  else changes; the Chat stays one chat, `a-chat`.
+
+### Phase 2: message system (the core; §4 below)
+
+- **Problem today:** every message goes to the one chat, and `check_answers` hands every answer
+  to whoever asks first. With Claude A and Codex both calling it, Codex could read and
+  acknowledge the answer meant for Claude A, and Claude A never sees it.
+- **Change:** messages get a recipient (`to: a-chat`, or `any`). An answer goes back to the agent
+  that asked. `check_answers` shows each agent only its own answers. Terminal agents get a
+  `check_messages` tool to pick up messages addressed to them.
+- **You notice:** you can write to one specific agent. Your answer in the inbox always reaches
+  the agent that asked, also when several agents are connected.
+
+### Phase 3: topic owner (who works on what)
+
+- **Problem today:** any agent may pick up any active topic. Two agents can start the same
+  topic, or both think "active topics are mine" and work on each other's.
+- **Change:** a topic gets `owner: a-chat`. Moving it to active claims it for the caller; another
+  agent's claim is refused. The owner stays through needs-decision and review, so answers and
+  your rejection come back to the same agent. You can reassign a topic to another agent.
+- **You notice:** each card says who works on it. Two agents never start the same topic.
+
+### Phase 4: dispatcher (who gets the next piece of work)
+
+- **Problem today:** the chat queue feeds exactly one chat: first its answers, then the top
+  todo topic.
+- **Change:** the same rules for every agent longe runs. When an agent's turn ends, it gets, in
+  this order: answers for it, messages for it, a topic you activated for it, and only then the
+  top unclaimed todo topic. One piece of work goes to exactly one agent.
+- **You notice:** with one chat, nothing. With several, free agents pick up todo topics one by
+  one instead of all jumping on the same one.
+
+### Phase 5: several chats per repository
+
+- **Problem today:** longe runs one chat process per repository.
+- **Change:** longe runs one process per managed agent. You add an agent (name, provider,
+  model), stop it or remove it. Removing it hands its topics and unread answers to another
+  agent, the same way the provider switch already does.
+- **You notice:** you can run Claude A and Claude B side by side in one repository.
+
+### Phase 6: one workspace per agent
+
+- **Problem:** two agents in the same folder edit the same files, run tests over each other's
+  half-done changes, and commit each other's work.
+- **Change:** each managed agent works in its own git worktree (a second checkout of the same
+  repository on its own branch). Its work reaches `main` by merge or pull request.
+- **You notice:** agents no longer disturb each other; you review and merge their branches.
+  This step has the most open questions (merging, conflicts, tests per worktree) and gets its
+  own spec.
+
+### Phase 7: UI
+
+- A list of agents with their state; one chat per agent; the owner on each card; the inbox
+  grouped or filtered by agent. Specced after the message system is agreed.
+
+### Order
+
+Phases 1–4 are useful with today's single chat plus agents in your terminal, so they come
+first. Phase 5 is safe only with phase 6: without separate workspaces, several chats in one
+folder overwrite each other.
 
 ## 4. Core message system spec
 
