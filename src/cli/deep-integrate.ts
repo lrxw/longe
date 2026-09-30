@@ -3,11 +3,11 @@ import { isProvider, PROVIDERS } from "../app/providers/index.js";
 import type { AgentProvider } from "../store/config.js";
 import { CliError } from "./args.js";
 
-export interface InboxHookResult {
+export interface DeepIntegrationResult {
   provider: AgentProvider;
-  /** Where the hook lives (relative to the repo when inside it). */
+  /** Where the integration lives (relative to the repo when inside it). */
   file: string;
-  /** Changed now (added by on, removed by off). */
+  /** Changed now (added, or removed with --remove). */
   changed: boolean;
   what: string;
 }
@@ -27,17 +27,18 @@ function shown(repo: string, file: string): string {
 }
 
 /**
- * `longe ask-in-inbox on`: the agents' own sessions (terminal, IDE) ask through the
- * inbox, as far as each agent's CLI allows (see ChatProvider.terminal). Default is
- * the user's own settings files; `shared` writes the ones committed with the repo.
- * Using an agent with longe does not need this: MCP and AGENTS.md do that.
+ * `longe provider deep-integrate`: optional hooks into each provider's own CLI, as far
+ * as it allows (see ChatProvider.terminal), so its terminal and IDE sessions use the
+ * inbox more reliably. Agents work with longe without it (MCP and AGENTS.md); this
+ * only catches what the protocol alone may miss. Default is the user's own settings
+ * files; `shared` writes the ones committed with the repo.
  */
-export async function askInInboxOn(
+export async function deepIntegrate(
   repo: string,
   opts: { shared?: boolean; providers?: string[] } = {},
-): Promise<InboxHookResult[]> {
+): Promise<DeepIntegrationResult[]> {
   const shared = opts.shared ?? false;
-  const out: InboxHookResult[] = [];
+  const out: DeepIntegrationResult[] = [];
   for (const id of which(opts.providers ?? [])) {
     const t = PROVIDERS[id].terminal;
     if (!t) continue;
@@ -52,14 +53,14 @@ export async function askInInboxOn(
 }
 
 /**
- * `longe ask-in-inbox off`: takes the hooks out again, from the user's own files and
- * the shared ones (only the shared ones with `shared`), so "off" means gone.
+ * `longe provider deep-integrate --remove`: takes it out again, from the user's own
+ * files and the shared ones (only the shared ones with `shared`), so it is gone.
  */
-export async function askInInboxOff(
+export async function removeDeepIntegration(
   repo: string,
   opts: { shared?: boolean; providers?: string[] } = {},
-): Promise<InboxHookResult[]> {
-  const out: InboxHookResult[] = [];
+): Promise<DeepIntegrationResult[]> {
+  const out: DeepIntegrationResult[] = [];
   for (const id of which(opts.providers ?? [])) {
     const t = PROVIDERS[id].terminal;
     if (!t) continue;
@@ -71,27 +72,29 @@ export async function askInInboxOff(
   return out;
 }
 
-export async function runAskInInbox(
+const USAGE = "Usage: longe provider deep-integrate [claude|codex …] [--shared] [--remove]\n";
+
+/** `longe provider <subcommand>`; deep-integrate is the only one so far. */
+export async function runProvider(
   rest: string[],
   repo: string,
-  shared: boolean,
+  opts: { shared: boolean; remove: boolean },
 ): Promise<number> {
   const [sub, ...providers] = rest;
-  if (sub === "on") {
-    for (const r of await askInInboxOn(repo, { shared, providers }))
+  if (sub !== "deep-integrate") {
+    process.stderr.write(USAGE);
+    return 2;
+  }
+  if (!opts.remove) {
+    for (const r of await deepIntegrate(repo, { shared: opts.shared, providers }))
       process.stdout.write(
         `${r.provider.padEnd(7)}${r.changed ? "added to" : "already in"} ${r.file}: ${r.what}\n`,
       );
     process.stdout.write("Restart running sessions to pick it up.\n");
     return 0;
   }
-  if (sub === "off") {
-    const removed = await askInInboxOff(repo, { shared, providers });
-    for (const r of removed)
-      process.stdout.write(`${r.provider.padEnd(7)}removed from ${r.file}\n`);
-    if (removed.length === 0) process.stdout.write("no inbox hooks were installed\n");
-    return 0;
-  }
-  process.stderr.write("Usage: longe ask-in-inbox on | off [claude|codex …] [--shared]\n");
-  return 2;
+  const removed = await removeDeepIntegration(repo, { shared: opts.shared, providers });
+  for (const r of removed) process.stdout.write(`${r.provider.padEnd(7)}removed from ${r.file}\n`);
+  if (removed.length === 0) process.stdout.write("no deep integration was installed\n");
+  return 0;
 }

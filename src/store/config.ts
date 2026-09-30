@@ -95,7 +95,7 @@ project: ${JSON.stringify(projectName)}
 
 # Agents' questions go to the inbox (default: true). The chat may not use the agent's
 # own question prompt and is reminded when it leaves a question in its reply; terminal
-# sessions get hooks (see \`longe ask-in-inbox\`) that do the same as far as each agent
+# sessions get hooks (see \`longe provider deep-integrate\`) that do the same as far as each agent
 # allows. Set to false to turn this off.
 # ask_in_inbox: true
 

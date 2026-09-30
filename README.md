@@ -151,11 +151,11 @@ Agents have their own ways to ask you in the terminal. With the option on:
 
 - The chat in the web UI may not use them. When it leaves a question in its reply text,
   longe reminds it once to use the inbox.
-- `longe ask-in-inbox on` installs hooks so each agent's own sessions ask you through the
-  inbox, as far as its CLI allows; `longe init` runs it for you. Agents work with longe
-  without it (MCP and `AGENTS.md` do that); the hooks only catch the questions they would
-  otherwise ask in the terminal. `longe ask-in-inbox on claude` / `codex` picks one,
-  `longe ask-in-inbox off` undoes it.
+- `longe provider deep-integrate` is an optional deeper integration with each agent's own
+  CLI: hooks that make its terminal and IDE sessions use the inbox more reliably, as far
+  as the CLI allows. Agents work with longe without it (MCP and `AGENTS.md` do that);
+  `longe init` adds it for you. `longe provider deep-integrate claude` / `codex` picks
+  one, `--remove` takes it out again.
   - **Claude Code:** a PreToolUse hook sends AskUserQuestion to the inbox (blocking, with
     its options) and tells the agent the question id, so it can wait for the answer or
     continue on an assumption.

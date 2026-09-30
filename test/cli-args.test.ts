@@ -11,6 +11,7 @@ describe("parseCli", () => {
       json: false,
       daemon: false,
       shared: false,
+      remove: false,
       repoGiven: false,
       rest: [],
     });
@@ -25,6 +26,7 @@ describe("parseCli", () => {
       json: false,
       daemon: false,
       shared: false,
+      remove: false,
       repoGiven: true,
       rest: [],
     });
@@ -47,6 +49,11 @@ describe("parseCli", () => {
       shared: true,
     });
     expect(parseCli(["init", "--shared"])).toMatchObject({ command: "init", shared: true });
+    expect(parseCli(["provider", "deep-integrate", "codex", "--remove"])).toMatchObject({
+      command: "provider",
+      rest: ["deep-integrate", "codex"],
+      remove: true,
+    });
   });
 
   it("reports missing option values and unknown flags with usage", () => {

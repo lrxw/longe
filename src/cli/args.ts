@@ -11,7 +11,7 @@ export type Command =
   | "stop"
   | "repos"
   | "hooks"
-  | "ask-in-inbox";
+  | "provider";
 
 export interface ParsedCli {
   command: Command;
@@ -20,8 +20,10 @@ export interface ParsedCli {
   open: boolean;
   json: boolean;
   daemon: boolean;
-  /** init, ask-in-inbox: the files committed with the repo, not the user's own. */
+  /** init, provider deep-integrate: the files committed with the repo, not the user's own. */
   shared: boolean;
+  /** provider deep-integrate: take it out again. */
+  remove: boolean;
   /** `--repo` was given explicitly (serve: single mode even without .longe/ in cwd). */
   repoGiven: boolean;
   /** Positional arguments after the command (repos add <path> …). */
@@ -39,10 +41,10 @@ const USAGE = `Usage:
   longe status                              # is the server running, which repos
   longe stop                                # stop the background server
   longe mcp    [--repo <dir>]
-  longe ask-in-inbox on|off [claude|codex …] [--repo <dir>] [--shared]
-               # hooks so the agents' own sessions (terminal, IDE) ask you through the
-               # inbox instead of the terminal, as far as each agent's CLI allows;
-               # no names: every agent. init turns it on.
+  longe provider deep-integrate [claude|codex …] [--repo <dir>] [--shared] [--remove]
+               # optional: hooks into each agent's own CLI (terminal, IDE) so it uses the
+               # inbox more reliably, as far as the CLI allows. Agents work without it.
+               # No names: every agent. init adds it.
 
 Options:
   --repo   Repository root containing (or to receive) .longe/  (default: .)
@@ -50,8 +52,9 @@ Options:
   --open   Open the browser after serve starts
   --daemon, -d   Run serve in the background (log in ~/.cache/longe/serve/)
   --name   With repos add: display name
-  --shared With init and ask-in-inbox: write the files committed with the repo (.claude/settings.json,
+  --shared With init and deep-integrate: write the files committed with the repo (.claude/settings.json,
            .codex/hooks.json) instead of your own (.claude/settings.local.json, ~/.codex/hooks.json)
+  --remove With deep-integrate: take it out again (your own and the shared files)
   -h, --help
   -v, --version
 `;
@@ -65,6 +68,7 @@ const OPTIONS = {
   all: { type: "boolean", default: false },
   name: { type: "string" },
   shared: { type: "boolean", default: false },
+  remove: { type: "boolean", default: false },
   help: { type: "boolean", short: "h", default: false },
   version: { type: "boolean", short: "v", default: false },
 } as const;
@@ -119,12 +123,12 @@ export function parseCli(argv: string[]): ParsedCli {
     "stop",
     "repos",
     "hooks",
-    "ask-in-inbox",
+    "provider",
   ];
   if (!commands.includes(command as Command)) {
     throw new CliError(`Unknown or missing command: ${command ?? "(none)"}\n\n${USAGE}`);
   }
-  const takesMore = ["repos", "hooks", "ask-in-inbox"];
+  const takesMore = ["repos", "hooks", "provider"];
   if (positionals.length > 1 && !takesMore.includes(command as string)) {
     throw new CliError(`Unexpected argument: ${positionals[1]}\n\n${USAGE}`);
   }
@@ -142,6 +146,7 @@ export function parseCli(argv: string[]): ParsedCli {
     json: values.json,
     daemon: values.daemon,
     shared: values.shared,
+    remove: values.remove,
     repoGiven: argv.includes("--repo") || argv.some((a) => a.startsWith("--repo=")),
     rest: positionals.slice(1),
     ...(values.name !== undefined ? { name: values.name } : {}),

@@ -5,7 +5,7 @@ import { endsWithQuestion } from "../domain/ends-with-question.js";
 import { askInInboxEnabled, findRepo } from "./hooks.js";
 
 /**
- * Codex's part of `longe ask-in-inbox on`. Codex has no hook for its own ask-the-user tool,
+ * Codex's part of `longe provider deep-integrate`. Codex has no hook for its own ask-the-user tool,
  * so the question cannot be redirected the way Claude Code's is. What it has is a
  * Stop hook that sees the last reply and may send the turn on with a new prompt: when
  * the reply ends with a question, Codex is told to ask it in the inbox instead.

@@ -4,7 +4,7 @@ import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
 import { defaultConfigText } from "../store/config.js";
 import { migrateBoardDir } from "../store/migrate.js";
 import { BOARD_DIR } from "../store/paths.js";
-import type { InboxHookResult } from "./ask-in-inbox.js";
+import type { DeepIntegrationResult } from "./deep-integrate.js";
 
 export interface InitResult {
   created: string[];
@@ -73,13 +73,13 @@ export async function runInit(repoRoot: string, projectName?: string): Promise<I
 }
 
 export interface InitProjectResult extends InitResult {
-  /** What `longe ask-in-inbox on` did per provider; empty when ask_in_inbox is off. */
-  inboxHooks: InboxHookResult[];
+  /** What `longe provider deep-integrate` did per provider; empty when ask_in_inbox is off. */
+  deepIntegration: DeepIntegrationResult[];
 }
 
 /**
  * Everything `longe init` does: the board, the agent files, and (with `ask_in_inbox`
- * on) `longe ask-in-inbox on` for every provider, so their own sessions ask through the inbox.
+ * on) `longe provider deep-integrate` for every provider, so their own sessions use the inbox.
  * The CLI and "+ New project" in the web UI both go through here, so a project set up
  * either way is the same.
  */
@@ -89,11 +89,11 @@ export async function initProject(
 ): Promise<InitProjectResult> {
   const result = await runInit(repoRoot, opts.name);
   const { askInInboxEnabled } = await import("./hooks.js");
-  const { askInInboxOn } = await import("./ask-in-inbox.js");
-  const inboxHooks = (await askInInboxEnabled(repoRoot))
-    ? await askInInboxOn(repoRoot, { shared: opts.shared ?? false }).catch(() => [])
+  const { deepIntegrate } = await import("./deep-integrate.js");
+  const deepIntegration = (await askInInboxEnabled(repoRoot))
+    ? await deepIntegrate(repoRoot, { shared: opts.shared ?? false }).catch(() => [])
     : [];
-  return { ...result, inboxHooks };
+  return { ...result, deepIntegration };
 }
 
 /**
