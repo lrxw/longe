@@ -798,3 +798,84 @@ done
     expect(ctx.agent.status().alive).toBe(false);
   });
 });
+
+describe("Codex AgentRunner", () => {
+  it("uses the shared chat, queues turns, persists an isolated session and resumes", async () => {
+    await writeFile(
+      fake,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const readline = require('node:readline');
+fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));
+const send = value => process.stdout.write(JSON.stringify(value) + '\\n');
+let active = false;
+readline.createInterface({ input: process.stdin }).on('line', line => {
+  fs.appendFileSync(${JSON.stringify(inputFile)}, line + '\\n');
+  const m = JSON.parse(line);
+  if (m.method === 'initialize') send({ id: m.id, result: {} });
+  if (m.method === 'model/list') send({ id: m.id, result: { data: [{model:'codex-test'}] } });
+  if (m.method === 'thread/start' || m.method === 'thread/resume') send({ id:m.id, result:{thread:{id:'codex-session'},model:'codex-test'} });
+  if (m.method === 'turn/start') {
+    if (active) { send({id:m.id,error:{message:'overlapping turns'}}); return; }
+    active = true;
+    send({id:m.id,result:{turn:{id:'turn'}}});
+    setTimeout(() => {
+      send({method:'item/completed',params:{threadId:'codex-session',item:{id:String(Date.now()),type:'agentMessage',text:m.params.input[0].text}}});
+      active = false;
+      send({method:'turn/completed',params:{threadId:'codex-session',turn:{status:'completed'}}});
+    }, 60);
+  }
+});
+`,
+    );
+    const runner = new AgentRunner(dir, { provider: "codex", command: fake }, "test");
+    runner.mcpUrl = "http://127.0.0.1:7311/r/test/mcp";
+    try {
+      await runner.say("human", "first");
+      await runner.say("human", "second");
+      await waitFor(() => !runner.busy());
+      expect(
+        runner
+          .status()
+          .events.filter((e) => e.kind === "text")
+          .map((e) => e.text),
+      ).toEqual(["first", "second"]);
+      expect(runner.status()).toMatchObject({
+        provider: "codex",
+        sessionId: "codex-session",
+        modelChoices: ["codex-test"],
+      });
+      expect(runner.status().costUsd).toBeUndefined();
+      expect(runner.status().resumeCommand).toContain(" resume codex-session");
+      expect((await runner.messages()).every((m) => m.fm.delivered_at)).toBe(true);
+      const args = JSON.parse(await readFile(argsFile, "utf8"));
+      expect(args[0]).toBe("app-server");
+      expect(args).not.toContain("--permission-mode");
+      expect(args).toEqual([
+        "app-server",
+        "-c",
+        'mcp_servers.longe.url="http://127.0.0.1:7311/r/test/mcp"',
+        "-c",
+        'mcp_servers.longe.default_tools_approval_mode="approve"',
+      ]);
+      await runner.close();
+      const restored = new AgentRunner(dir, { provider: "codex", command: fake }, "test");
+      try {
+        await restored.say("human", "third");
+        await waitFor(() => !restored.busy());
+        expect(await readFile(inputFile, "utf8")).toContain('"method":"thread/resume"');
+        expect(restored.status().costUsd).toBeUndefined();
+        // No injected board endpoint means no approval override for a user's own MCP setup.
+        expect(JSON.parse(await readFile(argsFile, "utf8"))).toEqual(["app-server"]);
+      } finally {
+        await restored.close();
+      }
+      const claude = new AgentRunner(dir, { command: fake }, "test");
+      await claude.setModel(undefined);
+      expect(claude.status().sessionId).toBeUndefined();
+      await claude.close();
+    } finally {
+      await runner.close();
+    }
+  });
+});

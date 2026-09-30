@@ -135,7 +135,7 @@ export class Hub extends EventEmitter<HubEvents> {
       return entry;
     }
     try {
-      const ctx = await createAppContext(root, opts);
+      const ctx = await createAppContext(root, { ...opts, deferChat: true });
       entry.ctx = ctx;
       entry.title = ctx.config.project ?? entry.title;
       const forward =

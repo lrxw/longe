@@ -17,7 +17,7 @@ themselves:
   file in `.longe/topics/`, committed together with the code it describes.
 - **The inbox** collects the questions agents ask you, with blocking ones first. You answer with
   one click, and the answer goes back to the agent.
-- **The chat** lets you talk to Claude Code from the board and send it through the open work.
+- **The chat** lets you talk to Claude Code or Codex from the board and send it through the open work.
 
 Agents reach longe through **MCP**, **REST** or by editing the files directly. longe runs
 entirely on your machine: it binds to `127.0.0.1`, has no database, no account and no telemetry.
@@ -32,7 +32,7 @@ The files are the source of truth.
   meanwhile. Markdown and code blocks are rendered.
 - **Review flow.** Agents submit topics for review; only you approve, reject (with a note),
   cancel or reopen.
-- **Chat with Claude Code.** One conversation per repository, with streaming output, model
+- **Chat with Claude Code or Codex.** One conversation per repository, with streaming output, model
   choice, context and cost display. "Work on board" sends the agent through the active topics,
   then the todo queue.
 - **One server, many repositories.** A single `longe serve` shows every registered repository:
@@ -48,7 +48,7 @@ The files are the source of truth.
 ## Requirements
 
 - Node.js 22 or later
-- For the chat: [Claude Code](https://claude.com/claude-code) (`claude`) on your `PATH`
+- For the chat: [Claude Code](https://claude.com/claude-code) (`claude`) or [Codex CLI](https://developers.openai.com/codex/cli) (`codex`) on your `PATH`, signed in.
 
 ## Install
 
@@ -201,9 +201,16 @@ are typing in.
 
 ## Chat
 
-Each repository has one conversation with Claude Code. longe keeps a `claude` process running in
-stream-JSON mode and hands it longe's MCP endpoint, so the agent can use the board without any
-setup. You can send messages at any time, also while it works.
+Use **Provider** in the Chat status bar to switch between Claude Code and Codex for that
+repository. Wait for an active turn to finish or use **Stop** first. Switching takes effect
+immediately without restarting the hub; send a message or use Continue to start the selected
+provider. The model dropdown chooses a model within that provider, and **Provider help**
+explains the setup. Each provider must be installed and signed in.
+
+Each repository has one conversation with its configured provider. Claude Code uses a persistent
+stream-JSON process; Codex uses `codex app-server`. Both receive longe's MCP endpoint and use
+the same chat, topic prompts, board and inbox. You can send messages while the agent works;
+Codex queues them for the next turn. Provider sessions and model overrides are stored separately.
 
 - **Continue** resumes the conversation where it stopped. **Work on board** sends the agent
   through the active topics, then the todo queue, until each is in review or waiting on you.
@@ -239,7 +246,8 @@ hooks:
      Call check_answers, acknowledge_answers, then continue that topic."
 
 agent:                           # the chat
-  command: claude                # default
+  provider: claude               # default; or codex
+  command: claude                # optional binary override; defaults to the provider name
   model: sonnet                  # optional; can also be picked in the chat
   permission_mode: acceptEdits   # default
   allowed_tools:                 # Claude Code permission rules
@@ -248,6 +256,51 @@ agent:                           # the chat
   idle_minutes: 30               # default; 0 keeps the process open
   args: []                       # extra arguments, appended as given
 ```
+
+### Codex chat
+
+Sign in with `codex login`, then set the repository's `.longe/config.yml`:
+
+```yaml
+agent:
+  provider: codex
+  sandbox: workspace-write       # default; read-only is also supported
+  idle_minutes: 30
+  # model: your-model-id         # optional; otherwise use Codex's configured default
+```
+
+The Chat **Provider** menu saves `agent.provider` to `.longe/config.yml` and applies it
+immediately. It retains custom `command`, `model` and `args` settings under
+`agent.providers.claude` or `agent.providers.codex`, so switching back restores them.
+Existing top-level overrides are moved to the old provider on the first UI switch.
+For advanced configuration, for example:
+
+```yaml
+agent:
+  provider: codex
+  providers:
+    claude:
+      model: sonnet
+    codex:
+      command: /path/to/codex
+```
+
+Changes made by editing the file directly still require `longe stop && longe serve -d`
+after the current turn finishes. The same Chat page shows the selected provider,
+loads Codex model choices after the first connection, and copies a
+`codex resume` command. Existing Claude sessions are preserved if you switch back.
+Codex uses your local login and configuration; no separate API key is required by longe.
+
+Codex runs with `approvalPolicy: never` inside the selected sandbox. Commands needing
+extra approval fail instead of waiting on an invisible prompt. Claude's `permission_mode`
+and `allowed_tools` settings do not apply to Codex. Questions go through longe's inbox.
+The provider configures approval for its injected longe MCP server automatically, so
+board tools work without extra repository settings. This does not grant shell permissions
+or change approval settings for other MCP servers.
+Cost is shown as unavailable because the app-server protocol does not report session cost.
+The chat does not offer Claude slash commands for Codex; use **New session** to start fresh.
+
+The integration uses the [Codex app-server protocol](https://developers.openai.com/codex/app-server).
 
 ### Waking your agent when you answer
 
@@ -329,7 +382,7 @@ Planned or under consideration:
 - A release on the npm registry (`npm install -g longe`) instead of the GitHub tarball
 - Editing topic text directly in the UI
 - Search and an archive view
-- Chat with other coding agents besides Claude Code
+- Additional coding agent providers
 - Awareness of git worktrees, so parallel agents keep their work apart
 
 Ideas and bug reports are welcome in the [issues](https://github.com/lrxw/longe/issues).

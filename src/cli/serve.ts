@@ -73,8 +73,13 @@ export async function runServe(opts: ServeOptions): Promise<void> {
   }
 
   const hub = await createRegistryHub({ notify: coalescing(desktopNotifier), drivesChat: true });
-  const app = createHttpApp(hub, { port: opts.port });
+  let ready!: () => void;
+  const chatReady = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const app = createHttpApp(hub, { port: opts.port, chatReady });
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: opts.port }, (info) => {
+    ready();
     const lines = [
       "longe serving all registered repos",
       `  UI    ${url}`,

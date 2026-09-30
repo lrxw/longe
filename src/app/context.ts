@@ -21,6 +21,8 @@ export interface AppContext {
   now: () => Date;
   hooks: HookRunner;
   agent: AgentRunner;
+  /** Starts the automatic answer/todo queue once the owning server is ready. */
+  startChat: () => void;
 }
 
 export interface AppOptions {
@@ -33,6 +35,8 @@ export interface AppOptions {
    * to it must not start a second chat.
    */
   drivesChat?: boolean;
+  /** Hubs wire MCP endpoints and start listening before enabling their queues. */
+  deferChat?: boolean;
 }
 
 /** Loads config, starts the index and wires external-change side effects. */
@@ -63,11 +67,15 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
   runner.attach();
   // answers (unless the repo's own on_answer hook owns that job), then todo topics,
   // each handed to the chat only when it is free (see todo-queue.ts)
-  const nextForChat = opts.drivesChat
-    ? attachChatQueue(index, agent, { answers: !config.hooks?.on_answer })
-    : undefined;
   await index.start();
-  nextForChat?.(); // what came in while the server was down
+  let chatStarted = false;
+  const startChat = () => {
+    if (!opts.drivesChat || chatStarted) return;
+    chatStarted = true;
+    const next = attachChatQueue(index, agent, { answers: !config.hooks?.on_answer });
+    next(); // what came in while the server was down
+  };
+  if (!opts.deferChat) startChat();
   return {
     root,
     config,
@@ -78,10 +86,12 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
     now: opts.now ?? (() => new Date()),
     hooks,
     agent,
+    startChat,
   };
 }
 
 export async function closeAppContext(ctx: AppContext): Promise<void> {
+  ctx.startChat = () => {};
   await ctx.agent.close();
   await ctx.index.stop();
 }

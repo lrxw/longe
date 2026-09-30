@@ -22,7 +22,7 @@ export function attachChatQueue(
 ): () => void {
   const offered = new Set<string>();
   const announced = new Set<string>();
-  // say() counts as busy only once its message file is written: bridge that gap
+  // Do not wake another turn while the previous delivery is being accepted.
   let waking = false;
   const wake = (text: string) => {
     waking = true;

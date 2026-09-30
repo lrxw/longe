@@ -4,7 +4,8 @@ import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
-import type { AgentConfig } from "../store/config.js";
+import { DomainError } from "../domain/errors.js";
+import { type AgentConfig, type AgentProvider, providerConfig } from "../store/config.js";
 import {
   clearMessages,
   listMessages,
@@ -12,6 +13,8 @@ import {
   markDelivered,
   writeMessage,
 } from "../store/messages.js";
+import { saveProvider } from "../store/provider.js";
+import { CodexTransport } from "./codex.js";
 
 /** One line of the live transcript (what the agent process printed). */
 export interface AgentEvent {
@@ -32,6 +35,10 @@ export interface SessionInfo {
 }
 
 export interface AgentStatus {
+  provider?: "claude" | "codex";
+  modelChoices?: string[];
+  canSwitchProvider?: boolean;
+  switchingProvider?: boolean;
   /** A `claude` process is open and takes messages. */
   alive: boolean;
   /** Messages sent that have no result yet. */
@@ -202,11 +209,22 @@ function withTopic(text: string, opts: SayOptions): string {
  */
 export class AgentRunner extends EventEmitter<AgentEvents> {
   private child: ChildProcess | undefined;
+  private codex: CodexTransport | undefined;
+  private codexReady: Promise<void> = Promise.resolve();
+  private modelChoices: string[] = [];
+  private streamed = new Map<string, AgentEvent>();
+  private switchingProvider = false;
+  private changingControls = 0;
+
+  private get provider(): "claude" | "codex" {
+    return this.config.provider ?? "claude";
+  }
   private session: SessionInfo | undefined;
   private events: AgentEvent[] = [];
   private pending = 0;
   /** Messages `say` accepted that `deliver` has not written yet. */
   private queued = 0;
+  private deliveryGeneration = 0;
   /** `total_cost_usd` of the live process (cumulative within a process). */
   private processCost = 0;
   private startedAt: string | undefined;
@@ -229,9 +247,15 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private writes: Promise<void> = Promise.resolve();
   /** The exit bookkeeping of the last process; close() waits for it. */
   private closing: Promise<void> = Promise.resolve();
-  readonly logFile: string;
-  private readonly sessionsFile: string;
-  readonly idleMinutes: number;
+  get logFile(): string {
+    return this.providerFile("log");
+  }
+  private get sessionsFile(): string {
+    return this.providerFile("sessions.json");
+  }
+  get idleMinutes(): number {
+    return this.config.idle_minutes ?? DEFAULT_IDLE_MINUTES;
+  }
   /** Longe MCP endpoint for this repo, set by the HTTP layer once it knows its port. */
   mcpUrl: string | undefined;
   /** config `ask_in_inbox`: no AskUserQuestion, and a reminder for questions left in text. */
@@ -245,19 +269,28 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    */
   constructor(
     private readonly root: string,
-    private readonly config: AgentConfig,
-    logName: string,
+    private config: AgentConfig,
+    private readonly logName: string,
     private readonly spawnImpl: typeof spawn = spawn,
-    legacyNames: string[] = [],
+    private readonly legacyNames: string[] = [],
   ) {
     super();
-    this.logFile = path.join(agentLogDir(), `${logName}.log`);
-    this.sessionsFile = path.join(agentLogDir(), `${logName}.sessions.json`);
-    this.idleMinutes = config.idle_minutes ?? DEFAULT_IDLE_MINUTES;
-    this.loaded = this.loadSession(
-      legacyNames
-        .filter((n) => n !== logName)
-        .map((n) => path.join(agentLogDir(), `${n}.sessions.json`)),
+    this.config = providerConfig(config);
+    this.loaded = this.loadProviderSession();
+  }
+
+  private providerFile(suffix: string, name = this.logName): string {
+    return path.join(
+      agentLogDir(),
+      `${name}${this.provider === "codex" ? ".codex" : ""}.${suffix}`,
+    );
+  }
+
+  private loadProviderSession(): Promise<void> {
+    return this.loadSession(
+      this.legacyNames
+        .filter((n) => n !== this.logName)
+        .map((n) => this.providerFile("sessions.json", n)),
     );
   }
 
@@ -304,6 +337,10 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   status(): AgentStatus {
     return {
+      provider: this.provider,
+      canSwitchProvider: !this.busy(),
+      switchingProvider: this.switchingProvider,
+      modelChoices: this.provider === "codex" ? this.modelChoices : MODEL_CHOICES,
       alive: this.child !== undefined,
       pending: this.pending,
       working: this.pending > 0,
@@ -320,7 +357,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       logFile: this.logFile,
       idleMinutes: this.idleMinutes,
       resumeCommand: this.session
-        ? resumeCommand(this.root, this.session.id, this.config.command ?? "claude")
+        ? this.provider === "codex"
+          ? `cd ${shellQuote(this.root)} && ${shellQuote(this.config.command ?? "codex")} resume ${shellQuote(this.session.id)}`
+          : resumeCommand(this.root, this.session.id, this.config.command ?? "claude")
         : undefined,
       model: this.modelOverride ?? this.config.model,
       modelOverride: this.modelOverride,
@@ -336,13 +375,75 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    * with the new `--model`.
    */
   async setModel(model: string | undefined): Promise<void> {
-    await this.loaded;
-    const next = model?.trim() || undefined;
-    if (next === this.modelOverride) return;
-    this.modelOverride = next;
-    await this.saveSession();
-    this.stop();
+    return this.changeControl(async () => {
+      await this.loaded;
+      const next = model?.trim() || undefined;
+      if (next === this.modelOverride) return;
+      this.modelOverride = next;
+      await this.saveSession();
+      await this.close();
+      this.emit("agent:changed");
+    });
+  }
+
+  private assertNotSwitching(): void {
+    if (this.switchingProvider)
+      throw new DomainError("conflict", "The provider is switching. Try again in a moment.");
+  }
+
+  private async changeControl(work: () => Promise<void>): Promise<void> {
+    this.assertNotSwitching();
+    this.changingControls++;
+    try {
+      await work();
+    } finally {
+      this.changingControls--;
+      this.emit("agent:changed");
+      if (!this.busy()) this.emit("agent:idle");
+    }
+  }
+
+  /** Changes this runner in place, retaining queue and SSE listeners and both sessions. */
+  async setProvider(provider: AgentProvider): Promise<AgentConfig> {
+    if (provider !== "claude" && provider !== "codex")
+      throw new DomainError("validation", "Choose Claude Code or Codex.");
+    this.assertNotSwitching();
+    if (provider === this.provider) return this.config;
+    if (this.busy())
+      throw new DomainError(
+        "conflict",
+        "Wait for the current turn to finish, or Stop it before switching provider.",
+      );
+    this.switchingProvider = true;
     this.emit("agent:changed");
+    try {
+      await this.loaded;
+      await this.close();
+      const config = await saveProvider(this.root, this.provider, provider);
+      this.config = providerConfig(config);
+      this.session = undefined;
+      this.modelOverride = undefined;
+      this.runningModel = undefined;
+      this.modelChoices = [];
+      this.events = [];
+      this.streamed.clear();
+      this.processCost = 0;
+      this.startedAt = undefined;
+      this.exitCode = undefined;
+      this.initSeen = false;
+      this.askedThisTurn = false;
+      this.remindedLastTurn = false;
+      this.compacted = false;
+      if (this.settleTimer) clearTimeout(this.settleTimer);
+      this.settleTimer = undefined;
+      this.loaded = this.loadProviderSession();
+      await this.loaded;
+      return config;
+    } finally {
+      this.switchingProvider = false;
+      this.emit("agent:changed");
+      if (!this.busy()) this.emit("agent:idle");
+    }
   }
 
   /** The stored messages, oldest first (the chat page merges them with `events`). */
@@ -355,16 +456,25 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    * one if needed. Returns once the file is written; delivery is asynchronous.
    */
   async say(from: Message["fm"]["from"], text: string, opts: SayOptions = {}): Promise<Message> {
-    const m = await writeMessage(this.root, {
-      from,
-      text: withTopic(text, opts),
-      topic: opts.topic?.id,
-      now: new Date(),
-    });
-    this.emit("agent:changed");
+    this.assertNotSwitching();
+    // Count acceptance before filesystem I/O so a concurrent provider change cannot race it.
     this.queued++;
+    let m: Message;
+    try {
+      m = await writeMessage(this.root, {
+        from,
+        text: withTopic(text, opts),
+        topic: opts.topic?.id,
+        now: new Date(),
+      });
+    } catch (error) {
+      this.queued--;
+      throw error;
+    }
+    this.emit("agent:changed");
+    const generation = this.deliveryGeneration;
     this.sending = this.sending
-      .then(() => this.deliver([m]))
+      .then(() => this.deliver([m], generation))
       .catch(() => {})
       .finally(() => {
         this.queued--;
@@ -382,7 +492,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   /** A turn is running or a message is on its way to one. */
   busy(): boolean {
-    return this.pending > 0 || this.queued > 0;
+    return (
+      this.pending > 0 || this.queued > 0 || this.switchingProvider || this.changingControls > 0
+    );
   }
 
   /**
@@ -409,6 +521,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   /** Kills the live process (SIGTERM). The session stays resumable. */
   stop(): boolean {
+    this.deliveryGeneration++;
     if (!this.child) return false;
     this.child.kill("SIGTERM");
     return true;
@@ -433,6 +546,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
     // the exit bookkeeping and the last file writes: after this nothing touches the disk
     await this.closing;
+    await this.sending;
     await this.writes;
   }
 
@@ -441,48 +555,65 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    * dropped. Messages still waiting stay. The session stays; the agent keeps its memory.
    */
   async clearHistory(): Promise<void> {
-    await this.loaded;
-    await this.sending; // a message on its way out is marked delivered first
-    this.events = [];
-    await clearMessages(this.root);
-    this.emit("agent:changed");
+    return this.changeControl(async () => {
+      await this.loaded;
+      await this.sending; // a message on its way out is marked delivered first
+      this.events = [];
+      await clearMessages(this.root);
+      this.emit("agent:changed");
+    });
   }
 
   /** Forget the session and the transcript: the next message starts a fresh conversation. */
   async reset(): Promise<void> {
-    await this.loaded;
-    this.stop();
-    this.session = undefined;
-    this.events = [];
-    this.processCost = 0;
-    await this.saveSession();
-    this.emit("agent:changed");
+    return this.changeControl(async () => {
+      await this.loaded;
+      await this.close();
+      this.session = undefined;
+      this.events = [];
+      this.processCost = 0;
+      await this.saveSession();
+      this.emit("agent:changed");
+    });
   }
 
-  private async deliver(messages: Message[]): Promise<void> {
+  private async deliver(messages: Message[], generation: number): Promise<void> {
     await this.loaded;
+    if (generation !== this.deliveryGeneration) return;
     if (!this.child) {
       // anything written while no process was open (server down, by hand) goes first
       const waiting = (await this.messages()).filter(
         (m) => !m.fm.delivered_at && !messages.some((n) => n.fm.id === m.fm.id),
       );
       messages = [...waiting, ...messages];
-      if (!this.spawn()) return;
+      if (generation !== this.deliveryGeneration || !this.spawn()) return;
     }
     for (const m of messages) {
-      if (!this.child) break;
+      if (!this.child || generation !== this.deliveryGeneration) break;
       const line = JSON.stringify({
         type: "user",
         message: { role: "user", content: [{ type: "text", text: m.text }] },
       });
       // count the turn before the write: a fast answer must not arrive first
       this.pending++;
+      if (this.provider === "codex") {
+        try {
+          await this.codexReady;
+          if (!this.codex) throw new Error("Codex process is closed");
+          await this.codex.send(m.text);
+        } catch (error) {
+          this.pending = Math.max(0, this.pending - 1);
+          this.push("error", error instanceof Error ? error.message : String(error));
+          this.stop();
+          break;
+        }
+      }
       try {
         await markDelivered(this.root, m.fm.id, new Date());
       } catch {
         // the flag is bookkeeping; the message still goes out
       }
-      this.child.stdin?.write(`${line}\n`);
+      if (this.provider !== "codex") this.child?.stdin?.write(`${line}\n`);
       await this.log(`>>> ${m.fm.id}\n${line}\n`);
     }
     this.armIdle();
@@ -491,6 +622,21 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   private args(): string[] {
     const mcpUrl = this.mcpUrl;
+    if (this.provider === "codex")
+      return [
+        "app-server",
+        // Like Claude's mcp__longe allowlist: the headless chat must be able to
+        // use its board without interactive approval. Only our endpoint gets this default.
+        ...(mcpUrl
+          ? [
+              "-c",
+              `mcp_servers.longe.url=${JSON.stringify(mcpUrl)}`,
+              "-c",
+              'mcp_servers.longe.default_tools_approval_mode="approve"',
+            ]
+          : []),
+        ...(this.config.args ?? []),
+      ];
     const mcp = mcpUrl
       ? ["--mcp-config", JSON.stringify({ mcpServers: { longe: { type: "http", url: mcpUrl } } })]
       : [];
@@ -520,7 +666,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
 
   /** Starts the process. False when it could not be spawned (an error event says why). */
   private spawn(): boolean {
-    const command = this.config.command ?? "claude";
+    const command = this.config.command ?? this.provider;
     const args = this.args();
     this.startedAt = new Date().toISOString();
     this.exitCode = undefined;
@@ -542,6 +688,52 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     }
     // ENOENT and friends: no pid, an "error" event follows on the next tick
     if (child.pid !== undefined) this.child = child;
+    if (this.provider === "codex" && this.child) {
+      this.streamed.clear();
+      const transport = new CodexTransport(child, {
+        session: (id, model, models) => {
+          this.modelChoices = models;
+          this.ingest(JSON.stringify({ type: "system", subtype: "init", session_id: id, model }));
+        },
+        text: (id, text) => {
+          const event = this.streamed.get(id);
+          if (event) {
+            event.text = text;
+            this.flushNotify();
+          } else {
+            this.push("text", text);
+            const latest = this.events.at(-1);
+            if (latest) this.streamed.set(id, latest);
+          }
+        },
+        tool: (name, input) => {
+          this.push("tool", `${name} ${summarize(input)}`);
+          if (name.endsWith("ask_question")) this.askedThisTurn = true;
+        },
+        usage: (tokens, window) => {
+          if (this.session) {
+            this.session.contextTokens = tokens;
+            this.session.contextWindow = window;
+            void this.saveSession();
+          }
+        },
+        result: (text, error) => {
+          this.streamed.clear();
+          this.ingest(JSON.stringify({ type: "result", result: text, is_error: error }));
+        },
+        error: (text) => this.push("error", text),
+      });
+      this.codex = transport;
+      this.codexReady = transport.initialize({
+        root: this.root,
+        sessionId: this.session?.id,
+        model: this.modelOverride ?? this.config.model,
+        instructions: SYSTEM_PROMPT,
+        sandbox: this.config.sandbox ?? "workspace-write",
+      });
+      // Delivery observes the failure; keep initialization from becoming an unhandled rejection.
+      void this.codexReady.catch(() => {});
+    }
     child.stdin?.on("error", () => {
       // EPIPE after the process died: the close handler reports it
     });
@@ -552,7 +744,11 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       buf += s;
       const lines = buf.split("\n");
       buf = lines.pop() ?? "";
-      for (const l of lines) if (l.trim()) this.ingest(l);
+      for (const l of lines)
+        if (l.trim()) {
+          if (this.provider === "codex") this.codex?.ingest(l);
+          else this.ingest(l);
+        }
     });
     child.stderr?.on("data", (d: Buffer) => {
       const s = d.toString();
@@ -568,7 +764,10 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       if (this.child === child) this.closing = this.closed(null);
     });
     child.on("close", (code) => {
-      if (buf.trim()) this.ingest(buf);
+      if (buf.trim()) {
+        if (this.provider === "codex") this.codex?.ingest(buf);
+        else this.ingest(buf);
+      }
       buf = "";
       if (this.child === child) this.closing = this.closed(code);
     });
@@ -576,6 +775,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   }
 
   private async closed(code: number | null): Promise<void> {
+    this.codex?.close();
+    this.codex = undefined;
     this.child = undefined;
     this.exitCode = code;
     this.clearIdle();
@@ -585,7 +786,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         `agent exited (${code ?? "?"}) with ${this.pending} message(s) unanswered`,
       );
     this.pending = 0;
-    if (this.session) {
+    if (this.session && this.provider !== "codex") {
       this.session.costUsd = (this.session.costUsd ?? 0) + this.processCost;
       this.processCost = 0;
       await this.saveSession();
@@ -777,7 +978,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         this.armIdle();
         this.flushNotify();
         if (!this.busy()) this.emit("agent:idle");
-        else this.armSettle();
+        else if (this.provider !== "codex") this.armSettle();
         break;
       }
       default:

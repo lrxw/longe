@@ -15,6 +15,28 @@ export const hooksSchema = z.object({
 
 /** How the board starts the coding agent (Claude Code by default). */
 export const agentSchema = z.object({
+  provider: z.enum(["claude", "codex"]).optional(),
+  /** CLI/model overrides saved separately when switching providers in Chat. */
+  providers: z
+    .object({
+      claude: z
+        .object({
+          command: z.string().trim().min(1).optional(),
+          model: z.string().trim().min(1).optional(),
+          args: z.array(z.string()).optional(),
+        })
+        .optional(),
+      codex: z
+        .object({
+          command: z.string().trim().min(1).optional(),
+          model: z.string().trim().min(1).optional(),
+          args: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  /** Codex filesystem sandbox; shell approval policy is never. */
+  sandbox: z.enum(["read-only", "workspace-write"]).optional(),
   /** Binary to run. */
   command: z.string().trim().min(1).optional(),
   /** `--permission-mode` for headless runs. */
@@ -32,6 +54,11 @@ export const agentSchema = z.object({
   idle_minutes: z.number().min(0).optional(),
 });
 export type AgentConfig = z.infer<typeof agentSchema>;
+export type AgentProvider = NonNullable<AgentConfig["provider"]>;
+
+export function providerConfig(config: AgentConfig): AgentConfig {
+  return { ...config, ...config.providers?.[config.provider ?? "claude"] };
+}
 
 export const configSchema = z.looseObject({
   version: z.literal(1),
@@ -90,7 +117,9 @@ project: ${JSON.stringify(projectName)}
 # allowed_tools (Claude Code permission rules), or allow it in .claude/settings.json.
 #
 # agent:
-#   command: claude
+#   provider: claude               # or codex (uses codex app-server)
+#   command: claude                # optional binary override
+#   # sandbox: workspace-write     # Codex only; or read-only
 #   permission_mode: acceptEdits
 #   model: sonnet
 #   allowed_tools: ["Bash(pnpm test:*)", "Bash(git add:*)", "Bash(git commit:*)"]

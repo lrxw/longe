@@ -59,17 +59,22 @@ export function ContextMeter({ status }: { status: AgentStatus }) {
  */
 export function ModelSelect({ status, base }: { status: AgentStatus; base: string }) {
   const chosen = status.modelOverride ?? "";
-  const choices = [...MODEL_CHOICES];
+  const choices = [...(status.modelChoices ?? MODEL_CHOICES)];
+  if (status.defaultModel && !choices.includes(status.defaultModel))
+    choices.push(status.defaultModel);
   if (chosen && !choices.includes(chosen)) choices.push(chosen);
   const inUse = status.modelInUse ? `in use: ${status.modelInUse}` : "no process yet";
   return (
     <select
+      id="chat-model"
       class="model"
       name="model"
+      aria-label="Chat model"
       hx-post={`${base}/agent/model`}
       hx-trigger="change"
       hx-target="#agent"
       hx-swap="outerHTML"
+      disabled={status.switchingProvider}
       title={`Model for the next process (${inUse}). Switching stops a running process; the session resumes with the new model.`}
     >
       <option value="" selected={chosen === ""}>
@@ -81,6 +86,37 @@ export function ModelSelect({ status, base }: { status: AgentStatus; base: strin
         </option>
       ))}
     </select>
+  );
+}
+
+export function ProviderSelect({ status, base }: { status: AgentStatus; base: string }) {
+  const ready = status.canSwitchProvider ?? !status.working;
+  return (
+    <label class="agent-setting">
+      Provider{" "}
+      <select
+        class="model"
+        name="provider"
+        aria-label="Chat provider"
+        hx-post={`${base}/agent/provider`}
+        hx-trigger="change"
+        hx-target="#agent"
+        hx-swap="outerHTML"
+        disabled={!ready}
+        title={
+          ready
+            ? "Switch this repository's provider. Each provider keeps its own session; no server restart needed."
+            : "Wait for the current turn to finish, or Stop it before switching provider."
+        }
+      >
+        <option value="claude" selected={status.provider !== "codex"}>
+          Claude Code
+        </option>
+        <option value="codex" selected={status.provider === "codex"}>
+          Codex
+        </option>
+      </select>
+    </label>
   );
 }
 
@@ -236,36 +272,48 @@ export function AgentPanel({
   return (
     <div
       id="agent"
+      data-command-session={`${status.provider ?? "claude"}:${status.sessionId ?? ""}`}
       class={`agent-panel ${state}`}
       hx-get={`${base}/fragments/agent`}
       hx-trigger={status.working ? "sse:agent-changed, every 30s" : "sse:agent-changed"}
       hx-swap="morph"
     >
       <div class="agent-status">
-        <span class="state">
-          <span class={`tag ${state === "working" ? "block" : state === "idle" ? "ok" : ""}`}>
-            {state}
-          </span>
-          {stalled ? (
-            <span
-              class="detail stall"
-              title="Headless runs cannot answer permission prompts; Stop, then send the message again."
-            >
-              no output for {ago(new Date(now.getTime() - silentMs).toISOString(), now)}
+        <div class="agent-summary">
+          <span class="state">
+            <span class={`tag ${state === "working" ? "block" : state === "idle" ? "ok" : ""}`}>
+              {state}
             </span>
-          ) : (
-            <span class="detail">{detail}</span>
-          )}
-        </span>
-        <span class="meters">
-          <ModelSelect status={status} base={base} />
-          <ContextMeter status={status} />
-          <span class="cost" title="cost of this session so far">
-            {status.costUsd !== undefined ? `$${status.costUsd.toFixed(2)}` : "–"}
+            {stalled ? (
+              <span
+                class="detail stall"
+                title="Headless runs cannot answer permission prompts; Stop, then send the message again."
+              >
+                no output for {ago(new Date(now.getTime() - silentMs).toISOString(), now)}
+              </span>
+            ) : (
+              <span class="detail">{detail}</span>
+            )}
           </span>
-        </span>
-        <span class="actions">
-          {/* every button is always there, so the bar never changes shape */}
+          <span class="meters">
+            <ContextMeter status={status} />
+            <span class="cost" title="cost of this session so far">
+              {status.costUsd !== undefined ? `$${status.costUsd.toFixed(2)}` : "–"}
+            </span>
+          </span>
+        </div>
+        <div class="agent-settings">
+          <ProviderSelect status={status} base={base} />
+          <label class="agent-setting" for="chat-model">
+            Model
+            <ModelSelect status={status} base={base} />
+          </label>
+          <a class="provider-help" href="/about#chat-provider">
+            Provider help
+          </a>
+        </div>
+        <div class="agent-actions">
+          {/* Keep actions in a consistent order, including when they are disabled. */}
           <button
             type="button"
             class="small primary"
@@ -352,7 +400,7 @@ export function AgentPanel({
           >
             Copy resume command
           </button>
-        </span>
+        </div>
       </div>
       <p class="meta agent-log" title={status.logFile}>
         log: <code>{status.logFile}</code>

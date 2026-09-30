@@ -36,6 +36,8 @@ export interface HttpOptions {
   port?: number;
   /** "New project" only creates folders in here (default: the home folder). */
   home?: string;
+  /** The real server resolves this on listen; in-process HTTP callers are ready immediately. */
+  chatReady?: Promise<void>;
 }
 
 function nav(hub: Hub, r: HubRepo): RepoNav {
@@ -85,14 +87,22 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
   const port = opts.port ?? 7311;
   const now = () => new Date();
   const repoNavs = () => hub.list().map((r) => nav(hub, r));
+  let chatReady = opts.chatReady === undefined;
   // every repo's agent gets this server's MCP endpoint, also repos that appear later
   const wireAgents = () => {
-    for (const r of hub.live())
-      (r.ctx as AppContext).agent.mcpUrl = `http://127.0.0.1:${port}${hub.base(r.name)}/mcp`;
+    for (const r of hub.live()) {
+      const ctx = r.ctx as AppContext;
+      ctx.agent.mcpUrl = `http://127.0.0.1:${port}${hub.base(r.name)}/mcp`;
+      if (chatReady) ctx.startChat();
+    }
   };
   wireAgents();
   hub.on("changed", (e) => {
     if (e.kind === "repos") wireAgents();
+  });
+  void opts.chatReady?.then(() => {
+    chatReady = true;
+    wireAgents();
   });
 
   // Pages must not be served from the browser's HTTP cache on back/forward navigation
@@ -563,6 +573,21 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
         error={error}
       />
     );
+    const agentAction = async (
+      c: Context,
+      w: { ctx: AppContext; view: RepoNav },
+      work: () => Promise<unknown>,
+    ) => {
+      try {
+        await work();
+        return c.html(await panel(w));
+      } catch (error) {
+        return c.html(
+          await panel(w, error instanceof Error ? error.message : String(error)),
+          statusFor(error) as 400,
+        );
+      }
+    };
     r.get("/fragments/agent", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
@@ -589,31 +614,45 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       const topic = topicId ? w.ctx.index.topics.get(topicId) : undefined;
       if (!prompt) return c.html(await panel(w, "Message is empty."), 400);
       if (topicId && !topic) return c.html(await panel(w, `unknown topic ${topicId}`), 404);
-      await w.ctx.agent.say("human", prompt, {
-        topic: topic ? { id: topic.id, title: topic.fm.title } : undefined,
-      });
+      const result = await agentAction(c, w, () =>
+        w.ctx.agent.say("human", prompt, {
+          topic: topic ? { id: topic.id, title: topic.fm.title } : undefined,
+        }),
+      );
+      if (result.status !== 200) return result;
       // a plain form post (topic page) lands on the chat; htmx gets the panel
       if (!c.req.header("hx-request")) return c.redirect(`${w.view.base}/chat`, 303);
-      return c.html(await panel(w));
+      return result;
     });
     r.post("/agent/continue", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
-      await w.ctx.agent.say("human", CONTINUE_PROMPT);
-      return c.html(await panel(w));
+      return agentAction(c, w, () => w.ctx.agent.say("human", CONTINUE_PROMPT));
     });
     r.post("/agent/work", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
-      await w.ctx.agent.say("human", WORK_PROMPT);
-      return c.html(await panel(w));
+      return agentAction(c, w, () => w.ctx.agent.say("human", WORK_PROMPT));
     });
     r.post("/agent/model", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       const form = await c.req.parseBody();
-      await w.ctx.agent.setModel(str(form.model));
-      return c.html(await panel(w));
+      return agentAction(c, w, () => w.ctx.agent.setModel(str(form.model)));
+    });
+    r.post("/agent/provider", async (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      const origin = c.req.header("origin");
+      if (!origin || safeHost(origin) !== new URL(c.req.url).host)
+        return c.html(await panel(w, "Refused: not sent from this page."), 403);
+      const form = await c.req.parseBody();
+      const provider = str(form.provider);
+      if (provider !== "claude" && provider !== "codex")
+        return c.html(await panel(w, "Choose Claude Code or Codex."), 400);
+      return agentAction(c, w, async () => {
+        w.ctx.config.agent = await w.ctx.agent.setProvider(provider);
+      });
     });
     r.post("/agent/stop", async (c) => {
       const w = withRepo(c);
@@ -624,14 +663,12 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     r.post("/agent/reset", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
-      await w.ctx.agent.reset();
-      return c.html(await panel(w));
+      return agentAction(c, w, () => w.ctx.agent.reset());
     });
     r.post("/agent/clear", async (c) => {
       const w = withRepo(c);
       if (isResponse(w)) return w;
-      await w.ctx.agent.clearHistory();
-      return c.html(await panel(w));
+      return agentAction(c, w, () => w.ctx.agent.clearHistory());
     });
 
     // agent surfaces, scoped to this repo

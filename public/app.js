@@ -288,23 +288,29 @@
   // (from claude's init line). Arrows move, Tab or Enter picks, Escape closes. The menu
   // lives on <body>, so the live refreshes (morph) never touch it. Not in the inbox answer
   // boxes: an answer is stored in the question file, so a command there would never run.
-  var commands = null;
   var menu = null;
   var menuField = null;
   var menuItems = [];
   var menuPick = 0;
   function loadCommands() {
-    if (commands?.length) return Promise.resolve(commands);
+    // Read the current session: another tab can switch providers without reloading us.
     return fetch(`${d.base || ""}/agent/commands`)
       .then((r) => (r.ok ? r.json() : []))
       .then(
-        (list) => {
-          commands = Array.isArray(list) ? list : [];
-          return commands;
-        },
+        (list) => (Array.isArray(list) ? list : []),
         () => [],
       );
   }
+  var commandGeneration = 0;
+  var commandSession = document.getElementById("agent")?.dataset.commandSession;
+  document.body.addEventListener("htmx:afterSwap", () => {
+    var session = document.getElementById("agent")?.dataset.commandSession;
+    if (session !== commandSession) {
+      commandSession = session;
+      commandGeneration++;
+      hideMenu();
+    }
+  });
   function hideMenu() {
     if (menu) menu.remove();
     menu = null;
@@ -343,9 +349,12 @@
       return;
     }
     var q = m[1].toLowerCase();
+    var value = f.value;
+    var generation = commandGeneration;
     loadCommands().then((list) => {
       // the box may have changed while the list loaded
-      if (document.activeElement !== f || !/^\/\S*$/.test(f.value)) return;
+      if (document.activeElement !== f || f.value !== value || generation !== commandGeneration)
+        return;
       var starts = list.filter((n) => n.toLowerCase().indexOf(q) === 0);
       var inside = list.filter((n) => n.toLowerCase().indexOf(q) > 0);
       menuItems = starts.concat(inside);
@@ -509,6 +518,12 @@
   }
   document.body.addEventListener("htmx:beforeSwap", (e) => {
     var target = e.detail?.target;
+    // Chat actions return the panel with an explanation on conflict or write failure.
+    // Keep isError true so the prompt form retains any message that was not accepted.
+    if (target?.id === "agent" && e.detail.xhr?.status >= 400) {
+      const failed = new DOMParser().parseFromString(e.detail.xhr.responseText, "text/html");
+      if (failed.querySelector("#agent")) e.detail.shouldSwap = true;
+    }
     var t = transcriptOf(target);
     reading = t
       ? { top: t.scrollTop, atEnd: t.scrollHeight - t.scrollTop - t.clientHeight < 24 }
