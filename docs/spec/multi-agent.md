@@ -128,6 +128,75 @@ created: 2026-10-01T09:00:00+02:00
 - **External agents** register themselves on their first tool call (§4.2) and appear with
   `kind: external`. An external agent that has not called a tool for 7 days is shown as gone.
 
+### 4.1a Agent lifecycle
+
+An agent has three layers, and each has its own life:
+
+| Layer | What it is | Lives |
+| --- | --- | --- |
+| **Record** | who the agent is: id, name, provider, model | from *add* until *delete* |
+| **Session** | the conversation the provider remembers (Claude session id, Codex thread) | until *new session* or *delete* |
+| **Process** | the running `claude` / `codex app-server` | from a message until idle, *stop* or server shutdown |
+
+Today's chat already works this way, with exactly one record. Multi-agent adds *add* and
+*delete*.
+
+**States of a managed agent**
+
+```
+             add                 message               turn ends
+  (none) ─────────▶ off ─────────────────▶ working ─────────────▶ idle
+                    ▲  ▲                     ▲                     │ │
+                    │  │                     └──── message ────────┘ │
+                    │  └────── stop / idle timeout / server stop ────┘
+                    │
+       delete ◀─────┘  (only when not working; hands over its work first)
+```
+
+- **off:** record exists, no process. The next message for it starts the process and resumes its
+  session.
+- **working:** a turn runs. **idle:** process open, waiting. After `idle_minutes` without work
+  the process closes (back to *off*); the session stays.
+
+**Add (spawn)**
+
+- **Who:** the human, from the Chat page (*+ Agent*: name, provider, model) or the CLI
+  (`longe agent add <name> [--provider codex] [--model …]`). Agents do not add agents in this
+  version; an agent that wants help asks with `ask_question`.
+- **What happens:** the record is written; the agent starts *off*. No process is started until
+  there is work for it: a message from you, a topic you assign, or the dispatcher handing it the
+  next todo topic. With phase 6, *add* also creates its worktree.
+- **Limit:** `agents.max` in config.yml (default 3 managed agents per repository), so the
+  dispatcher cannot run up costs behind your back.
+- `a-chat` exists from the start in every repository and is the fallback for unaddressed work.
+
+**Stop, new session, delete**
+
+| Action | Process | Session | Record | Its work (topics, answers, messages) |
+| --- | --- | --- | --- | --- |
+| *Stop* | killed | kept | kept | stays with it |
+| *New session* | killed | fresh | kept | stays with it; next turn starts without memory |
+| *Delete* | killed | removed | removed | handed to another agent first |
+
+*Delete* in detail:
+
+1. Refused while the agent is *working*: stop it first, or wait for the turn to end.
+2. You pick who takes over (default `a-chat`). Its owned topics get the new owner, its
+   unacknowledged answers and undelivered messages are routed to the new owner, and the new
+   owner gets one handoff message (§4.6).
+3. The process and session are removed; the record is deleted. Messages and Log lines it wrote
+   stay on the board, still naming it.
+4. With phase 6: its worktree is removed only if it has no uncommitted changes; its branch
+   always stays, so no work is lost.
+5. `a-chat` cannot be deleted, only stopped or given a new session.
+
+**External agents** (terminal, IDE) are not started or stopped by longe:
+
+- **Appear** on their first tool call (§4.2): record written with `kind: external`.
+- **Connected** while they call tools; **gone** after 7 days without a call.
+- **Delete** (human only) works like above: their topics and answers move to another agent. If
+  the same agent calls again later, it comes back as a new record.
+
 ### 4.2 Knowing who is calling
 
 Every tool call is made by an agent; the server resolves which one:
