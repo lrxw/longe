@@ -60,8 +60,26 @@ export const agentSchema = z.object({
 export type AgentConfig = z.infer<typeof agentSchema>;
 export type AgentProvider = NonNullable<AgentConfig["provider"]>;
 
-export function providerConfig(config: AgentConfig): AgentConfig {
-  return { ...config, ...config.providers?.[config.provider ?? "claude"] };
+/**
+ * The agent settings for one provider. `provider` in config.yml is the repo's default;
+ * the Chat may run another one (a local choice, see AgentRunner). Top-level
+ * `command` / `model` / `args` belong to the default provider only; any provider's
+ * own values come from `providers.<id>`.
+ */
+export function providerConfig(
+  config: AgentConfig,
+  provider: AgentProvider = config.provider ?? "claude",
+): AgentConfig {
+  const { command, model, args, ...shared } = config;
+  const own =
+    provider === (config.provider ?? "claude")
+      ? {
+          ...(command !== undefined ? { command } : {}),
+          ...(model !== undefined ? { model } : {}),
+          ...(args !== undefined ? { args } : {}),
+        }
+      : {};
+  return { ...shared, ...own, ...config.providers?.[provider], provider };
 }
 
 export const configSchema = z.looseObject({

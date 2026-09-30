@@ -294,11 +294,12 @@ agent:
   # model: your-model-id         # optional; otherwise use Codex's configured default
 ```
 
-The Chat **Provider** menu saves `agent.provider` to `.longe/config.yml` and applies it
-immediately. It retains custom `command`, `model` and `args` settings under
-`agent.providers.claude` or `agent.providers.codex`, so switching back restores them.
-Existing top-level overrides are moved to the old provider on the first UI switch.
-For advanced configuration, for example:
+`agent.provider` in `.longe/config.yml` is the repository's default, shared with everyone
+who uses it. The Chat **Provider** menu switches immediately, but only on your machine: the
+choice is stored next to the chat's sessions (`~/.cache/longe/agent/<repo>.provider.json`),
+because it depends on which agents you have installed and signed in. `config.yml` is not
+changed. Top-level `command`, `model` and `args` apply to the default provider; settings for
+another provider go under `agent.providers.<id>`, for example:
 
 ```yaml
 agent:

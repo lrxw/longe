@@ -7,8 +7,6 @@ import { type AppContext, closeAppContext, createAppContext } from "../src/app/c
 import { attachChatQueue } from "../src/app/todo-queue.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
-import * as atomic from "../src/store/atomic.js";
-import { parseConfig } from "../src/store/config.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;
@@ -99,6 +97,7 @@ afterEach(async () => {
 describe("UI provider switching", () => {
   it("switches live, preserves settings and sessions, and persists across server restarts", async () => {
     const runner = ctx.agent;
+    const original = await readFile(configFile, "utf8");
     await post("prompt", { prompt: "hello" });
     await idle();
     await post("model", { model: "sonnet" });
@@ -116,18 +115,13 @@ describe("UI provider switching", () => {
     expect(ctx.agent.status().costUsd).toBeUndefined();
     expect(ctx.agent.status().slashCommands).toBeUndefined();
     expect(ctx.agent.mcpUrl).toBe("http://127.0.0.1:8123/mcp");
-    const saved = await readFile(configFile, "utf8");
-    expect(saved).toContain("# keep this comment");
-    expect(saved).toContain("# custom Claude launcher");
-    expect(parseConfig(saved)).toMatchObject({
-      extra: "keep-me",
-      agent: {
-        provider: "codex",
-        allowed_tools: ["Read"],
-        providers: { claude: { model: "claude-default", args: ["--claude-only"] } },
-      },
-    });
-    expect(parseConfig(saved).agent?.command).toBeUndefined();
+    // a local choice: the shared config.yml is untouched, the choice sits next to the sessions
+    expect(await readFile(configFile, "utf8")).toBe(original);
+    expect(
+      JSON.parse(
+        await readFile(path.join(dir, "cache/longe/agent/switch-test.provider.json"), "utf8"),
+      ),
+    ).toEqual({ provider: "codex" });
     await post("prompt", { prompt: "codex hello" });
     await idle();
     expect(JSON.parse(await readFile(path.join(dir, "codex-args.json"), "utf8"))).not.toContain(
@@ -185,25 +179,39 @@ describe("UI provider switching", () => {
     expect((await post("provider", { provider: "codex" })).status).toBe(200);
   });
 
-  it("keeps the old provider and saved config when persistence fails", async () => {
+  it("keeps the old provider when the choice cannot be saved", async () => {
     const original = await readFile(configFile, "utf8");
-    vi.spyOn(atomic, "atomicWrite").mockRejectedValueOnce(new Error("config is read-only"));
+    // a folder where the choice file should go: the write fails
+    await mkdir(path.join(dir, "cache/longe/agent/switch-test.provider.json"));
     const response = await post("provider", { provider: "codex" });
     expect(response.status).toBe(500);
-    expect(await response.text()).toContain("config is read-only");
+    expect(await response.text()).toMatch(/EISDIR|illegal operation/);
     expect(ctx.agent.status()).toMatchObject({ provider: "claude", canSwitchProvider: true });
     expect(await readFile(configFile, "utf8")).toBe(original);
   });
 
+  it("a local choice takes an agent's own settings from providers.<id>, never the default's", async () => {
+    await writeFile(
+      path.join(dir, "cache/longe/agent/switch-test.provider.json"),
+      JSON.stringify({ provider: "codex" }),
+    );
+    await closeAppContext(ctx);
+    ctx = await createAppContext(dir, { index: { usePolling: true } });
+    expect(ctx.agent.status()).toMatchObject({ provider: "codex", defaultModel: "codex-default" });
+    expect(ctx.config.agent?.provider).toBeUndefined(); // config.yml still says the default
+  });
+
   it("rejects conflicting actions during a switch instead of changing the wrong session", async () => {
-    const originalWrite = atomic.atomicWrite;
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {
       release = resolve;
     });
-    vi.spyOn(atomic, "atomicWrite").mockImplementationOnce(async (...args) => {
+    // hold the switch while it saves the choice
+    const runner = ctx.agent as unknown as { saveLocalProvider: (p: string) => Promise<void> };
+    const save = runner.saveLocalProvider.bind(runner);
+    vi.spyOn(runner, "saveLocalProvider").mockImplementationOnce(async (p) => {
       await barrier;
-      await originalWrite(...args);
+      await save(p);
     });
     const switching = post("provider", { provider: "codex" });
     await vi.waitFor(() => expect(ctx.agent.status().switchingProvider).toBe(true));

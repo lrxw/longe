@@ -652,7 +652,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       if (!isProvider(provider))
         return c.html(await panel(w, "Choose a provider from the list."), 400);
       return agentAction(c, w, async () => {
-        w.ctx.config.agent = await w.ctx.agent.setProvider(provider);
+        await w.ctx.agent.setProvider(provider); // a local choice: config.yml stays as it is
       });
     });
     r.post("/agent/stop", async (c) => {

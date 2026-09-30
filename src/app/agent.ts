@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,7 +15,6 @@ import {
   markDelivered,
   writeMessage,
 } from "../store/messages.js";
-import { saveProvider } from "../store/provider.js";
 import {
   type ChatProvider,
   isProvider,
@@ -264,16 +264,52 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    * `project:` is set): their sessions file is read, and moved, when the current
    * one does not exist, so setting a project name does not forget the chat.
    */
+  /** config.yml's `agent:` as written; `config` is it resolved for the provider in use. */
+  private readonly base: AgentConfig;
+  private config: AgentConfig;
+
   constructor(
     private readonly root: string,
-    private config: AgentConfig,
+    config: AgentConfig,
     private readonly logName: string,
     private readonly spawnImpl: typeof spawn = spawn,
     private readonly legacyNames: string[] = [],
   ) {
     super();
-    this.config = providerConfig(config);
+    this.base = config;
+    this.config = providerConfig(config, this.readLocalProvider() ?? config.provider ?? "claude");
     this.loaded = this.loadProviderSession();
+  }
+
+  /**
+   * The provider picked in Chat is this machine's choice (which CLI and account you
+   * have), so it lives next to the sessions, not in the shared config.yml, whose
+   * `provider` is only the repo's default.
+   */
+  private get providerChoiceFile(): string {
+    return path.join(agentLogDir(), `${this.logName}.provider.json`);
+  }
+
+  private readLocalProvider(): AgentProvider | undefined {
+    try {
+      const { provider } = JSON.parse(readFileSync(this.providerChoiceFile, "utf8")) as {
+        provider?: string;
+      };
+      return isProvider(provider) ? provider : undefined;
+    } catch {
+      return undefined; // no choice made here yet: the config's default
+    }
+  }
+
+  /** Unlike the log and sessions, a failure here matters: the switch is refused. */
+  private saveLocalProvider(provider: AgentProvider): Promise<void> {
+    const text = `${JSON.stringify({ provider })}\n`;
+    const next = this.writes.then(async () => {
+      await mkdir(agentLogDir(), { recursive: true });
+      await writeFile(this.providerChoiceFile, text);
+    });
+    this.writes = next.catch(() => {});
+    return next;
   }
 
   private providerFile(suffix: string, name = this.logName): string {
@@ -421,8 +457,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     try {
       await this.loaded;
       await this.close();
-      const config = await saveProvider(this.root, this.provider, provider);
-      this.config = providerConfig(config);
+      await this.saveLocalProvider(provider);
+      this.config = providerConfig(this.base, provider);
       this.session = undefined;
       this.modelOverride = undefined;
       this.runningModel = undefined;
@@ -446,7 +482,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         text: handoffPrompt(previous, provider),
         now: new Date(),
       }).catch(() => undefined);
-      return config;
+      return this.config;
     } finally {
       this.switchingProvider = false;
       this.emit("agent:changed");
