@@ -35,7 +35,7 @@ export interface SessionInfo {
 }
 
 export interface AgentStatus {
-  provider?: "claude" | "codex";
+  provider?: AgentProvider;
   modelChoices?: string[];
   canSwitchProvider?: boolean;
   switchingProvider?: boolean;
@@ -216,7 +216,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private switchingProvider = false;
   private changingControls = 0;
 
-  private get provider(): "claude" | "codex" {
+  private get provider(): AgentProvider {
     return this.config.provider ?? "claude";
   }
   private session: SessionInfo | undefined;

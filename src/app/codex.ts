@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { packageVersion } from "../cli/args.js";
 
 interface RpcMessage {
   id?: number | string;
@@ -83,7 +84,7 @@ export class CodexTransport {
     instructions: string;
     sandbox: string;
   }): Promise<void> {
-    await this.request("initialize", { clientInfo: { name: "longe", version: "0.1.1" } });
+    await this.request("initialize", { clientInfo: { name: "longe", version: packageVersion() } });
     this.write({ method: "initialized", params: {} });
     const models: string[] = [];
     let cursor: string | undefined;
