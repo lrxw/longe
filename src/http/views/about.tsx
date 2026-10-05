@@ -24,20 +24,20 @@ export function AboutPage({
           <strong>Inbox</strong>: the questions agents ask you, answered with one click.
         </li>
         <li>
-          <strong>Chat</strong>: one Claude Code or Codex conversation per repository that works
-          through the board.
+          <strong>Chat</strong>: one Claude Code, Codex or opencode conversation per repository that
+          works through the board.
         </li>
         <li>
-          Everything is markdown under <code>.longe/</code> in your repository; agents use it over
-          MCP or REST.
+          Everything is markdown in <code>~/.longe/projects/</code>, next to your repository; agents
+          use it over MCP or REST.
         </li>
       </ul>
       <section id="chat-provider">
         <h2>Choose a chat provider</h2>
         <p>
-          Use the <strong>Provider</strong> menu in Chat to choose Claude Code or Codex for this
-          repository. The change applies immediately; no server restart is needed. The model menu
-          selects a model within that provider.
+          Use the <strong>Provider</strong> menu in Chat to choose Claude Code, Codex or opencode
+          for this repository. The change applies immediately; no server restart is needed. The
+          model menu selects a model within that provider.
         </p>
         <p>
           If the chat is working, wait for the turn to finish or use <strong>Stop</strong> before

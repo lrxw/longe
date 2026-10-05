@@ -33,7 +33,7 @@ Three connected views keep that loop visible:
   file on the project's board; commits carry a `Topic: <id>` line that links them back.
 - **The inbox** collects the questions agents ask you, with blocking ones first. You answer with
   one click, and the answer goes back to the agent.
-- **The chat** lets you talk to Claude Code or Codex from the board and send it through the open work.
+- **The chat** lets you talk to Claude Code, Codex or opencode from the board and send it through the open work.
 
 Agents reach longe through **MCP**, **REST** or by editing the files directly. longe runs
 entirely on your machine: it binds to `127.0.0.1`, has no database, no account and no telemetry.
@@ -48,7 +48,7 @@ The files are the source of truth.
   meanwhile. Markdown and code blocks are rendered.
 - **Review flow.** Agents submit topics for review; only you approve, reject (with a note),
   cancel or reopen.
-- **Chat with Claude Code or Codex.** One conversation per repository, with streaming output, model
+- **Chat with Claude Code, Codex or opencode.** One conversation per repository, with streaming output, model
   choice, context and cost display. "Work on board" sends the agent through the active topics,
   then the todo queue.
 - **One server, many repositories.** A single `longe serve` shows every registered repository:
@@ -238,7 +238,7 @@ are typing in.
 
 ## Chat
 
-Use **Provider** in the Chat status bar to switch between Claude Code and Codex for that
+Use **Provider** in the Chat status bar to switch between Claude Code, Codex and opencode for that
 repository. Wait for an active turn to finish or use **Stop** first. Switching takes effect
 immediately without restarting the hub; send a message or use Continue to start the selected
 provider. The model dropdown chooses a model within that provider, and **Provider help**
@@ -293,6 +293,24 @@ agent:                           # the chat
   idle_minutes: 30               # default; 0 keeps the process open
   args: []                       # extra arguments, appended as given
 ```
+
+### opencode chat
+
+Pick **opencode** in the Chat's Provider menu (your machine only), or make it the repository's
+default in `.longe/config.yml`:
+
+```yaml
+agent:
+  provider: opencode
+  permission_mode: acceptEdits   # default: reads and edits; bypassPermissions allows commands too
+  # model: anthropic/claude-sonnet-4-5   # optional, provider/model; otherwise opencode's default
+```
+
+longe runs `opencode acp` (the Agent Client Protocol over stdio) with your local opencode login,
+config and models, and passes longe's MCP server to each session. A headless chat cannot answer
+permission prompts: longe answers them by `permission_mode`, and commands opencode asks about are
+refused unless you allow them in opencode's own permission config or set `bypassPermissions`.
+**Copy resume command** gives `opencode --session <id>`.
 
 ### Codex chat
 

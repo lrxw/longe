@@ -17,7 +17,7 @@ export const hooksSchema = z.object({
  * The chat providers longe can run. A new one is added here and gets its file in
  * src/app/providers/ (the registry there must cover every id, the compiler checks).
  */
-export const PROVIDER_IDS = ["claude", "codex"] as const;
+export const PROVIDER_IDS = ["claude", "codex", "opencode"] as const;
 
 const providerOverrides = z
   .object({
