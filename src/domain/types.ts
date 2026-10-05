@@ -45,6 +45,8 @@ export interface QuestionFrontmatter {
   reject_options?: string[] | null;
   /** Options that approve the topic's reviewed work: picking one moves it review → done. */
   approve_options?: string[] | null;
+  /** Submitted option label; null for a custom answer, absent on legacy answers. */
+  selected_option?: string | null;
   assumption?: string | null;
   answered_at?: string | null;
   acknowledged_at?: string | null;

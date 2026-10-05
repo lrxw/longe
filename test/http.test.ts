@@ -6,7 +6,7 @@ import { type AppContext, closeAppContext, createAppContext } from "../src/app/c
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
 import { dataDir, questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText } from "../src/store/question.js";
+import { newQuestionText, parseQuestion } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;
@@ -263,6 +263,59 @@ describe("actions", () => {
     // answering again is a conflict
     const again = await app.request("/questions/q-20260922-bl0k/answer", form({ answer: "x" }));
     expect(again.status).toBe(409);
+  });
+
+  it.each([
+    {
+      input: { answer: "Please change the layout", note: "The menu overlaps." },
+      expected: "active",
+      selected: null,
+    },
+    { input: { answer: "Good\n\nBut change the layout." }, expected: "active", selected: null },
+    { input: { option_index: "0", note: "Looks right." }, expected: "done", selected: "Good" },
+    {
+      input: { option_index: "1", note: "The menu overlaps." },
+      expected: "active",
+      selected: "Broken",
+    },
+    { input: { option_index: "2" }, expected: "review", selected: "Later" },
+  ])("review answer $input changes status to $expected", async ({ input, expected, selected }) => {
+    await writeFile(
+      topicFile("verification"),
+      newTopicText({ id: "verification", title: "Verification", goal: "g", now }).replace(
+        "status: backlog",
+        "status: review",
+      ),
+    );
+    await waitFor(() => ctx.index.topics.get("verification")?.fm.status === "review");
+    const id = "q-20261001-vr01";
+    await writeFile(
+      questionFile(id),
+      newQuestionText({
+        id,
+        question: "Does it work?",
+        topic: "verification",
+        blocking: false,
+        assumption: "It works",
+        asked_by: "agent",
+        now,
+        options: ["Good", "Broken", "Later"],
+        approve_options: ["Good"],
+        reject_options: ["Broken"],
+      }),
+    );
+    await waitFor(() => ctx.index.questions.has(id));
+    const response = await app.request(`/questions/${id}/answer`, form(input));
+    expect(response.status).toBe(200);
+    expect(ctx.index.topics.get("verification")?.fm.status).toBe(expected);
+    const saved = parseQuestion(await readFile(questionFile(id), "utf8"));
+    expect(saved.fm.status).toBe("answered");
+    expect(saved.fm.selected_option).toBe(selected);
+    if (expected === "active") {
+      expect(await readFile(topicFile("verification"), "utf8")).toContain(
+        `system — rejected in ${id}:`,
+      );
+    }
   });
 
   it("board cleanup archives or deletes done and cancelled topics with their questions", async () => {

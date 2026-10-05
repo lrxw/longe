@@ -39,6 +39,11 @@ export function answerQuestion(q: Question, input: AnswerInput, now: Date): void
     );
   }
   const text = resolveAnswerText(q, input);
+  setField(
+    q.doc,
+    "selected_option",
+    input.option_index === undefined ? null : q.fm.options?.[input.option_index],
+  );
   replaceSection(q.doc, "Answer", text);
   setField(q.doc, "status", "answered");
   setField(q.doc, "answered_at", toLocalIso(now));

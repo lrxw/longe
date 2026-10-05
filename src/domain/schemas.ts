@@ -33,6 +33,7 @@ export const questionFrontmatterSchema = z
     options: z.array(z.string().trim().min(1)).min(2).max(4).nullish(),
     reject_options: z.array(z.string().trim().min(1)).nullish(),
     approve_options: z.array(z.string().trim().min(1)).nullish(),
+    selected_option: nullishString,
     assumption: nullishString,
     answered_at: isoTimestamp.nullish(),
     acknowledged_at: isoTimestamp.nullish(),

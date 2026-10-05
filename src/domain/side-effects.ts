@@ -74,11 +74,21 @@ export function effectsForQuestionClosed(
   answer = "",
 ): Effect[] {
   if (!topic) return [];
-  // the human judged reviewed work from the inbox: a reject option sends the topic
-  // back to the agent, an approve option closes it
-  const chosen = answer.split(/\n\s*\n/)[0]?.trim() ?? "";
-  if (q.status === "answered" && topic.fm.status === "review" && chosen) {
-    if ((q.reject_options ?? []).includes(chosen))
+  // Preserve the submitted choice: custom feedback may start with an approval label.
+  // Older files and hand-written answers have no selection metadata.
+  const firstParagraph = answer.split(/\n\s*\n/)[0]?.trim() ?? "";
+  const chosen =
+    q.selected_option !== undefined
+      ? q.selected_option
+      : q.options?.includes(firstParagraph)
+        ? firstParagraph
+        : null;
+  const isReviewQuestion = (q.reject_options?.length ?? 0) + (q.approve_options?.length ?? 0) > 0;
+  if (q.status === "answered" && topic.fm.status === "review" && answer.trim()) {
+    if (
+      (chosen === null && isReviewQuestion) ||
+      (chosen !== null && (q.reject_options ?? []).includes(chosen))
+    )
       return [
         {
           kind: "set_topic_status",
@@ -88,7 +98,7 @@ export function effectsForQuestionClosed(
           note: `rejected in ${q.id}: ${truncate(answer)}`,
         },
       ];
-    if ((q.approve_options ?? []).includes(chosen))
+    if (chosen !== null && (q.approve_options ?? []).includes(chosen))
       return [
         {
           kind: "set_topic_status",

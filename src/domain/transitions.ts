@@ -47,7 +47,7 @@ export const TRANSITION_RULES: readonly Rule[] = [
   {
     from: "review",
     to: "active",
-    // system: the human picked one of a question's reject_options in the inbox
+    // system: the human picked a reject option or sent custom review feedback
     actors: ["human", "system"],
     requiresNote: true,
     rule: "review → active (reject) is human-only and requires a note",

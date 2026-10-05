@@ -214,7 +214,7 @@ todo cards up and down to set the order; new ones join at the bottom.
 |---|---|
 | Agent | pick up (`todo → active`, or `backlog → active` for a topic it just created), submit (`active → review`) |
 | Human | queue (`backlog ↔ todo`), approve, reject with a note, cancel, reopen |
-| longe | `active → needs-decision` while a blocking question is open, and back when it is answered; `review → active` when you pick a reject option |
+| longe | `active → needs-decision` while a blocking question is open, and back when it is answered; `review → active` when you pick a reject option or send a custom answer to a review question |
 
 **Tools.** Agents use `list_topics`, `get_topic`, `create_topic`, `set_plan`, `set_status`,
 `add_decision`, `append_log`, `ask_question`, `check_answers`, `acknowledge_answers`,

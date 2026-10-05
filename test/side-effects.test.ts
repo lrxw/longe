@@ -119,9 +119,11 @@ describe("§5 side effects", () => {
         note: "rejected in q-20260922-aaaa: Broken menu never opens",
       },
     ]);
-    // other options, free text, or a topic no longer in review: nothing happens
+    // an unmarked option or a topic no longer in review: nothing happens
     expect(effectsForQuestionClosed(verify, review, "Works")).toEqual([]);
-    expect(effectsForQuestionClosed(verify, review, "Broken, sort of")).toEqual([]);
+    expect(effectsForQuestionClosed(verify, review, "Broken, sort of")[0]).toMatchObject({
+      to: "active",
+    });
     expect(
       effectsForQuestionClosed(verify, { fm: topic("active"), openBlockingCount: 0 }, "Broken"),
     ).toEqual([]);
@@ -150,5 +152,45 @@ describe("§5 side effects", () => {
     expect(
       effectsForQuestionClosed(verify, { fm: topic("active"), openBlockingCount: 0 }, "Good"),
     ).toEqual([]);
+  });
+
+  it("custom review feedback rejects even when it starts with an approval label", () => {
+    const verify = {
+      ...q(false, "answered"),
+      options: ["Good", "Broken"],
+      approve_options: ["Good"],
+      selected_option: null,
+    };
+    const answer = "Good\n\nBut please change the layout.";
+    expect(
+      effectsForQuestionClosed(verify, { fm: topic("review"), openBlockingCount: 0 }, answer),
+    ).toEqual([
+      {
+        kind: "set_topic_status",
+        topic: "t1",
+        from: "review",
+        to: "active",
+        note: "rejected in q-20260922-aaaa: Good But please change the layout.",
+      },
+    ]);
+    for (const status of ["active", "done", "cancelled", "needs-decision"] as const) {
+      expect(
+        effectsForQuestionClosed(verify, { fm: topic(status), openBlockingCount: 0 }, answer),
+      ).toEqual([]);
+    }
+    expect(
+      effectsForQuestionClosed(
+        { ...verify, status: "withdrawn" },
+        { fm: topic("review"), openBlockingCount: 0 },
+        answer,
+      ),
+    ).toEqual([]);
+    expect(
+      effectsForQuestionClosed(
+        { ...q(false, "answered"), selected_option: null },
+        { fm: topic("review"), openBlockingCount: 0 },
+        answer,
+      ),
+    ).toEqual([]); // ordinary questions do not become review decisions
   });
 });

@@ -102,6 +102,9 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
           rows={2}
           placeholder={options.length ? "Or answer in your own words…" : "Answer…"}
         />
+        {q.fm.approve_options?.length || q.fm.reject_options?.length ? (
+          <p class="meta">A custom answer sends work in review back to the agent.</p>
+        ) : null}
         <div class="row">
           <textarea
             name="note"

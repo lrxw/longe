@@ -42,7 +42,8 @@ or withdrawn. A project-wide question can appear in the inbox without belonging 
 
 Review questions can also name approval and rejection options. Choosing an approval option
 moves a topic in review to done; choosing a rejection option returns it to active with your
-feedback. This makes review part of the same inbox loop.
+feedback. Writing a custom answer to one of these review questions also returns the topic to
+active. To approve, choose the approval option. This makes review part of the same inbox loop.
 
 ## Sent, answered, read
 
