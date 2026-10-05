@@ -135,6 +135,26 @@ export function activatedPrompt(v: ActivatedVars): string {
 Call check_answers, then get_topic and work on it. Report on the board when you stop.`;
 }
 
+/** A topic the human took away from the agent: queued again (todo) or parked (backlog). */
+export interface ParkedVars {
+  id: string;
+  title: string;
+  from: string;
+  to: "todo" | "backlog";
+  note?: string | undefined;
+}
+
+/** What the chat is told when the human moves a topic it works on back to todo or backlog. */
+export function parkedPrompt(v: ParkedVars): string {
+  const why = v.note?.trim() ? ` Note: ${v.note.trim()}` : "";
+  const where =
+    v.to === "todo"
+      ? "back to todo: it is queued again and will be handed out later"
+      : "to the backlog: it is parked";
+  return `The human moved topic \`${v.id}\` ("${v.title}") from ${v.from} ${where}.${why}
+Stop working on it now: no more changes, commits or questions for it. append_log what is done and what is left, including uncommitted changes in the working tree that belong to it. Do not set its status and do not pick it up again unless it is handed to you.`;
+}
+
 /** What the chat is told when it is free and the todo queue has a topic for it. */
 export function todoPrompt(v: { id: string; title: string }): string {
   return `Next in the todo queue: topic \`${v.id}\` ("${v.title}"). Call check_answers, then set_status active on it, get_topic and work on it until it is in review or blocked on a question. Report on the board when you stop.`;
@@ -558,6 +578,19 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
    * The human moved a topic to active: that asks for work now, so unlike an answer
    * this starts the chat also when the repo has no session yet.
    */
+  /**
+   * The human moved a topic back to todo or backlog: a chat that may be working on it
+   * is told to stop (also mid-turn). A repo without a chat gets nothing: there is no
+   * one to stop, and no agent is started just to be told that.
+   */
+  async notifyParked(vars: ParkedVars): Promise<boolean> {
+    await this.loaded;
+    await this.sending;
+    if (!this.session && !this.child) return false;
+    await this.say("board", parkedPrompt(vars));
+    return true;
+  }
+
   async notifyActivated(vars: ActivatedVars): Promise<void> {
     await this.loaded;
     await this.say("board", activatedPrompt(vars));

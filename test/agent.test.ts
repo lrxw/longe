@@ -12,6 +12,7 @@ import {
   answersPrompt,
   CONTINUE_PROMPT,
   endsWithQuestion,
+  parkedPrompt,
   resumeCommand,
   SETTLE_MS,
   todoPrompt,
@@ -442,6 +443,23 @@ while IFS= read -r line; do :; done
       'moved topic `t1` ("T one") to active (from review; note: tests missing)',
     );
     expect(activatedPrompt({ id: "t1", title: "T", from: "backlog" })).toContain("(from backlog)");
+    await runner.close();
+  });
+
+  it("notifyParked tells a running chat to stop, and starts nothing without one", async () => {
+    const runner = new AgentRunner(dir, { command: fake }, "test");
+    const vars = { id: "t1", title: "T one", from: "active", to: "todo" as const, note: "later" };
+    expect(await runner.notifyParked(vars)).toBe(false); // no chat: nobody to stop
+    expect(await runner.messages()).toEqual([]);
+    await runner.say("human", "start");
+    expect(await runner.notifyParked(vars)).toBe(true);
+    await waitFor(() => runner.status().pending === 0 && runner.status().events.length >= 8);
+    expect(await inputLines()).toEqual(["start", parkedPrompt(vars)]);
+    expect(parkedPrompt(vars)).toContain(
+      'moved topic `t1` ("T one") from active back to todo: it is queued again',
+    );
+    expect(parkedPrompt(vars)).toContain("Note: later");
+    expect(parkedPrompt({ ...vars, to: "backlog" })).toContain("to the backlog: it is parked");
     await runner.close();
   });
 

@@ -80,6 +80,14 @@ describe("§4 transition table", () => {
     expect(ballHolder("todo")).toBe("agent");
   });
 
+  it("work in progress goes back to todo or backlog: human only", () => {
+    for (const from of ["active", "needs-decision", "review"] as const)
+      for (const to of ["todo", "backlog"] as const) {
+        expectOk(from, to, "human");
+        expectCode(from, to, "agent", "human_only");
+      }
+  });
+
   it("same status is rejected", () => {
     for (const s of TOPIC_STATUSES) expectCode(s, s, "human", "same_status");
   });
@@ -102,6 +110,12 @@ describe("§4 transition table", () => {
       "cancelled>active",
       "active>needs-decision",
       "needs-decision>active",
+      "active>todo",
+      "active>backlog",
+      "needs-decision>todo",
+      "needs-decision>backlog",
+      "review>todo",
+      "review>backlog",
     ]);
     for (const from of TOPIC_STATUSES) {
       for (const to of TOPIC_STATUSES) {
@@ -112,7 +126,13 @@ describe("§4 transition table", () => {
   });
 
   it("allowedTargets reflects the table per actor", () => {
-    expect(allowedTargets("review", "human").sort()).toEqual(["active", "cancelled", "done"]);
+    expect(allowedTargets("review", "human").sort()).toEqual([
+      "active",
+      "backlog",
+      "cancelled",
+      "done",
+      "todo",
+    ]);
     expect(allowedTargets("review", "agent")).toEqual([]);
     expect(allowedTargets("active", "agent")).toEqual(["review"]);
     expect(allowedTargets("active", "system")).toEqual(["needs-decision"]);

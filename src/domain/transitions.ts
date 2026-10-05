@@ -52,6 +52,17 @@ export const TRANSITION_RULES: readonly Rule[] = [
     requiresNote: true,
     rule: "review → active (reject) is human-only and requires a note",
   },
+  // stop working on it: queue it again, or park it (the agent is told to stop)
+  ...(["active", "needs-decision", "review"] as const).flatMap((from) =>
+    (["todo", "backlog"] as const).map(
+      (to): Rule => ({
+        from,
+        to,
+        actors: ["human"],
+        rule: `moving a topic from ${from} back to ${to} is human-only`,
+      }),
+    ),
+  ),
   {
     from: "non-terminal",
     to: "cancelled",

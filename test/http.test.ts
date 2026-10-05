@@ -401,6 +401,11 @@ describe("actions", () => {
     ctx.agent.notifyActivated = async (v) => {
       woken.push(v);
     };
+    const parked: unknown[] = [];
+    ctx.agent.notifyParked = async (v) => {
+      parked.push(v);
+      return true;
+    };
     await rm(questionFile("q-20260922-bl0k"));
     await waitFor(() => !ctx.index.questions.has("q-20260922-bl0k"));
     // needs-decision → active is system-only, even for a human
@@ -429,6 +434,16 @@ describe("actions", () => {
     expect(woken).toEqual([
       { id: "billing", title: "Billing refactor", from: "review", note: "missing tests" },
     ]);
+
+    // back to todo while active: the chat is told to stop; then picked up again
+    res = await app.request("/topics/billing/status", form({ status: "todo", note: "later" }));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('class="status todo"');
+    expect(parked).toEqual([
+      { id: "billing", title: "Billing refactor", from: "active", to: "todo", note: "later" },
+    ]);
+    await app.request("/topics/billing/status", form({ status: "active" }));
+    woken.pop(); // the pickup from todo, not under test here
 
     await app.request("/topics/billing/status", form({ status: "review" }));
     res = await app.request("/topics/billing/status", form({ status: "done" }));

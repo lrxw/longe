@@ -29,6 +29,9 @@ import { StatusActions, TopicFragment } from "./views/topic.js";
 
 export const PUBLIC_DIR = path.resolve(import.meta.dirname, "../../public");
 
+/** Statuses in which an agent works on (or waits on) a topic. */
+const WORKING: readonly TopicStatus[] = ["active", "needs-decision", "review"];
+
 /** SSE "changed" events within this window go out as one (see /events). */
 export const CHANGED_WINDOW_MS = 100;
 
@@ -551,6 +554,10 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
         // pick up, reject or reopen: the human wants work on it now, so wake the chat
         if (to === "active" && from && from !== "active") {
           void w.ctx.agent.notifyActivated({ id, title: t.fm.title, from, note });
+        }
+        // queued again or parked: whoever works on it must stop
+        if ((to === "todo" || to === "backlog") && from && WORKING.includes(from)) {
+          void w.ctx.agent.notifyParked({ id, title: t.fm.title, from, to, note });
         }
         return c.html(<StatusActions t={t} base={w.view.base} />);
       } catch (err) {
