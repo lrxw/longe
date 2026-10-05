@@ -17,7 +17,7 @@ project: "longe"
 # Takes effect when the hub is (re)started with a build that knows allowed_tools;
 # .claude/settings.json carries the same rules for the current build.
 agent:
-  provider: codex
+  provider: claude
   sandbox: workspace-write
   allowed_tools:
     - "Bash(pnpm typecheck)"
