@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import { packageVersion } from "../cli/args.js";
+import type { SubagentState, SubagentUpdate } from "./subagents.js";
 
 /**
  * Client side of the Agent Client Protocol (https://agentclientprotocol.com): JSON-RPC
@@ -26,6 +27,8 @@ interface ToolCallInfo {
   title?: string;
   kind?: string;
   rawInput?: unknown;
+  status?: string;
+  rawOutput?: unknown;
 }
 
 interface PermissionOption {
@@ -39,7 +42,17 @@ export interface AcpCallbacks {
   session(id: string, model: string | undefined, models: string[]): void;
   /** Streaming text of the agent's current message (cumulative per message id). */
   text(id: string, text: string): void;
-  tool(name: string, input: unknown): void;
+  tool(name: string, input: unknown, id?: string): void;
+  /** Current context occupancy and capacity, not cumulative token billing. */
+  usage(tokens: number, window?: number): void;
+  /** Opt-in provider interpretation; ACP prompt usage is not always context occupancy. */
+  contextFromPromptUsage?(usage: unknown): number | undefined;
+  /**
+   * A subagent started or changed: a tool call whose input names a `subagent_type`
+   * (opencode's task tool). Only start and end are known; ACP does not forward the
+   * child session's own activity.
+   */
+  subagent?(update: SubagentUpdate): void;
   /** The turn ended; error when it stopped for another reason than end_turn. */
   result(text: string, error: boolean): void;
   error(text: string): void;
@@ -84,6 +97,12 @@ export class AcpTransport {
   private turn: Promise<void> = Promise.resolve();
   /** `session/load` replays the history as updates: not shown again. */
   private replaying = false;
+  private initialized = false;
+  /** Updates can arrive before session/new or session/load returns. */
+  private pendingUsage: { used: number; size: number } | undefined;
+  private usageSeenThisTurn = false;
+  private toolSeenThisTurn = false;
+  private tools = new Map<string, ToolCallInfo>();
   private texts = new Map<string, string>();
   private lastText = "";
   private messageSeq = 0;
@@ -134,7 +153,10 @@ export class AcpTransport {
       ? [{ type: "http", name: "longe", url: options.mcpUrl, headers: [] }]
       : [];
     const base = { cwd: options.root, mcpServers };
-    let result: { sessionId?: string; models?: AcpModels } | null | undefined;
+    let result:
+      | { sessionId?: string; models?: AcpModels; configOptions?: unknown }
+      | null
+      | undefined;
     if (options.sessionId && init.agentCapabilities?.loadSession) {
       this.replaying = true;
       try {
@@ -145,6 +167,7 @@ export class AcpTransport {
         this.sessionId = options.sessionId;
       } catch {
         result = undefined; // gone or unreadable: start a new one
+        this.pendingUsage = undefined;
       } finally {
         this.replaying = false;
       }
@@ -155,25 +178,52 @@ export class AcpTransport {
       if (!this.sessionId) throw new Error("ACP agent returned no session id");
       this.instructions = options.instructions;
     }
-    const models = (result?.models?.availableModels ?? [])
-      .map((m) => m.modelId)
-      .filter((m): m is string => typeof m === "string");
-    let current = result?.models?.currentModelId;
+    let selection = modelOption(result?.configOptions);
+    let models =
+      selection?.models ??
+      (result?.models?.availableModels ?? [])
+        .map((m) => m.modelId)
+        .filter((m): m is string => typeof m === "string");
+    let current = selection?.current ?? result?.models?.currentModelId;
     if (options.model && options.model !== current) {
-      // unstable in ACP; agents without it keep their own default
-      await this.request("session/set_model", { sessionId: this.sessionId, modelId: options.model })
-        .then(() => {
+      try {
+        if (selection) {
+          const changed = (await this.request("session/set_config_option", {
+            sessionId: this.sessionId,
+            configId: selection.id,
+            value: options.model,
+          })) as { configOptions?: unknown } | null;
+          selection = modelOption(changed?.configOptions);
+          current = selection?.current ?? current;
+          models = selection?.models ?? models;
+          if (current !== options.model) throw new Error("model selection was not confirmed");
+        } else {
+          // Legacy ACP agents expose the unstable model API instead.
+          await this.request("session/set_model", {
+            sessionId: this.sessionId,
+            modelId: options.model,
+          });
           current = options.model;
-        })
-        .catch(() => this.callbacks.error(`The agent did not switch to model ${options.model}.`));
+        }
+      } catch {
+        this.callbacks.error(`The agent did not switch to model ${options.model}.`);
+      }
     }
     this.callbacks.session(this.sessionId, current, models);
+    this.initialized = true;
+    if (this.pendingUsage) {
+      this.callbacks.usage(this.pendingUsage.used, this.pendingUsage.size || undefined);
+      this.pendingUsage = undefined;
+    }
   }
 
   async send(text: string): Promise<void> {
     await this.turn;
     if (this.dead) throw new Error("ACP agent process is closed");
     this.lastText = "";
+    this.usageSeenThisTurn = false;
+    this.toolSeenThisTurn = false;
+    this.tools.clear();
     this.texts.clear();
     this.messageSeq++;
     let done!: () => void;
@@ -189,10 +239,21 @@ export class AcpTransport {
     // the turn runs in the background; send() returns once the message is handed over
     prompt
       .then((r) => {
-        const stop = (r as { stopReason?: string } | null)?.stopReason ?? "end_turn";
+        const response = r as { stopReason?: string; usage?: unknown } | null;
+        const stop = response?.stopReason ?? "end_turn";
+        if (!this.usageSeenThisTurn) {
+          const tokens = this.callbacks.contextFromPromptUsage?.(response?.usage);
+          if (tokens !== undefined) this.callbacks.usage(tokens);
+        }
+        const empty = stop === "end_turn" && !this.lastText.trim() && !this.toolSeenThisTurn;
         this.callbacks.result(
-          stop === "end_turn" ? this.lastText : this.lastText || `stopped: ${stop}`,
-          stop !== "end_turn" && stop !== "max_turn_requests",
+          empty
+            ? "The agent ended the turn without sending a reply or running any tools. Check the selected model in its own client, or try another model."
+            : stop === "end_turn"
+              ? this.lastText ||
+                "The agent finished its tool calls without sending a written reply."
+              : this.lastText || `stopped: ${stop}`,
+          empty || (stop !== "end_turn" && stop !== "max_turn_requests"),
         );
       })
       .catch((e: unknown) =>
@@ -240,22 +301,61 @@ export class AcpTransport {
       });
       return;
     }
-    if (msg.method !== "session/update" || this.replaying) return;
+    if (msg.method !== "session/update") return;
     const update = (msg.params?.update ?? {}) as Record<string, unknown>;
+    // Usage is session state, so retain it even while suppressing replayed messages.
+    if (update.sessionUpdate === "usage_update") {
+      const { used, size } = update;
+      if (
+        typeof used === "number" &&
+        Number.isSafeInteger(used) &&
+        used >= 0 &&
+        typeof size === "number" &&
+        Number.isSafeInteger(size) &&
+        size >= 0
+      ) {
+        this.usageSeenThisTurn = true;
+        if (this.initialized) this.callbacks.usage(used, size || undefined);
+        else this.pendingUsage = { used, size };
+      }
+      return;
+    }
+    if (this.replaying) return;
     switch (update.sessionUpdate) {
+      case "config_option_update": {
+        const selection = modelOption(update.configOptions);
+        if (this.initialized && selection)
+          this.callbacks.session(this.sessionId, selection.current, selection.models);
+        break;
+      }
       case "agent_message_chunk": {
         const content = update.content as { type?: string; text?: string } | undefined;
         if (content?.type !== "text" || typeof content.text !== "string") break;
         const id = typeof update.messageId === "string" ? update.messageId : `m${this.messageSeq}`;
         const text = (this.texts.get(id) ?? "") + content.text;
         this.texts.set(id, text);
+        if (!text.trim()) break;
         this.lastText = text;
         this.callbacks.text(id, text);
         break;
       }
-      case "tool_call": {
-        const tool = update as ToolCallInfo;
-        this.callbacks.tool(tool.title ?? tool.kind ?? "tool", tool.rawInput);
+      case "tool_call":
+      case "tool_call_update": {
+        this.toolSeenThisTurn = true;
+        const patch = update as ToolCallInfo;
+        const id = patch.toolCallId;
+        const prior = id ? this.tools.get(id) : undefined;
+        if (update.sessionUpdate === "tool_call_update" && !prior && !patch.title && !patch.kind)
+          break;
+        const tool = { ...prior, ...patch };
+        if (id) this.tools.set(id, tool);
+        if (id) this.reportSubagent(id, tool);
+        if (
+          update.sessionUpdate === "tool_call" ||
+          patch.title !== undefined ||
+          patch.rawInput !== undefined
+        )
+          this.callbacks.tool(tool.title ?? tool.kind ?? "tool", tool.rawInput, id);
         break;
       }
       default:
@@ -284,6 +384,39 @@ export class AcpTransport {
     });
   }
 
+  /**
+   * opencode's task tool: input `{description, prompt, subagent_type, background?}`; the
+   * update's status ends it, and its output says `<task … state="running|completed|error">`
+   * (a background task completes the tool call at once while the child still runs).
+   */
+  private reportSubagent(id: string, tool: ToolCallInfo): void {
+    if (!this.callbacks.subagent) return;
+    const input = (tool.rawInput ?? {}) as Record<string, unknown>;
+    const type = typeof input.subagent_type === "string" ? input.subagent_type : undefined;
+    if (!type) return;
+    const output = (tool.rawOutput ?? {}) as { output?: unknown; metadata?: unknown };
+    const taskState =
+      typeof output.output === "string"
+        ? /<task\b[^>]*\bstate="([a-z]+)"/.exec(output.output)?.[1]
+        : undefined;
+    const background = input.background === true || taskState === "running";
+    let state: SubagentState = "running";
+    if (tool.status === "failed" || taskState === "error") state = "failed";
+    else if (tool.status === "completed" && taskState !== "running") state = "done";
+    const description =
+      typeof input.description === "string" ? input.description : (tool.title ?? "");
+    this.callbacks.subagent({
+      id,
+      type,
+      description,
+      background,
+      state,
+      ...(background && state === "running" && tool.status === "completed"
+        ? { activity: "runs in the background; opencode does not report its end over ACP" }
+        : {}),
+    });
+  }
+
   close(): void {
     this.dead = true;
     for (const request of this.requests.values()) {
@@ -297,4 +430,23 @@ export class AcpTransport {
 interface AcpModels {
   availableModels?: { modelId?: string; name?: string }[];
   currentModelId?: string;
+}
+
+/** Current ACP uses configOptions; older agents still return models. */
+function modelOption(raw: unknown): { id: string; current: string; models: string[] } | undefined {
+  if (!Array.isArray(raw)) return;
+  const option = raw.find(
+    (o) => o?.type === "select" && (o.category === "model" || o.id === "model"),
+  );
+  if (!option || typeof option.id !== "string" || typeof option.currentValue !== "string") return;
+  const choices: unknown[] = Array.isArray(option.options) ? option.options : [];
+  const models = choices.flatMap((c) => {
+    const choice = c as { value?: unknown; options?: unknown[] } | null;
+    const values = Array.isArray(choice?.options) ? choice.options : [choice];
+    return values.flatMap((v) => {
+      const value = (v as { value?: unknown } | null)?.value;
+      return typeof value === "string" ? [value] : [];
+    });
+  });
+  return { id: option.id, current: option.currentValue, models };
 }

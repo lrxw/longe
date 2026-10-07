@@ -14,6 +14,7 @@ export const codex: ChatProvider = {
   fileTag: ".codex",
   tracksCost: false,
   foldsMessages: false,
+  reportsSubagents: true,
   args({ config, mcpUrl }) {
     return [
       "app-server",
@@ -39,6 +40,7 @@ export const codex: ChatProvider = {
       text: (id, text) => hooks.streamText(id, text),
       tool: (name, input) => hooks.tool(name, input),
       usage: (tokens, window) => hooks.usage(tokens, window),
+      subagent: (update) => hooks.subagent(update),
       result: (text, error) =>
         hooks.ingest(JSON.stringify({ type: "result", result: text, is_error: error })),
       error: (text) => hooks.error(text),

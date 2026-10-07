@@ -6,7 +6,7 @@ import { type AppContext, closeAppContext, createAppContext } from "../src/app/c
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
 import { dataDir, questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText, parseQuestion } from "../src/store/question.js";
+import { newQuestionText, parseQuestion, questionSections } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;
@@ -81,6 +81,41 @@ afterEach(async () => {
 });
 
 describe("pages", () => {
+  it("serves the live Agents page, fragments and navigation with honest provider support", async () => {
+    const res = await app.request("/agents");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('href="/agents" class="on"');
+    expect(html).toContain("No subagents reported yet");
+    expect(html).toContain('hx-get="/fragments/agents"');
+    const status = ctx.agent.status();
+    ctx.agent.status = () => ({
+      ...status,
+      subagentsReported: true,
+      subagents: [
+        {
+          id: "a",
+          type: "Explore",
+          description: "Review <script>routes</script>",
+          background: true,
+          state: "running",
+          startedAt: now.toISOString(),
+          tools: 2,
+        },
+      ],
+    });
+    const fragment = await (await app.request("/fragments/agents")).text();
+    expect(fragment).toContain("Review &lt;script&gt;routes&lt;/script&gt;");
+    expect(fragment).toContain("every 5s");
+    expect(fragment).toContain("2 tool calls");
+    expect(await (await app.request("/fragments/agents-badge")).text()).toContain("1 running");
+    ctx.agent.status = () => ({ ...status, provider: "opencode", subagentsReported: false });
+    expect(await (await app.request("/fragments/agents")).text()).toContain(
+      "opencode does not report its subagents",
+    );
+    expect(await (await app.request("/fragments/agents-badge")).text()).toContain("unavailable");
+  });
+
   it("inbox lists blocking first, non-blocking collapsed, with title badge", async () => {
     const res = await app.request("/");
     expect(res.status).toBe(200);
@@ -104,6 +139,15 @@ describe("pages", () => {
     expect(html).toContain("Assumption: <em>spaces</em>");
     expect(html).toContain('href="/topics/billing"');
     expect(html).toContain('name="option_index" value="1"');
+    const answerForms = [...html.matchAll(/<form class="answer"[^>]*>([\s\S]*?)<\/form>/g)];
+    expect(answerForms).toHaveLength(2);
+    for (const [, answerForm] of answerForms) {
+      expect(answerForm?.match(/<textarea/g)).toHaveLength(1);
+      expect(answerForm).toContain('name="reply"');
+      expect(answerForm).not.toContain('name="note"');
+      expect(answerForm).not.toContain('name="answer"');
+      expect(answerForm).toContain("Send reply");
+    }
     expect(html).not.toContain("Withdraw");
   });
 
@@ -267,6 +311,19 @@ describe("actions", () => {
 
   it.each([
     {
+      input: { reply: "Good\n\nBut please explain the change." },
+      expected: "active",
+      selected: null,
+    },
+    { input: { option_index: "0", reply: "  Looks right.  " }, expected: "done", selected: "Good" },
+    { input: { option_index: "0", reply: "" }, expected: "done", selected: "Good" },
+    {
+      input: { option_index: "1", reply: "The menu overlaps." },
+      expected: "active",
+      selected: "Broken",
+    },
+    { input: { option_index: "2", reply: "Tomorrow." }, expected: "review", selected: "Later" },
+    {
       input: { answer: "Please change the layout", note: "The menu overlaps." },
       expected: "active",
       selected: null,
@@ -311,9 +368,15 @@ describe("actions", () => {
     const saved = parseQuestion(await readFile(questionFile(id), "utf8"));
     expect(saved.fm.status).toBe("answered");
     expect(saved.fm.selected_option).toBe(selected);
+    if ("reply" in input) {
+      const reply = input.reply?.trim();
+      expect(questionSections(saved).Answer).toBe(
+        selected ? `${selected}${reply ? `\n\n${reply}` : ""}` : reply,
+      );
+    }
     if (expected === "active") {
       expect(await readFile(topicFile("verification"), "utf8")).toContain(
-        `system — rejected in ${id}:`,
+        `system — ${selected === null ? "follow-up" : "rejected"} in ${id}:`,
       );
     }
   });
@@ -385,12 +448,15 @@ describe("actions", () => {
   it("answer validation: empty and bad option", async () => {
     expect((await app.request("/questions/q-20260922-nb0k/answer", form({}))).status).toBe(400);
     expect(
+      (await app.request("/questions/q-20260922-nb0k/answer", form({ reply: "   " }))).status,
+    ).toBe(400);
+    expect(
       (await app.request("/questions/q-20260922-nb0k/answer", form({ option_index: "7" }))).status,
     ).toBe(400);
     expect(
       (await app.request("/questions/q-00000000-zzzz/answer", form({ answer: "x" }))).status,
     ).toBe(404);
-    const ok = await app.request("/questions/q-20260922-nb0k/answer", form({ answer: "Tabs." }));
+    const ok = await app.request("/questions/q-20260922-nb0k/answer", form({ reply: "Tabs." }));
     expect(ok.status).toBe(200);
     expect(await readFile(questionFile("q-20260922-nb0k"), "utf8")).toContain("## Answer\nTabs.\n");
   });

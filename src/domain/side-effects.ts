@@ -95,7 +95,7 @@ export function effectsForQuestionClosed(
           topic: topic.fm.id,
           from: "review",
           to: "active",
-          note: `rejected in ${q.id}: ${truncate(answer)}`,
+          note: `${chosen === null ? "follow-up" : "rejected"} in ${q.id}: ${truncate(answer)}`,
         },
       ];
     if (chosen !== null && (q.approve_options ?? []).includes(chosen))

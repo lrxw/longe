@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentConfig, AgentProvider } from "../../store/config.js";
+import type { SubagentUpdate } from "../subagents.js";
 
 /** What a provider needs to start a process for this chat. */
 export interface ProviderContext {
@@ -25,12 +26,14 @@ export interface ProviderHooks {
   ingest(streamJsonLine: string): void;
   error(text: string): void;
   /** A tool call, e.g. `longe/ask_question` or `command`. */
-  tool(name: string, input: unknown): void;
+  /** Repeated ids update the same tool entry as arguments arrive. */
+  tool(name: string, input: unknown, id?: string): void;
   /** A message that grows while it streams (same id: replace the text). */
   streamText(id: string, text: string): void;
   /** Models the provider offers, known once its process started. */
   models(list: string[]): void;
   usage(tokens: number, window?: number): void;
+  subagent(update: SubagentUpdate): void;
 }
 
 /** One running provider process as the runner sees it. */
@@ -61,6 +64,11 @@ export interface TerminalIntegration {
 export interface ChatProvider {
   /** Absent: the provider offers no hook longe can use. */
   terminal?: TerminalIntegration;
+  /**
+   * The provider reports the subagents it starts, in the runner's event model (see
+   * ../subagents.ts), so the Agents page can show them.
+   */
+  reportsSubagents?: boolean;
   id: AgentProvider;
   /** Shown in the provider select and in handoff messages. */
   label: string;

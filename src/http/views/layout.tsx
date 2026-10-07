@@ -1,6 +1,7 @@
 import type { Child } from "hono/jsx";
 import type { AgentStatus } from "../../app/agent.js";
 import { AgentBadge } from "./agent.js";
+import { AgentsBadge } from "./agents.js";
 import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./badge.js";
 
 export interface RepoNav {
@@ -67,7 +68,7 @@ export interface LayoutProps {
   project: string;
   /** Open questions across repos: title prefix and the Inbox badge. */
   inbox: InboxCounts;
-  active: "inbox" | "board" | "topic" | "chat" | "about";
+  active: "inbox" | "board" | "topic" | "chat" | "agents" | "about";
   /**
    * Hub mode: every registered repo, one avatar each in the header; each one is that
    * repo's board link. Undefined in single mode (a plain Board link instead).
@@ -150,6 +151,10 @@ export function Layout({
                 <a href={`${current.base}/chat`} class={active === "chat" ? "on" : ""}>
                   Chat
                   {agent ? <AgentBadge status={agent} base={current.base} /> : null}
+                </a>
+                <a href={`${current.base}/agents`} class={active === "agents" ? "on" : ""}>
+                  Agents
+                  {agent ? <AgentsBadge status={agent} base={current.base} /> : null}
                 </a>
               </nav>
             </aside>

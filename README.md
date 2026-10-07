@@ -56,6 +56,14 @@ The files are the source of truth.
   folder under your home folder (or takes an existing one), adds `.longe/` and opens its board.
 - **Any agent.** A standard MCP server (stdio and Streamable HTTP) plus a REST API with an
   OpenAPI document. Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline and others.
+- **Agents view.** The Agents menu shows the chat and the Claude Code or Codex subagents it starts,
+  with running/finished state, latest activity, elapsed time, and reported tool/token counts.
+  Foreground and background runs are tracked from the live chat stream; agents started
+  outside longe are not discovered. History resets on a new session, provider switch, or
+  server restart and keeps up to 30 entries (plus any additional running agents).
+  Codex uses reported child-thread states; a completed spawn call does not mean the child
+  finished. Activity/counts depend on child notifications, and completion may appear when
+  the parent next checks the child. OpenCode subagent tracking is follow-up work.
 - **Wake-up hooks.** Run a command when you answer a question, or feed new answers into the
   next Claude Code prompt.
 - **Desktop notifications** for new blocking questions, naming the repo; bursts are grouped.
@@ -216,6 +224,11 @@ todo cards up and down to set the order; new ones join at the bottom.
 | Human | queue (`backlog ↔ todo`), take work back (`active`, `needs-decision` or `review` → `todo` to queue it again, → `backlog` to park it; the chat is told to stop), approve, reject with a note, cancel, reopen |
 | longe | `active → needs-decision` while a blocking question is open, and back when it is answered; `review → active` when you pick a reject option or send a custom answer to a review question |
 
+Inbox questions have one reply box. Click an option to attach your text as a note, or
+**Send reply** to send it as a custom answer. Custom replies to review questions return
+the work to the agent as a follow-up; they are not labelled rejections. Only an explicit
+approval option approves the work. Neutral options (such as “I'll test later”) leave it in review.
+
 **Tools.** Agents use `list_topics`, `get_topic`, `create_topic`, `set_plan`, `set_status`,
 `add_decision`, `append_log`, `ask_question`, `check_answers`, `acknowledge_answers`,
 `wait_for_answer` and `withdraw_question`. Humans answer, approve, reject, cancel and reopen
@@ -311,6 +324,15 @@ config and models, and passes longe's MCP server to each session. A headless cha
 permission prompts: longe answers them by `permission_mode`, and commands opencode asks about are
 refused unless you allow them in opencode's own permission config or set `bypassPermissions`.
 **Copy resume command** gives `opencode --session <id>`.
+
+The context meter shows tokens in use and the model's window when opencode reports them over
+ACP. Updates may arrive only at the end of a turn; until the first report, it shows `context –`.
+For custom models without a reported window limit (for example, a local LM Studio model),
+longe uses opencode's last prompt input/cache token counts and shows the used tokens alone.
+It cannot show a capacity or percentage without a known limit. Model choices come from the
+agent's ACP configuration. If a turn ends without reply text or tool activity, the chat says
+so instead of displaying `done`; try the selected model in opencode itself or choose another
+model to diagnose that case.
 
 ### Codex chat
 

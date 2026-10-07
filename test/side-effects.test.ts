@@ -154,7 +154,7 @@ describe("§5 side effects", () => {
     ).toEqual([]);
   });
 
-  it("custom review feedback rejects even when it starts with an approval label", () => {
+  it("custom review feedback follows up even when it starts with an approval label", () => {
     const verify = {
       ...q(false, "answered"),
       options: ["Good", "Broken"],
@@ -170,7 +170,7 @@ describe("§5 side effects", () => {
         topic: "t1",
         from: "review",
         to: "active",
-        note: "rejected in q-20260922-aaaa: Good But please change the layout.",
+        note: "follow-up in q-20260922-aaaa: Good But please change the layout.",
       },
     ]);
     for (const status of ["active", "done", "cancelled", "needs-decision"] as const) {

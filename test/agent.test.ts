@@ -21,6 +21,7 @@ import {
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { ContextMeter } from "../src/http/views/agent.js";
 import {
   clearMessages,
   listMessages,
@@ -793,6 +794,85 @@ done
     await runner.close();
   });
 
+  it("tracks Claude children without changing the main session, usage or pending turns", async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 1,
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      stdin: Object.assign(new EventEmitter(), { write: () => true, end: () => {} }),
+      kill: () => {
+        setImmediate(() => child.emit("close", 0));
+        return true;
+      },
+    });
+    const emit = (message: unknown) =>
+      child.stdout.emit("data", Buffer.from(`${JSON.stringify(message)}\n`));
+    const runner = new AgentRunner(dir, {}, "children", (() => child) as unknown as typeof spawn);
+    try {
+      await runner.say("human", "delegate a review");
+      await waitFor(() => runner.status().alive && runner.status().pending === 1);
+      emit({ type: "system", subtype: "init", session_id: "main", model: "main-model" });
+      emit({
+        type: "assistant",
+        session_id: "main",
+        message: {
+          usage: { input_tokens: 100 },
+          content: [
+            {
+              type: "tool_use",
+              id: "a",
+              name: "Agent",
+              input: { subagent_type: "Explore", run_in_background: true },
+            },
+          ],
+        },
+      });
+      emit({
+        type: "system",
+        subtype: "init",
+        parent_tool_use_id: "a",
+        session_id: "child",
+        model: "child-model",
+      });
+      emit({
+        type: "assistant",
+        parent_tool_use_id: "a",
+        session_id: "child",
+        message: {
+          usage: { input_tokens: 90000 },
+          content: [{ type: "tool_use", name: "Read", input: { file_path: "child.ts" } }],
+        },
+      });
+      emit({
+        type: "result",
+        parent_tool_use_id: "a",
+        session_id: "child",
+        result: "child result",
+        total_cost_usd: 99,
+      });
+      expect(runner.status()).toMatchObject({
+        sessionId: "main",
+        modelInUse: "main-model",
+        contextTokens: 100,
+        pending: 1,
+        subagentsReported: true,
+      });
+      expect(runner.status().events.some((e) => e.text.includes("child"))).toBe(false);
+      expect(runner.status().subagents).toEqual([
+        expect.objectContaining({ id: "a", state: "running", tools: 1, activity: "Read child.ts" }),
+      ]);
+      emit({ type: "result", session_id: "main", result: "Launched review", is_error: false });
+      expect(runner.status().pending).toBe(0);
+      expect(runner.status().subagents?.[0]?.state).toBe("running");
+      await runner.close();
+      expect(runner.status().subagents?.[0]?.state).toBe("stopped");
+      await runner.reset();
+      expect(runner.status().subagents).toEqual([]);
+    } finally {
+      await runner.close();
+    }
+  });
+
   it("answersPrompt: one answer reads like before, several are listed", () => {
     const one = { question_id: "q-1", topic_id: "t", answer: "yes" };
     expect(answersPrompt([one])).toBe(answeredPrompt(one));
@@ -818,6 +898,148 @@ done
   });
 });
 
+describe("OpenCode AgentRunner", () => {
+  it.each([
+    { window: true, cache: 0, expected: 41000 },
+    { window: false, cache: 0, expected: 14523 },
+    { window: false, cache: 1000, expected: 15723 },
+  ])("renders and persists OpenCode context (window=$window, cache=$cache)", async (test) => {
+    const emit = (message: unknown) =>
+      child.stdout.emit("data", Buffer.from(`${JSON.stringify(message)}\n`));
+    const usage = (used: number) =>
+      emit({
+        method: "session/update",
+        params: {
+          sessionId: "opencode-session",
+          update: { sessionUpdate: "usage_update", used, size: 200000 },
+        },
+      });
+    const child = Object.assign(new EventEmitter(), {
+      pid: 1,
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      stdin: Object.assign(new EventEmitter(), {
+        writable: true,
+        write: (line: string) => {
+          const request = JSON.parse(line);
+          queueMicrotask(() => {
+            if (request.method === "initialize") emit({ id: request.id, result: {} });
+            if (request.method === "session/new") {
+              if (test.window) usage(41000); // before the session response
+              emit({
+                id: request.id,
+                result: {
+                  sessionId: "opencode-session",
+                  configOptions: [
+                    {
+                      id: "model",
+                      category: "model",
+                      type: "select",
+                      currentValue: "lmstudio/qwen/qwen3.5-35b-a3b",
+                      options: [{ value: "lmstudio/qwen/qwen3.5-35b-a3b", name: "Qwen 35B" }],
+                    },
+                  ],
+                },
+              });
+            }
+            if (request.method === "session/prompt") {
+              if (test.window) usage(41000);
+              // The reported failure: reasoning events, no reply text, prompt usage only.
+              emit({
+                method: "session/update",
+                params: {
+                  sessionId: "opencode-session",
+                  update: {
+                    sessionUpdate: "agent_thought_chunk",
+                    content: { type: "text", text: "thinking" },
+                  },
+                },
+              });
+              emit({
+                id: request.id,
+                result: {
+                  stopReason: "end_turn",
+                  usage: {
+                    inputTokens: 14523,
+                    outputTokens: 1,
+                    totalTokens: 14566,
+                    thoughtTokens: 42,
+                    ...(test.cache ? { cachedReadTokens: test.cache, cachedWriteTokens: 200 } : {}),
+                  },
+                },
+              });
+            }
+          });
+          return true;
+        },
+        end: () => {},
+      }),
+      kill: () => {
+        setImmediate(() => child.emit("close", 0));
+        return true;
+      },
+    });
+    const config = { provider: "opencode" as const };
+    const runner = new AgentRunner(dir, config, "test", (() => child) as unknown as typeof spawn);
+    try {
+      await runner.say("human", "hello");
+      await waitFor(() => !runner.busy());
+      expect(runner.status()).toMatchObject({
+        modelInUse: "lmstudio/qwen/qwen3.5-35b-a3b",
+        modelChoices: ["lmstudio/qwen/qwen3.5-35b-a3b"],
+        contextTokens: test.expected,
+        contextWindow: test.window ? 200000 : undefined,
+      });
+      expect(
+        runner
+          .status()
+          .events.some((e) => e.kind === "error" && e.text.includes("without sending a reply")),
+      ).toBe(true);
+      expect(runner.status().events.some((e) => e.text === "done")).toBe(false);
+      const html = ContextMeter({ status: runner.status() }).toString();
+      expect(html).toContain(`${Math.round(test.expected / 1000)}k`);
+      if (test.window) {
+        expect(html).toContain("200k");
+        expect(html).toContain("21%");
+      } else {
+        expect(html).not.toContain("%");
+      }
+      let notifiedTokens: number | undefined;
+      runner.on("agent:changed", () => {
+        notifiedTokens = runner.status().contextTokens;
+      });
+      usage(12000); // a late report must refresh the browser without another chat message
+      expect(notifiedTokens).toBe(12000);
+      const toolUpdate = (update: unknown) =>
+        emit({ method: "session/update", params: { sessionId: "opencode-session", update } });
+      toolUpdate({ sessionUpdate: "tool_call", toolCallId: "read-1", title: "read", rawInput: {} });
+      toolUpdate({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "read-1",
+        rawInput: { filePath: "/repo/main.ts" },
+      });
+      toolUpdate({ sessionUpdate: "tool_call_update", toolCallId: "read-1", status: "completed" });
+      const tools = runner.status().events.filter((e) => e.kind === "tool");
+      expect(tools).toHaveLength(1);
+      expect(tools[0]?.text).toContain("/repo/main.ts");
+      await runner.close();
+      const restored = new AgentRunner(dir, config, "test");
+      try {
+        await restored.setModel(undefined); // waits for saved session state to load
+        expect(restored.status()).toMatchObject({
+          sessionId: "opencode-session",
+          contextTokens: 12000,
+          contextWindow: 200000,
+        });
+      } finally {
+        await restored.close();
+      }
+    } finally {
+      await runner.close();
+    }
+  });
+});
+
 describe("Codex AgentRunner", () => {
   it("uses the shared chat, queues turns, persists an isolated session and resumes", async () => {
     await writeFile(
@@ -838,6 +1060,11 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     if (active) { send({id:m.id,error:{message:'overlapping turns'}}); return; }
     active = true;
     send({id:m.id,result:{turn:{id:'turn'}}});
+    send({method:'thread/tokenUsage/updated',params:{threadId:'codex-session',tokenUsage:{last:{totalTokens:77},modelContextWindow:4000}}});
+    send({method:'item/completed',params:{threadId:'codex-session',item:{id:'spawn',type:'collabAgentToolCall',tool:'spawnAgent',status:'completed',senderThreadId:'codex-session',receiverThreadIds:['child'],agentsStates:{child:{status:'running'}},prompt:'Review routes'}}});
+    send({method:'item/completed',params:{threadId:'child',item:{id:'child-text',type:'agentMessage',text:'Child review ready'}}});
+    send({method:'thread/tokenUsage/updated',params:{threadId:'child',tokenUsage:{last:{totalTokens:999},modelContextWindow:8000}}});
+    send({method:'turn/completed',params:{threadId:'child',turn:{status:'completed'}}});
     setTimeout(() => {
       send({method:'item/completed',params:{threadId:'codex-session',item:{id:String(Date.now()),type:'agentMessage',text:m.params.input[0].text}}});
       active = false;
@@ -863,6 +1090,17 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
         provider: "codex",
         sessionId: "codex-session",
         modelChoices: ["codex-test"],
+        contextTokens: 77,
+        contextWindow: 4000,
+        subagentsReported: true,
+        subagents: [
+          expect.objectContaining({
+            id: "child",
+            state: "done",
+            tokens: 999,
+            activity: "Child review ready",
+          }),
+        ],
       });
       expect(runner.status().costUsd).toBeUndefined();
       expect(runner.status().resumeCommand).toContain(" resume codex-session");

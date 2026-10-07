@@ -22,6 +22,7 @@ export const claude: ChatProvider = {
   staticModels: MODEL_CHOICES,
   tracksCost: true,
   foldsMessages: true,
+  reportsSubagents: true,
   args(ctx) {
     const { config, mcpUrl } = ctx;
     const mcp = mcpUrl

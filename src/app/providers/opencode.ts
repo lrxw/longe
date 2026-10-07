@@ -15,6 +15,8 @@ export const opencode: ChatProvider = {
   fileTag: ".opencode",
   tracksCost: false,
   foldsMessages: false,
+  // start and end of task subagents only; ACP does not forward the child's activity
+  reportsSubagents: true,
   args: ({ config }) => ["acp", ...(config.args ?? [])],
   attach(child, ctx, hooks) {
     const transport = new AcpTransport(
@@ -27,7 +29,10 @@ export const opencode: ChatProvider = {
           );
         },
         text: (id, text) => hooks.streamText(id, text),
-        tool: (name, input) => hooks.tool(name, input),
+        tool: (name, input, id) => hooks.tool(name, input, id),
+        usage: (tokens, window) => hooks.usage(tokens, window),
+        subagent: (update) => hooks.subagent(update),
+        contextFromPromptUsage: contextFromPromptUsage,
         result: (text, error) =>
           hooks.ingest(JSON.stringify({ type: "result", result: text, is_error: error })),
         error: (text) => hooks.error(text),
@@ -55,3 +60,13 @@ export const opencode: ChatProvider = {
   resumeCommand: (root, command, sessionId) =>
     `cd ${shellQuote(root)} && ${shellQuote(command)} --session ${shellQuote(sessionId)}`,
 };
+
+/** OpenCode's prompt response describes its last model call, even without a known window. */
+function contextFromPromptUsage(raw: unknown): number | undefined {
+  if (!raw || typeof raw !== "object") return;
+  const usage = raw as Record<string, unknown>;
+  const counts = [usage.inputTokens, usage.cachedReadTokens ?? 0, usage.cachedWriteTokens ?? 0];
+  if (!counts.every((n) => typeof n === "number" && Number.isSafeInteger(n) && n >= 0)) return;
+  const tokens = (counts as number[]).reduce((sum, n) => sum + n, 0);
+  return Number.isSafeInteger(tokens) ? tokens : undefined;
+}

@@ -97,24 +97,27 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
             })}
           </div>
         ) : null}
-        <textarea
-          name="answer"
-          rows={2}
-          placeholder={options.length ? "Or answer in your own words…" : "Answer…"}
-        />
-        {q.fm.approve_options?.length || q.fm.reject_options?.length ? (
-          <p class="meta">A custom answer sends work in review back to the agent.</p>
-        ) : null}
+        <label for={`reply-${q.id}`}>Reply</label>
         <div class="row">
           <textarea
-            name="note"
+            id={`reply-${q.id}`}
+            name="reply"
             rows={2}
-            placeholder="Note (optional): details, a reason, next steps…"
+            placeholder="Your reply or details for an option…"
+            aria-describedby={`reply-help-${q.id}`}
           />
           <button type="submit" class="primary">
-            Answer
+            Send reply
           </button>
         </div>
+        <p class="meta" id={`reply-help-${q.id}`}>
+          {options.length > 0
+            ? "Click an option to send it with your text, or Send reply to send just your text."
+            : "Send your answer to the agent."}
+          {q.fm.approve_options?.length || q.fm.reject_options?.length
+            ? " A reply returns work in review to the agent for follow-up. Approval requires an approval option."
+            : ""}
+        </p>
       </form>
     </article>
   );

@@ -607,12 +607,50 @@ form.answer {
 .row textarea {
   flex: 1;
 }
-/* the note grows with what you type; the button stays at its own height, at the bottom */
+/* the reply grows with what you type; keep its send button alongside it */
 form.answer .row {
   align-items: flex-end;
 }
+form.answer .row textarea {
+  min-width: 0;
+}
+form.answer .row button {
+  flex-shrink: 0;
+}
 .hookstatus {
   margin: 0 0 1rem;
+}
+
+/* Live agents: wrap long descriptions and activity on narrow screens. */
+.agents .subagents {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.agents .subagent {
+  min-width: 0;
+  padding: 0.9rem 1.2rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.agents .head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.agents .head > * {
+  min-width: 0;
+}
+.agents .desc,
+.agents .activity {
+  margin: 0.6rem 0 0;
+}
+.agents .activity code {
+  white-space: pre-wrap;
 }
 
 /* agent: prompt box + live transcript */

@@ -1,5 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { packageVersion } from "../cli/args.js";
+import { CodexSubagents } from "./codex-subagents.js";
+import type { SubagentUpdate } from "./subagents.js";
 
 interface RpcMessage {
   id?: number | string;
@@ -31,6 +33,7 @@ export interface CodexCallbacks {
   text(id: string, text: string): void;
   tool(name: string, input: unknown): void;
   usage(tokens: number, window?: number): void;
+  subagent(update: SubagentUpdate): void;
   result(text: string, error: boolean): void;
   error(text: string): void;
 }
@@ -48,11 +51,14 @@ export class CodexTransport {
   private finishTurn: (() => void) | undefined;
   private texts = new Map<string, string>();
   private lastText = "";
+  private readonly subagents: CodexSubagents;
 
   constructor(
     private child: Pick<ChildProcess, "stdin">,
     private callbacks: CodexCallbacks,
-  ) {}
+  ) {
+    this.subagents = new CodexSubagents((update) => callbacks.subagent(update));
+  }
 
   private write(value: unknown): void {
     if (this.dead || !this.child.stdin?.writable) throw new Error("Codex process is closed");
@@ -166,6 +172,7 @@ export class CodexTransport {
       return;
     }
     const p = msg.params ?? {};
+    this.subagents.ingest(msg.method, p, this.threadId);
     if (p.threadId && p.threadId !== this.threadId) return;
     switch (msg.method) {
       case "item/agentMessage/delta": {

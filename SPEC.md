@@ -153,6 +153,7 @@ Who has the ball: `backlog`, `needs-decision`, `review` → human. `todo`, `acti
 | review | done | **system** | Set automatically when the human answers a question on the topic with one of its `approve_options`. The note is `approved in <question id>: <answer>`. |
 | review | active | human | Reject. Requires a note; written to Log as `human — rejected: <note>`. |
 | review | active | **system** | Set automatically when the human answers a question on the topic with one of its `reject_options`. The note is `rejected in <question id>: <answer>`. |
+| review | active | **system** | A custom reply to a review question (one with approve/reject options) returns work to the agent. The note is `follow-up in <question id>: <answer>`; this is not an explicit rejection. |
 | any non-terminal | cancelled | **human only** | |
 | done, cancelled | active | human | Reopen. |
 | active | needs-decision | **system** | Set automatically when a blocking question is created for the topic. |

@@ -20,6 +20,7 @@ import { mountMcp } from "./mcp.js";
 import { vendorPath } from "./vendor.js";
 import { AboutPage } from "./views/about.js";
 import { AgentBadge, AgentPanel, AgentSection, TopicPrompt } from "./views/agent.js";
+import { AgentsBadge, AgentsPanel } from "./views/agents.js";
 import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./views/badge.js";
 import { BoardFragment } from "./views/board.js";
 import { AnsweredStub, InboxFragment, type InboxItem, QuestionCard } from "./views/inbox.js";
@@ -462,10 +463,20 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       const id = c.req.param("id");
       const form = await c.req.parseBody();
       const optionRaw = str(form.option_index);
+      const optionIndex =
+        optionRaw !== undefined && optionRaw !== "" ? Number(optionRaw) : undefined;
+      const reply = str(form.reply);
+      // One UI field: the clicked option determines whether its text is a note or
+      // the answer itself. Keep accepting forms already open before an upgrade.
+      const content =
+        reply === undefined
+          ? { answer: str(form.answer), note: str(form.note) }
+          : optionIndex === undefined
+            ? { answer: reply }
+            : { note: reply };
       const input = {
-        answer: str(form.answer),
-        option_index: optionRaw !== undefined && optionRaw !== "" ? Number(optionRaw) : undefined,
-        note: str(form.note),
+        ...content,
+        option_index: optionIndex,
       };
       try {
         await answerQuestion(w.ctx, id, input);
@@ -600,6 +611,37 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       const w = withRepo(c);
       if (isResponse(w)) return w;
       return c.html(await panel(w));
+    });
+    // the chat and the subagents it started
+    r.get("/agents", (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      remember(c, w.repo);
+      const status = w.ctx.agent.status();
+      return c.html(
+        <Layout
+          title={`Agents · ${w.repo.title}`}
+          project={w.repo.title}
+          inbox={inboxCounts()}
+          active="agents"
+          repos={switcher()}
+          current={w.view}
+          board={boardCounts(w.ctx)}
+          agent={status}
+        >
+          <AgentsPanel status={status} base={w.view.base} now={now()} />
+        </Layout>,
+      );
+    });
+    r.get("/fragments/agents", (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      return c.html(<AgentsPanel status={w.ctx.agent.status()} base={w.view.base} now={now()} />);
+    });
+    r.get("/fragments/agents-badge", (c) => {
+      const w = withRepo(c);
+      if (isResponse(w)) return w;
+      return c.html(<AgentsBadge status={w.ctx.agent.status()} base={w.view.base} />);
     });
     r.get("/fragments/agent-badge", (c) => {
       const w = withRepo(c);

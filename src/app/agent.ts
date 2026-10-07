@@ -23,6 +23,7 @@ import {
   type ProviderProcess,
   providerLabel,
 } from "./providers/index.js";
+import { type SubagentRun, SubagentTracker } from "./subagents.js";
 
 /** One line of the live transcript (what the agent process printed). */
 export interface AgentEvent {
@@ -75,6 +76,10 @@ export interface AgentStatus {
   modelInUse?: string | undefined;
   /** Slash commands of the session (names without the `/`); unknown before the first init. */
   slashCommands?: string[] | undefined;
+  /** Subagents the chat started in this server's lifetime, newest first (Agents page). */
+  subagents?: SubagentRun[];
+  /** The provider reports its subagents to longe (see ChatProvider.reportsSubagents). */
+  subagentsReported?: boolean;
 }
 
 export { MODEL_CHOICES, resumeCommand } from "./providers/claude.js";
@@ -226,7 +231,10 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   /** The provider's handle on the live process (how messages go in, output comes out). */
   private proc: ProviderProcess | undefined;
   private modelChoices: string[] = [];
+  /** Subagents the chat started (Agents page); kept in memory only. */
+  private readonly subagents = new SubagentTracker();
   private streamed = new Map<string, AgentEvent>();
+  private streamedTools = new Map<string, AgentEvent>();
   private switchingProvider = false;
   private changingControls = 0;
 
@@ -418,6 +426,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       defaultModel: this.config.model,
       modelInUse: this.runningModel,
       slashCommands: this.session?.slashCommands,
+      subagents: this.subagents.list(),
+      subagentsReported: this.chat.reportsSubagents === true,
     };
   }
 
@@ -485,6 +495,8 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       this.modelChoices = [];
       this.events = [];
       this.streamed.clear();
+      this.streamedTools.clear();
+      this.subagents.clear();
       this.processCost = 0;
       this.startedAt = undefined;
       this.exitCode = undefined;
@@ -648,6 +660,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       await this.close();
       this.session = undefined;
       this.events = [];
+      this.subagents.clear();
       this.processCost = 0;
       await this.saveSession();
       this.emit("agent:changed");
@@ -729,15 +742,28 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
     if (child.pid !== undefined) this.child = child;
     if (this.child) {
       this.streamed.clear();
+      this.streamedTools.clear();
       this.proc = chat.attach(child, ctx, {
         ingest: (line) => {
           // a result ends the turn: streamed texts are final from here on
-          if (line.includes('"type":"result"')) this.streamed.clear();
+          if (line.includes('"type":"result"')) {
+            this.streamed.clear();
+            this.streamedTools.clear();
+          }
           this.ingest(line);
         },
         error: (text) => this.push("error", text),
-        tool: (name, input) => {
-          this.push("tool", `${name} ${summarize(input)}`);
+        tool: (name, input, id) => {
+          const text = `${name} ${summarize(input)}`.trim();
+          const event = id ? this.streamedTools.get(id) : undefined;
+          if (event) {
+            event.text = text;
+            this.notifySoon();
+          } else {
+            this.push("tool", text);
+            const latest = this.events.at(-1);
+            if (id && latest) this.streamedTools.set(id, latest);
+          }
           if (name.endsWith("ask_question")) this.askedThisTurn = true;
         },
         streamText: (id, text) => {
@@ -754,11 +780,16 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         models: (list) => {
           this.modelChoices = list;
         },
+        subagent: (update) => {
+          this.subagents.update(update);
+          this.notifySoon();
+        },
         usage: (tokens, window) => {
           if (this.session) {
             this.session.contextTokens = tokens;
             this.session.contextWindow = window;
             void this.saveSession();
+            this.flushNotify();
           }
         },
       });
@@ -809,6 +840,7 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
         `agent exited (${code ?? "?"}) with ${this.pending} message(s) unanswered`,
       );
     this.pending = 0;
+    this.subagents.stopAll(); // they ran inside the process
     if (this.session && this.chat.tracksCost) {
       this.session.costUsd = (this.session.costUsd ?? 0) + this.processCost;
       this.processCost = 0;
@@ -863,7 +895,11 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
   private push(kind: AgentEvent["kind"], text: string): void {
     this.events.push({ at: new Date().toISOString(), kind, text });
     if (this.events.length > MAX_EVENTS) this.events.splice(0, this.events.length - MAX_EVENTS);
-    // coalesce UI refreshes while streaming
+    this.notifySoon();
+  }
+
+  /** Coalesces UI refreshes while streaming. */
+  private notifySoon(): void {
     if (!this.notifyTimer)
       this.notifyTimer = setTimeout(() => {
         this.notifyTimer = undefined;
@@ -912,8 +948,15 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       this.push("text", line);
       return;
     }
+    // a subagent's own messages: shown on the Agents page, not in the chat, and their
+    // usage is the subagent's context, not the chat's
+    if (SubagentTracker.parentOf(msg)) {
+      if (this.chat.reportsSubagents && this.subagents.ingest(msg)) this.notifySoon();
+      return;
+    }
     const sid = typeof msg.session_id === "string" ? msg.session_id : undefined;
     if (sid && this.session?.id !== sid) {
+      this.subagents.clear();
       this.session = {
         id: sid,
         costUsd: this.session?.costUsd,
@@ -921,12 +964,14 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
       };
       void this.saveSession();
     }
+    if (this.chat.reportsSubagents && this.subagents.ingest(msg)) this.notifySoon();
     switch (msg.type) {
       case "system":
+        if (msg.subtype === "init" && typeof msg.model === "string" && msg.model)
+          this.runningModel = msg.model;
         // one init per turn; only the first tells the human something new
         if (msg.subtype === "init" && !this.initSeen) {
           this.initSeen = true;
-          if (typeof msg.model === "string" && msg.model) this.runningModel = msg.model;
           const cmds = Array.isArray(msg.slash_commands)
             ? msg.slash_commands.filter((c): c is string => typeof c === "string")
             : undefined;
@@ -934,7 +979,9 @@ export class AgentRunner extends EventEmitter<AgentEvents> {
             this.session.slashCommands = cmds;
             void this.saveSession();
           }
-          this.push("system", `session ${sid ?? "?"} · model ${String(msg.model ?? "?")}`);
+          this.push("system", `session ${sid ?? "?"} · model ${String(msg.model || "?")}`);
+        } else if (msg.subtype === "init") {
+          this.flushNotify(); // ACP can update model configuration during a session
         } else if (msg.subtype === "compact_boundary") {
           // /compact or auto-compaction: the old context figure is stale until the next reply
           const meta = msg.compact_metadata as
