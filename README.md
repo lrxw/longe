@@ -33,7 +33,8 @@ Three connected views keep that loop visible:
   file on the project's board; commits carry a `Topic: <id>` line that links them back.
 - **The inbox** collects the questions agents ask you, with blocking ones first. You answer with
   one click, and the answer goes back to the agent.
-- **The chat** lets you talk to Claude Code, Codex or opencode from the board and send it through the open work.
+- **The chat** lets you talk to Claude Code, Codex or opencode (experimental) from the board and
+  send it through the open work.
 
 Agents reach longe through **MCP**, **REST** or by editing the files directly. longe runs
 entirely on your machine: it binds to `127.0.0.1`, has no database, no account and no telemetry.
@@ -48,7 +49,7 @@ The files are the source of truth.
   meanwhile. Markdown and code blocks are rendered.
 - **Review flow.** Agents submit topics for review; only you approve, reject (with a note),
   cancel or reopen.
-- **Chat with Claude Code, Codex or opencode.** One conversation per repository, with streaming output, model
+- **Chat with Claude Code, Codex or opencode (experimental).** One conversation per repository, with streaming output, model
   choice, context and cost display. "Work on board" sends the agent through the active topics,
   then the todo queue.
 - **One server, many repositories.** A single `longe serve` shows every registered repository:
@@ -56,23 +57,43 @@ The files are the source of truth.
   folder under your home folder (or takes an existing one), adds `.longe/` and opens its board.
 - **Any agent.** A standard MCP server (stdio and Streamable HTTP) plus a REST API with an
   OpenAPI document. Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline and others.
-- **Agents view.** The Agents menu shows the chat and the Claude Code or Codex subagents it starts,
+- **Agents view.** The Agents menu shows the chat and the subagents it starts (see
+  [Supported agents](#supported-agents) for what each agent reports),
   with running/finished state, latest activity, elapsed time, and reported tool/token counts.
   Foreground and background runs are tracked from the live chat stream; agents started
   outside longe are not discovered. History resets on a new session, provider switch, or
   server restart and keeps up to 30 entries (plus any additional running agents).
   Codex uses reported child-thread states; a completed spawn call does not mean the child
   finished. Activity/counts depend on child notifications, and completion may appear when
-  the parent next checks the child. OpenCode subagent tracking is follow-up work.
+  the parent next checks the child. opencode reports only when a subagent starts and ends.
 - **Wake-up hooks.** Run a command when you answer a question, or feed new answers into the
   next Claude Code prompt.
 - **Desktop notifications** for new blocking questions, naming the repo; bursts are grouped.
 - **Cleanup.** Archive or delete finished topics in one go.
 
+## Supported agents
+
+| Agent | Chat in longe | Board tools (MCP) | Inbox hook for its own sessions | Subagents on the Agents page |
+| --- | --- | --- | --- | --- |
+| [Claude Code](https://claude.com/claude-code) | yes | yes | yes: its questions go to the inbox | yes, with live activity |
+| [Codex CLI](https://developers.openai.com/codex/cli) | yes | yes | yes: reminded to ask in the inbox | yes, from child-thread states |
+| [opencode](https://opencode.ai) **(experimental)** | yes, over ACP | yes | no | start and end only |
+| Gemini CLI, Cursor, Cline and other MCP clients | no | yes | no | no |
+
+- **Chat in longe:** the agent runs as the board's chat, started and fed by longe
+  ([Chat](#chat), [Configuration](#configuration)).
+- **Board tools:** the agent uses the board through MCP from your terminal or IDE
+  ([Connect your agent](#connect-your-agent)); any MCP client works.
+- **Inbox hook:** `longe provider deep-integrate` sends the agent's own questions to the inbox
+  as far as its CLI allows. Optional; agents work without it.
+- **Experimental:** opencode works, but has seen little use with longe so far. It needs a model
+  with a configured context window for the context meter, and some local models end turns
+  without a reply. Expect rough edges and report them.
+
 ## Requirements
 
 - Node.js 22 or later
-- For the chat: [Claude Code](https://claude.com/claude-code) (`claude`) or [Codex CLI](https://developers.openai.com/codex/cli) (`codex`) on your `PATH`, signed in.
+- For the chat: [Claude Code](https://claude.com/claude-code) (`claude`), [Codex CLI](https://developers.openai.com/codex/cli) (`codex`) or [opencode](https://opencode.ai) (`opencode`, experimental) on your `PATH`, signed in.
 
 ## Install
 
@@ -307,7 +328,7 @@ agent:                           # the chat
   args: []                       # extra arguments, appended as given
 ```
 
-### opencode chat
+### opencode chat (experimental)
 
 Pick **opencode** in the Chat's Provider menu (your machine only), or make it the repository's
 default in `.longe/config.yml`:
