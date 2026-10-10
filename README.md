@@ -173,7 +173,16 @@ args = ["mcp", "--repo", "."]
 { "mcpServers": { "longe": { "command": "longe", "args": ["mcp", "--repo", "."] } } }
 ```
 
-HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, with the address above.
+**opencode** (`opencode.json` in the repository, or `~/.config/opencode/opencode.json`)
+
+```json
+{ "mcp": { "longe": { "type": "local", "command": ["longe", "mcp", "--repo", "."], "enabled": true } } }
+```
+
+The board chat does not need this: longe passes its MCP server to `opencode acp` itself.
+
+HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, opencode uses
+`{ "type": "remote", "url": … }`, with the address above.
 
 The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
