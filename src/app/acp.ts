@@ -248,7 +248,7 @@ export class AcpTransport {
         const empty = stop === "end_turn" && !this.lastText.trim() && !this.toolSeenThisTurn;
         this.callbacks.result(
           empty
-            ? "The agent ended the turn without sending a reply or running any tools. Check the selected model in its own client, or try another model."
+            ? "The agent ended the turn without sending a reply or running any tools. With local models this often means the context window overflowed: raise the model's context length (and set it as the model's limit in the agent's config), then start a new session. Otherwise check the selected model in its own client, or try another model."
             : stop === "end_turn"
               ? this.lastText ||
                 "The agent finished its tool calls without sending a written reply."
