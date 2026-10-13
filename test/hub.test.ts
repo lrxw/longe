@@ -123,6 +123,25 @@ describe("hub mode", () => {
     );
     expect(inbox).toContain('href="/r/blog/board"');
     expect(inbox).not.toContain('class="tabs"');
+    // several repos: project chips (only projects with questions), "All" lit, counts
+    expect(inbox).toContain('<nav class="inbox-filter" aria-label="Filter by project">');
+    expect(inbox).toMatch(
+      /class="chip on" href="\/"[^>]*aria-current="true"[^>]*>All<span class="count block"[^>]*>1</,
+    );
+    expect(inbox).toMatch(
+      /class="chip" href="\/\?repo=blog" hx-get="\/fragments\/inbox\?repo=blog" hx-target="#inbox" hx-swap="morph" hx-push-url="\/\?repo=blog"/,
+    );
+    expect(inbox).not.toContain("?repo=shop"); // shop has no questions: no chip
+    const blogOnly = await (await app.request("/?repo=blog")).text();
+    expect(blogOnly).toContain("Blog Q?");
+    expect(blogOnly).toContain('hx-get="/fragments/inbox?repo=blog"'); // live refresh keeps it
+    // the chosen chip is lit and clicking it again clears the filter
+    expect(blogOnly).toMatch(/class="chip on" href="\/" [^>]*aria-current="true"[^>]*>.*?Blog/s);
+    const shopOnly = await (await app.request("/?repo=shop")).text();
+    expect(shopOnly).not.toContain("Blog Q?");
+    expect(shopOnly).toContain("Nothing is waiting on you in this project.");
+    expect(shopOnly).toContain("<title>(1) Inbox · longe</title>"); // badge stays unfiltered
+    expect(await (await app.request("/fragments/inbox?repo=nope")).text()).toContain("Blog Q?");
 
     // the board you visited last is remembered; /board follows it
     const cookie = boardRes.headers.get("set-cookie") ?? "";

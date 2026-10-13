@@ -23,7 +23,14 @@ import { AgentBadge, AgentPanel, AgentSection, TopicPrompt } from "./views/agent
 import { AgentsBadge, AgentsPanel } from "./views/agents.js";
 import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./views/badge.js";
 import { BoardFragment } from "./views/board.js";
-import { AnsweredStub, InboxFragment, type InboxItem, QuestionCard } from "./views/inbox.js";
+import {
+  AnsweredStub,
+  type InboxFilter,
+  InboxFragment,
+  type InboxItem,
+  parseInboxFilter,
+  QuestionCard,
+} from "./views/inbox.js";
 import { Layout, type RepoNav, ReposNav } from "./views/layout.js";
 import { NewProjectForm, OverviewStrip, type RepoOverview } from "./views/overview.js";
 import { StatusActions, TopicFragment } from "./views/topic.js";
@@ -216,8 +223,14 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       }
       return { nav: nav(hub, r), counts, blocking, open };
     });
+  /** The inbox filter from `?repo=…`. */
+  const inboxFilter = (c: Context): InboxFilter =>
+    parseInboxFilter(
+      { repo: c.req.query("repo") },
+      hub.live().map((r) => r.name),
+    );
   /** The one inbox: everything waiting on you, across repos. */
-  const inboxFragment = () => (
+  const inboxFragment = (filter: InboxFilter) => (
     <InboxFragment
       items={inboxItems()}
       now={now()}
@@ -225,6 +238,8 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
       hooks={inboxHooks()}
       missing={inboxMissing()}
       overview={hub.mode === "hub" ? <OverviewStrip repos={overview()} /> : null}
+      repos={hub.live().map((r) => nav(hub, r))}
+      filter={filter}
     />
   );
   const projectLabel = () =>
@@ -260,8 +275,9 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     return r?.ctx ? r : hub.live()[0];
   };
 
-  app.get("/", (c) =>
-    c.html(
+  app.get("/", (c) => {
+    const filter = inboxFilter(c);
+    return c.html(
       <Layout
         title="Inbox"
         project={projectLabel()}
@@ -270,10 +286,10 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
         repos={switcher()}
         board={singleBoard()}
       >
-        {inboxFragment()}
+        {inboxFragment(filter)}
       </Layout>,
-    ),
-  );
+    );
+  });
   // ---- about: the big logo, version and links ---------------------------------
   let pkg: Promise<{ version?: string; description?: string; homepage?: string }> | undefined;
   app.get("/about", async (c) => {
@@ -338,7 +354,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     });
   }
 
-  app.get("/fragments/inbox", (c) => c.html(inboxFragment()));
+  app.get("/fragments/inbox", (c) => c.html(inboxFragment(inboxFilter(c))));
   app.get("/fragments/inbox-badge", (c) => c.html(<InboxBadge counts={inboxCounts()} />));
   app.get("/fragments/repos", (c) =>
     c.html(<ReposNav repos={repoNavs()} current={c.req.query("current")} />),

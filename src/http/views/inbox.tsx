@@ -166,6 +166,103 @@ export function HookStatusLine({
   );
 }
 
+/** What the inbox shows; lives in the URL (`/?repo=…`). */
+export interface InboxFilter {
+  repo?: string | undefined;
+}
+
+/** Reads the filter from query values; an unknown repo is ignored. */
+export function parseInboxFilter(
+  query: { repo?: string | undefined },
+  repos: string[],
+): InboxFilter {
+  return { repo: query.repo && repos.includes(query.repo) ? query.repo : undefined };
+}
+
+/** `?repo=…`, or "" for no filter. */
+export function inboxQuery(f: InboxFilter): string {
+  return f.repo ? `?${new URLSearchParams({ repo: f.repo })}` : "";
+}
+
+export function filterInbox(items: InboxItem[], f: InboxFilter): InboxItem[] {
+  return f.repo ? items.filter((i) => i.repo.name === f.repo) : items;
+}
+
+/**
+ * One chip per project that has questions, with its count (red when one blocks), plus
+ * "All". A chip is a link (`/?repo=…`, so a filter can be reloaded and bookmarked) that
+ * htmx swaps in place; clicking the chosen chip again clears the filter. Several repos
+ * only, and only while something waits.
+ */
+function ProjectChips({
+  items,
+  repos,
+  filter,
+}: {
+  items: InboxItem[];
+  repos: RepoNav[];
+  filter: InboxFilter;
+}) {
+  if (repos.length < 2 || items.length === 0) return null;
+  const counts = new Map<string, { open: number; blocking: number }>();
+  for (const i of items) {
+    const c = counts.get(i.repo.name) ?? { open: 0, blocking: 0 };
+    c.open++;
+    if (i.q.fm.blocking) c.blocking++;
+    counts.set(i.repo.name, c);
+  }
+  const allBlocking = items.filter((i) => i.q.fm.blocking).length;
+  const chip = (
+    href: string,
+    on: boolean,
+    label: Child,
+    n: number,
+    blocking: number,
+    style?: string,
+  ) => (
+    <a
+      class={`chip${on ? " on" : ""}`}
+      href={`/${href}`}
+      hx-get={`/fragments/inbox${href}`}
+      hx-target="#inbox"
+      hx-swap="morph"
+      hx-push-url={`/${href}`}
+      aria-current={on ? "true" : undefined}
+      style={style}
+    >
+      {label}
+      <span
+        class={`count${blocking > 0 ? " block" : ""}`}
+        title={blocking > 0 ? `${blocking} blocking` : undefined}
+      >
+        {n}
+      </span>
+    </a>
+  );
+  return (
+    <nav class="inbox-filter" aria-label="Filter by project">
+      {chip("", !filter.repo, "All", items.length, allBlocking)}
+      {repos
+        .filter((r) => counts.has(r.name) || r.name === filter.repo)
+        .map((r) => {
+          const c = counts.get(r.name) ?? { open: 0, blocking: 0 };
+          const on = filter.repo === r.name;
+          return chip(
+            on ? "" : inboxQuery({ repo: r.name }),
+            on,
+            <>
+              <Avatar repo={r} />
+              {r.title}
+            </>,
+            c.open,
+            c.blocking,
+            `--repo:${r.color}`,
+          );
+        })}
+    </nav>
+  );
+}
+
 /** Id of the most recently asked question. */
 function newest(items: InboxItem[]): string {
   return items.reduce((a, b) => (b.q.fm.asked_at > a.q.fm.asked_at ? b : a)).q.id;
@@ -178,6 +275,8 @@ export function InboxFragment({
   hooks,
   missing,
   overview,
+  repos = [],
+  filter = {},
 }: {
   items: InboxItem[];
   now: Date;
@@ -185,13 +284,19 @@ export function InboxFragment({
   hooks: { label?: string | undefined; status: HookStatus }[];
   missing: RepoNav[];
   overview?: Child;
+  /** The live repos, for the project chips. */
+  repos?: RepoNav[];
+  filter?: InboxFilter;
 }) {
-  const blocking = items.filter((i) => i.q.fm.blocking);
-  const other = items.filter((i) => !i.q.fm.blocking);
+  const total = items.length;
+  const shown = filterInbox(items, filter);
+  const blocking = shown.filter((i) => i.q.fm.blocking);
+  const other = shown.filter((i) => !i.q.fm.blocking);
   return (
     <div
       id="inbox"
-      hx-get="/fragments/inbox"
+      // a live refresh keeps the filter
+      hx-get={`/fragments/inbox${inboxQuery(filter)}`}
       hx-trigger="sse:changed"
       hx-sync="this:replace"
       hx-swap="morph"
@@ -214,7 +319,13 @@ export function InboxFragment({
       {hooks.map((h) => (
         <HookStatusLine hooks={h.status} label={h.label} now={now} />
       ))}
-      {items.length === 0 ? <p class="empty">Nothing is waiting on you.</p> : null}
+      {total === 0 ? <p class="empty">Nothing is waiting on you.</p> : null}
+      <ProjectChips items={items} repos={repos} filter={filter} />
+      {total > 0 && shown.length === 0 ? (
+        <p class="empty">
+          Nothing is waiting on you in this project. <a href="/">Show all</a>
+        </p>
+      ) : null}
       {blocking.map((i) => (
         <QuestionCard {...i} now={now} />
       ))}

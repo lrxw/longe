@@ -459,6 +459,66 @@ details[open] > summary::before {
 details > summary::-webkit-details-marker {
   display: none;
 }
+/* inbox: project chips */
+.inbox-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.25rem 0 1rem;
+}
+.inbox-filter .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.35rem 0.25rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  font-size: 0.9em;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    box-shadow 0.12s;
+}
+.inbox-filter .chip:has(.avatar) {
+  padding-left: 0.3rem;
+}
+.inbox-filter .chip .avatar {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.6rem;
+  border-radius: 999px;
+}
+.inbox-filter .chip:hover {
+  text-decoration: none;
+  border-color: var(--repo, var(--accent));
+}
+.inbox-filter .chip:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 1px;
+}
+.inbox-filter .chip.on {
+  border-color: var(--repo, var(--accent));
+  background: color-mix(in srgb, var(--repo, var(--accent)) 12%, var(--card));
+  box-shadow: inset 0 0 0 1px var(--repo, var(--accent));
+}
+.inbox-filter .count {
+  min-width: 1.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-align: center;
+}
+.inbox-filter .count.block {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
 details.nonblocking {
   margin-top: 1.25rem;
   border-top: 1px solid var(--line);

@@ -174,6 +174,15 @@ describe("pages", () => {
     expect(html).toMatch(/<details data-key="context:q-20260922-bl0k">\s*<summary>Context/);
   });
 
+  it("inbox filter: one repo shows no project filter and ignores ?repo", async () => {
+    const all = await (await app.request("/")).text();
+    expect(all).not.toContain('class="inbox-filter"');
+    const bogus = await (await app.request("/?repo=nope")).text();
+    expect(bogus).toContain("Tabs or spaces?");
+    expect(bogus).toContain('hx-get="/fragments/inbox"');
+    expect(bogus).not.toContain('class="chip');
+  });
+
   it("inbox empty state", async () => {
     await rm(questionFile("q-20260922-bl0k"));
     await rm(questionFile("q-20260922-nb0k"));
