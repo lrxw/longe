@@ -1,0 +1,11 @@
+{
+  "name": "longe-mods",
+  "owner": { "name": "longe" },
+  "plugins": [
+    {
+      "name": "longe-inbox",
+      "source": "./longe-inbox",
+      "description": "longe's question inbox inside Claude Code"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "longe-inbox",
+  "version": "0.2.1",
+  "description": "Shows longe's question inbox inside Claude Code: a band above the prompt, a pane to read and answer questions, and /longe.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "port": {
+      "type": "number",
+      "title": "longe port",
+      "description": "Port of the local longe server (longe serve), used to send answers.",
+      "default": 7311
+    }
+  }
+}

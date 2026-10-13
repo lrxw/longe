@@ -24,7 +24,7 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && (test ! -f mods/longe-inbox/.claude-plugin/types/tsconfig.json || tsc -p mods/longe-inbox)",
     "prepublishOnly": "pnpm lint && pnpm typecheck && pnpm test"
   },
   "packageManager": "pnpm@8.15.9",
