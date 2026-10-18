@@ -136,7 +136,10 @@ describe("pages", () => {
     expect(html).toContain(
       '<details class="nonblocking" data-key="inbox:nonblocking:q-20260922-nb0k" data-default-open',
     );
-    expect(html).toContain("Assumption: <em>spaces</em>");
+    expect(html).toContain("Working on: <em>spaces</em>");
+    // labels and icons come from the shared inbox tokens
+    expect(html).toContain('<span class="tag block">● blocking</span>');
+    expect(html).toContain('<span class="tag nonblocking">○ non-blocking</span>');
     expect(html).toContain('href="/topics/billing"');
     expect(html).toContain('name="option_index" value="1"');
     const answerForms = [...html.matchAll(/<form class="answer"[^>]*>([\s\S]*?)<\/form>/g)];
@@ -172,6 +175,25 @@ describe("pages", () => {
     );
     // a context without code stays collapsed
     expect(html).toMatch(/<details data-key="context:q-20260922-bl0k">\s*<summary>Context/);
+  });
+
+  it("GET /api/v1/inbox: the view model, in inbox order, with tokens", async () => {
+    const res = await app.request("/api/v1/inbox");
+    expect(res.status).toBe(200);
+    const view = (await res.json()) as {
+      version: number;
+      tokens: { text: { workingOn: string } };
+      counts: { total: number; blocking: number };
+      questions: { id: string; kind: string; topic: string | null; options: { role: string }[] }[];
+    };
+    expect(view.version).toBe(1);
+    expect(view.tokens.text.workingOn).toBe("Working on:");
+    expect(view.counts).toMatchObject({ total: 2, blocking: 1 });
+    expect(view.questions.map((q) => [q.id, q.kind, q.topic])).toEqual([
+      ["q-20260922-bl0k", "blocking", "billing"],
+      ["q-20260922-nb0k", "nonBlocking", null],
+    ]);
+    expect(view.questions[0]?.options.map((o) => o.role)).toEqual(["neutral", "neutral"]);
   });
 
   it("inbox filter: one repo shows no project filter and ignores ?repo", async () => {

@@ -17,6 +17,14 @@
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
   --shadow-lg: 0 4px 12px rgba(16, 24, 40, 0.12);
   --radius: 10px;
+  /* inbox roles (src/domain/inbox-view.ts INBOX_TOKENS); the Claude Code mod maps the
+     same roles to its theme keys. They follow the light/dark values above. */
+  --role-blocking: var(--block);
+  --role-non-blocking: var(--muted);
+  --role-approve: var(--ok);
+  --role-reject: var(--danger);
+  --role-muted: var(--muted);
+  --role-accent: var(--accent);
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -423,7 +431,10 @@ footer.hints kbd {
 }
 .tag.block {
   background: var(--danger-soft);
-  color: var(--danger);
+  color: var(--role-blocking);
+}
+.tag.nonblocking {
+  color: var(--role-non-blocking);
 }
 .tag.ok {
   background: var(--ok-soft);
@@ -630,11 +641,11 @@ form.answer {
 }
 /* picking it sends the topic back from review to active */
 .options button.reject {
-  border-color: var(--danger);
-  color: var(--danger);
+  border-color: var(--role-reject);
+  color: var(--role-reject);
 }
 .options button.reject:hover {
-  background: var(--danger);
+  background: var(--role-reject);
   color: #fff;
 }
 /* delete a question: quiet until you point at it */
@@ -652,11 +663,11 @@ form.answer {
 }
 /* picking it approves the work: the topic moves to done */
 .options button.approve {
-  border-color: var(--ok);
-  color: var(--ok);
+  border-color: var(--role-approve);
+  color: var(--role-approve);
 }
 .options button.approve:hover {
-  background: var(--ok);
+  background: var(--role-approve);
   color: #fff;
 }
 .row {

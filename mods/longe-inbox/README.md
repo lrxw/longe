@@ -16,11 +16,18 @@ It runs alongside the web board: both read the same files, so you can answer in 
 
 ## How it works
 
-- **Reading**: the mod reads the board files directly, the way longe does. It takes repositories
-  from `~/.config/longe/repos.yml`, each repository's `id` from `.longe/config.yml`, and open
-  questions from `~/.longe/projects/<id>/questions/*.md`. `LONGE_HOME` and `XDG_CONFIG_HOME` are
-  respected. The inbox therefore shows even while `longe serve` is stopped. It refreshes every
-  5 seconds and after each Claude turn, and re-reads only the files that changed.
+- **Reading**: while longe runs, the mod draws longe's inbox view model
+  (`GET http://127.0.0.1:7311/api/v1/inbox`): the same order, labels, icons and option roles
+  (✓ approves, ✗ sends back) as the web inbox. Roles map to Claude Code theme keys (blocking →
+  `warning`, approve → `success`, reject → `error`); project colours are the same hex values.
+  The view carries a version; one this mod does not know makes it fall back to the files and
+  say so. The shared contract is `src/domain/inbox-view.ts` in longe; `hooks/tokens.ts` is the
+  mod's copy, kept equal by longe's tests.
+- **Offline**: while `longe serve` is stopped, the mod reads the board files directly, the way
+  longe does. It takes repositories from `~/.config/longe/repos.yml`, each repository's `id`
+  from `.longe/config.yml`, and open questions from `~/.longe/projects/<id>/questions/*.md`.
+  `LONGE_HOME` and `XDG_CONFIG_HOME` are respected. The pane says "(from files)". It refreshes
+  every 5 seconds and after each Claude turn, and re-reads only the files that changed.
 - **Answering**: answers go to `POST http://127.0.0.1:7311/api/v1/answer_question` with `repo`,
   `id` and either `option_index` or `answer`. longe then applies its own rules: it unblocks the
   topic, approves or rejects a review, and wakes the chat. If longe isn't running, the card tells

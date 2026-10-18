@@ -1,7 +1,9 @@
 // longe-inbox: longe's question inbox inside Claude Code.
 //
-// Reads the boards straight from disk (the files are longe's source of
-// truth), so the inbox shows even while `longe serve` is not running.
+// Draws longe's inbox view model (GET /api/v1/inbox): the same order, labels,
+// icons and meanings as the web inbox, with roles mapped to Claude Code theme
+// keys. While `longe serve` is not running it reads the boards straight from
+// disk (the files are longe's source of truth), so the inbox still shows.
 // Answers go through longe's REST API, so longe applies its own rules
 // (unblocking topics, review approve/reject, waking the chat).
 
@@ -11,18 +13,31 @@ import { atom, read, update } from "claude-code";
 import type { LongeInboxProblem, LongeInboxQuestion, LongeInboxSnapshot } from "../types";
 import {
   ago,
+  fromView,
   inboxOrder,
   parseQuestionFile,
   parseRegistry,
   parseYamlMap,
   toOpenQuestion,
 } from "./parse";
+import { INBOX_TOKENS, INBOX_VIEW_VERSION, type InboxViewWire, THEME } from "./tokens";
 
 const PANE = "longe-inbox";
 const PANE_TITLE = "longe inbox";
 const POLL_MS = 5000;
+// the size the pane asks for: docked beside a fullscreen transcript it opens this
+// wide, inline above the prompt this tall. A size the person dragged to still wins.
+const PANE_COLUMNS = 100;
+const PANE_ROWS = 24;
 
-const EMPTY: LongeInboxSnapshot = { questions: [], problems: [], scannedAt: 0, note: null };
+const EMPTY: LongeInboxSnapshot = {
+  questions: [],
+  problems: [],
+  scannedAt: 0,
+  note: null,
+  tokens: INBOX_TOKENS,
+  source: "files",
+};
 const inbox = atom({ plugin: "longe-inbox", key: "inbox" } as const, EMPTY);
 const flash = atom({ plugin: "longe-inbox", key: "flash" } as const, {});
 const isBandHidden = atom({ plugin: "longe-inbox", key: "isBandHidden" } as const, false);
@@ -45,7 +60,18 @@ async function scan($: EngineInterface): Promise<void> {
   if (isScanning) return;
   isScanning = true;
   try {
-    const snapshot = await readBoards($);
+    const view = await fetchView($);
+    const snapshot =
+      typeof view === "object" && view !== null
+        ? view
+        : {
+            ...(await readBoards($)),
+            ...(typeof view === "number"
+              ? {
+                  note: `longe sends inbox view v${view}, this mod reads v${INBOX_VIEW_VERSION}: showing the files instead. Update with: longe provider deep-integrate claude --mod`,
+                }
+              : {}),
+          };
     await update($, inbox, () => snapshot);
     const ids = new Set(snapshot.questions.map((q) => q.id));
     if (seen) {
@@ -63,6 +89,30 @@ async function scan($: EngineInterface): Promise<void> {
     seen = ids;
   } finally {
     isScanning = false;
+  }
+}
+
+/**
+ * The running longe's inbox view; null when longe is not reachable or sends something
+ * else, the view's version when it is one this mod does not read.
+ */
+async function fetchView($: EngineInterface): Promise<LongeInboxSnapshot | number | null> {
+  try {
+    const res = await $.http.fetch(`${base}/api/v1/inbox`, { method: "GET" });
+    if (!res.ok) return null;
+    const view = JSON.parse(res.text) as Partial<InboxViewWire>;
+    if (typeof view.version !== "number" || !Array.isArray(view.questions)) return null;
+    if (view.version !== INBOX_VIEW_VERSION) return view.version;
+    return {
+      questions: view.questions.map(fromView),
+      problems: Array.isArray(view.problems) ? view.problems : [],
+      scannedAt: await $.clock.now(),
+      note: null,
+      tokens: view.tokens ?? INBOX_TOKENS,
+      source: "server",
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -107,7 +157,13 @@ async function readVersion($: EngineInterface): Promise<string> {
 }
 
 async function openPane($: EngineInterface): Promise<void> {
-  await $.ui.open({ id: PANE, title: PANE_TITLE, focus: true });
+  await $.ui.open({
+    id: PANE,
+    title: PANE_TITLE,
+    focus: true,
+    columns: PANE_COLUMNS,
+    rows: PANE_ROWS,
+  });
 }
 
 async function openBoard($: EngineInterface, path: string): Promise<void> {
@@ -155,15 +211,18 @@ export const register: Register = (on, options) => {
   // ---- the band above the prompt -------------------------------------------
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const { questions } = await read($, inbox);
-    if (questions.length === 0 || e.props.hasSurvey || (await read($, isBandHidden)))
-      return next(e);
+    const first = questions[0];
+    if (!first || e.props.hasSurvey || (await read($, isBandHidden))) return next(e);
     const { Box, Button, Text } = $.ui.resolve(e);
-    const first = questions[0]!;
     const blocking = questions.filter((q) => q.blocking).length;
     const room = Math.max(10, (e.props.bodyColumns ?? 80) - 48);
     return (
       <Box flexDirection="row" gap={1} alignItems="center">
-        <Text backgroundColor={blocking > 0 ? "warning" : "suggestion"} color="inverseText" bold>
+        <Text
+          backgroundColor={blocking > 0 ? THEME.blocking : THEME.nonBlocking}
+          color="inverseText"
+          bold
+        >
           {" longe "}
         </Text>
         <Text bold>{counts(questions)}</Text>
@@ -191,15 +250,17 @@ export const register: Register = (on, options) => {
     const width = Math.max(30, e.props.bodyColumns);
     const qs = snap.questions;
     const current = qs.find((q) => q.id === chosen) ?? qs[0];
+    const { roles, text } = snap.tokens;
 
     const header = (
       <Box flexDirection="column" marginBottom={1}>
         <Box flexDirection="row" gap={1} alignItems="center">
-          <Text backgroundColor="claude" color="inverseText" bold>
+          <Text backgroundColor={THEME.accent} color="inverseText" bold>
             {" longe "}
           </Text>
           <Text bold>inbox</Text>
           {ver !== "" && <Text dimColor>v{ver}</Text>}
+          {snap.source === "files" && <Text dimColor>(from files: longe is not running)</Text>}
           <Box flexGrow={1} />
           <Button key="refresh" label="↻ Refresh" plain dimColor onPress={() => scan($)} />
           <Button key="board" label="↗ Board" plain dimColor onPress={() => openBoard($, "/")} />
@@ -207,12 +268,15 @@ export const register: Register = (on, options) => {
         {qs.length > 0 && (
           <Box flexDirection="row" gap={2} marginTop={1}>
             {qs.some((q) => q.blocking) && (
-              <Text color="warning" bold>
-                ● {qs.filter((q) => q.blocking).length} blocking
+              <Text color={THEME.blocking} bold>
+                {roles.blocking.icon} {qs.filter((q) => q.blocking).length} {roles.blocking.label}
               </Text>
             )}
             {qs.some((q) => !q.blocking) && (
-              <Text color="suggestion">○ {qs.filter((q) => !q.blocking).length} non-blocking</Text>
+              <Text color={THEME.nonBlocking}>
+                {roles.nonBlocking.icon} {qs.filter((q) => !q.blocking).length}{" "}
+                {roles.nonBlocking.label}
+              </Text>
             )}
             {new Set(qs.map((q) => q.project)).size > 1 && (
               <Text dimColor>{new Set(qs.map((q) => q.project)).size} projects</Text>
@@ -224,11 +288,11 @@ export const register: Register = (on, options) => {
 
     const empty = (
       <Box flexDirection="column" alignItems="center" paddingY={2}>
-        <Text color="success" bold>
-          ✓ Inbox zero
+        <Text color={THEME.approve} bold>
+          {roles.approve.icon} Inbox zero
         </Text>
         <Text dimColor>
-          {snap.note ?? "Nothing is waiting on you. Questions your agents ask in longe land here."}
+          {snap.note ?? `${text.empty} Questions your agents ask in longe land here.`}
         </Text>
       </Box>
     );
@@ -246,9 +310,9 @@ export const register: Register = (on, options) => {
               hover={{ backgroundColor: "promptBorder" }}
             >
               <Button key={`sel-${q.id}`} plain onPress={() => update($, selected, () => q.id)}>
-                <Text color={isOn ? "claude" : "inactive"}>{isOn ? "▌" : " "}</Text>
-                <Text color={q.blocking ? "warning" : "suggestion"}>
-                  {q.blocking ? "● " : "○ "}
+                <Text color={isOn ? THEME.accent : THEME.muted}>{isOn ? "▌" : " "}</Text>
+                <Text color={q.blocking ? THEME.blocking : THEME.nonBlocking}>
+                  {q.blocking ? roles.blocking.icon : roles.nonBlocking.icon}{" "}
                 </Text>
                 <Text bold={isOn} color={q.color ?? undefined}>
                   {q.project}
@@ -266,25 +330,26 @@ export const register: Register = (on, options) => {
     );
 
     const card = (q: LongeInboxQuestion) => {
-      const isOpen = expanded[q.id] ?? q.context.includes("```");
+      const isOpen = expanded[q.id] ?? q.contextOpen;
+      const kind = q.blocking ? "blocking" : "nonBlocking";
       const note = notes[q.id];
       return (
         <Box
           key={`q-${q.id}`}
           flexDirection="column"
           borderStyle="round"
-          borderColor={q.blocking ? "warning" : (q.color ?? "subtle")}
+          borderColor={q.blocking ? THEME.blocking : (q.color ?? "subtle")}
           paddingX={1}
         >
           <Box flexDirection="row" gap={1} flexWrap="wrap">
-            <Text backgroundColor={q.blocking ? "warning" : "suggestion"} color="inverseText" bold>
-              {q.blocking ? " BLOCKING " : " NON-BLOCKING "}
+            <Text backgroundColor={THEME[kind]} color="inverseText" bold>
+              {` ${roles[kind].icon} ${roles[kind].label.toUpperCase()} `}
             </Text>
             <Text color={q.color ?? undefined} bold>
               {q.project}
             </Text>
             <Text dimColor>›</Text>
-            <Text>{q.topic ?? "project-wide"}</Text>
+            <Text>{q.topic ?? text.projectWide}</Text>
             <Box flexGrow={1} />
             <Text dimColor>
               {q.askedBy} · {ago(q.askedAt, now)} ago
@@ -301,7 +366,7 @@ export const register: Register = (on, options) => {
                 key={`ctx-toggle-${q.id}`}
                 plain
                 dimColor
-                label={isOpen ? "▾ Context" : "▸ Context"}
+                label={`${isOpen ? "▾" : "▸"} ${text.context}`}
                 onPress={() => update($, openContext, (m) => ({ ...m, [q.id]: !isOpen }))}
               />
               {isOpen && (
@@ -314,7 +379,7 @@ export const register: Register = (on, options) => {
 
           {q.assumption && (
             <Box marginTop={1} flexDirection="row" gap={1}>
-              <Text color="suggestion">Working on:</Text>
+              <Text color={THEME.nonBlocking}>{text.workingOn}</Text>
               <Text italic>{q.assumption}</Text>
             </Box>
           )}
@@ -322,14 +387,13 @@ export const register: Register = (on, options) => {
           {q.options.length > 0 && (
             <Box flexDirection="row" flexWrap="wrap" gap={1} marginTop={1}>
               {q.options.map((label, i) => {
-                const isApprove = q.approveOptions.includes(label);
-                const isReject = q.rejectOptions.includes(label);
+                const role = q.optionRoles[i] ?? "neutral";
                 return (
                   <Button
                     key={`opt-${q.id}-${i}`}
                     hotkey={i < 9 ? String(i + 1) : undefined}
-                    variant={isApprove ? "primary" : undefined}
-                    label={`${isApprove ? "✓ " : isReject ? "✗ " : ""}${label}`}
+                    variant={role === "approve" ? "primary" : undefined}
+                    label={`${role === "neutral" ? "" : `${roles[role].icon} `}${label}`}
                     onPress={() => answer($, q, { option_index: i })}
                   />
                 );
@@ -341,7 +405,7 @@ export const register: Register = (on, options) => {
             <Box marginTop={1}>
               <Input
                 key={`reply-${q.id}`}
-                label="Reply › "
+                label={`${text.reply} › `}
                 placeholder={
                   q.options.length > 0 ? "or write your own answer…" : "write your answer…"
                 }
@@ -356,8 +420,8 @@ export const register: Register = (on, options) => {
 
           {note && (
             <Box marginTop={1}>
-              <Text color={note === "Answered." ? "success" : "error"}>
-                {note === "Answered." ? "✓ " : "✗ "}
+              <Text color={note === "Answered." ? THEME.approve : THEME.reject}>
+                {note === "Answered." ? `${roles.approve.icon} ` : `${roles.reject.icon} `}
                 {note}
               </Text>
             </Box>
@@ -369,9 +433,7 @@ export const register: Register = (on, options) => {
               plain
               dimColor
               label={q.topic ? "↗ Open topic" : "↗ Open in longe"}
-              onPress={() =>
-                openBoard($, q.topic ? `/r/${q.repo}/topics/${q.topic}` : `/#q-${q.id}`)
-              }
+              onPress={() => openBoard($, q.links.topic ?? `/#q-${q.id}`)}
             />
             <Box flexGrow={1} />
             <Text dimColor>{q.id}</Text>
@@ -490,5 +552,5 @@ async function readBoards($: EngineInterface): Promise<LongeInboxSnapshot> {
   for (const key of [...cache.keys()]) if (!live.has(key)) cache.delete(key);
 
   questions.sort(inboxOrder);
-  return { questions, problems, scannedAt: now, note: null };
+  return { questions, problems, scannedAt: now, note: null, tokens: INBOX_TOKENS, source: "files" };
 }

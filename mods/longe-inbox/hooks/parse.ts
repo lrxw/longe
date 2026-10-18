@@ -4,6 +4,7 @@
 // never guessed.
 
 import type { LongeInboxQuestion } from "../types";
+import { type InboxViewWire, optionRole } from "./tokens";
 
 export type Scalar = string | boolean | null;
 export type Value = Scalar | string[];
@@ -122,21 +123,53 @@ export function toOpenQuestion(
   if (typeof fm.blocking !== "boolean") throw new Error("blocking must be true or false");
   if (!sections.Question) throw new Error('missing "## Question" section');
   const str = (v: Value | undefined) => (typeof v === "string" ? v : null);
+  const options = Array.isArray(fm.options) ? fm.options : [];
+  const roles = {
+    approveOptions: Array.isArray(fm.approve_options) ? fm.approve_options : [],
+    rejectOptions: Array.isArray(fm.reject_options) ? fm.reject_options : [],
+  };
+  const topic = str(fm.topic);
+  const context = sections.Context ?? "";
   return {
     id: fm.id,
     repo,
     project,
     color,
-    topic: str(fm.topic),
+    topic,
     askedBy: str(fm.asked_by) ?? "agent",
     askedAt: str(fm.asked_at) ?? "",
     blocking: fm.blocking,
-    options: Array.isArray(fm.options) ? fm.options : [],
-    approveOptions: Array.isArray(fm.approve_options) ? fm.approve_options : [],
-    rejectOptions: Array.isArray(fm.reject_options) ? fm.reject_options : [],
+    options,
+    ...roles,
+    optionRoles: options.map((o) => optionRole(o, roles)),
     assumption: str(fm.assumption),
     question: sections.Question,
-    context: sections.Context ?? "",
+    context,
+    contextOpen: context.includes("```"),
+    links: { board: `/r/${repo}/board`, topic: topic ? `/r/${repo}/topics/${topic}` : null },
+  };
+}
+
+/** A question from longe's view model (GET /api/v1/inbox), in the mod's shape. */
+export function fromView(q: InboxViewWire["questions"][number]): LongeInboxQuestion {
+  return {
+    id: q.id,
+    repo: q.repo,
+    project: q.project,
+    color: q.color,
+    topic: q.topic,
+    askedBy: q.askedBy,
+    askedAt: q.askedAt,
+    blocking: q.kind === "blocking",
+    options: q.options.map((o) => o.label),
+    approveOptions: q.options.filter((o) => o.role === "approve").map((o) => o.label),
+    rejectOptions: q.options.filter((o) => o.role === "reject").map((o) => o.label),
+    optionRoles: q.options.map((o) => o.role),
+    assumption: q.assumption,
+    question: q.question,
+    context: q.context,
+    contextOpen: q.contextOpen,
+    links: q.links,
   };
 }
 

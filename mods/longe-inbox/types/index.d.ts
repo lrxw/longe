@@ -1,3 +1,5 @@
+import type { InboxTokens, OptionRole } from "../hooks/tokens";
+
 /** One open question from a longe board, as the inbox shows it. */
 export type LongeInboxQuestion = {
   id: string;
@@ -16,9 +18,15 @@ export type LongeInboxQuestion = {
   approveOptions: string[];
   /** Options that reject a topic in review (moves it back to active). */
   rejectOptions: string[];
+  /** Per option, in order: what picking it does to work in review. */
+  optionRoles: OptionRole[];
   assumption: string | null;
   question: string;
   context: string;
+  /** Show the context open from the start (it holds code). */
+  contextOpen: boolean;
+  /** Paths on the longe server. */
+  links: { board: string; topic: string | null };
 };
 
 /** A question the inbox could not read. */
@@ -31,6 +39,10 @@ export type LongeInboxSnapshot = {
   scannedAt: number;
   /** Why nothing could be scanned (no registry, no boards), if so. */
   note: string | null;
+  /** Labels and icons by role: the running longe's, else the mod's copy. */
+  tokens: InboxTokens;
+  /** "server": the view model from a running longe; "files": read from disk. */
+  source: "server" | "files";
 };
 
 declare module "claude-code" {

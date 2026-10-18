@@ -142,6 +142,17 @@ describe("hub mode", () => {
     expect(shopOnly).toContain("Nothing is waiting on you in this project.");
     expect(shopOnly).toContain("<title>(1) Inbox · longe</title>"); // badge stays unfiltered
     expect(await (await app.request("/fragments/inbox?repo=nope")).text()).toContain("Blog Q?");
+    // the view model is hub-wide; ?repo narrows it
+    const all = (await json(await app.request("/api/v1/inbox"))) as {
+      questions: { repo: string; project: string; links: { board: string } }[];
+    };
+    expect(all.questions.map((q) => [q.repo, q.project, q.links.board])).toEqual([
+      ["blog", "Blog", "/r/blog/board"],
+    ]);
+    const shopView = (await json(await app.request("/api/v1/inbox?repo=shop"))) as {
+      questions: unknown[];
+    };
+    expect(shopView.questions).toEqual([]);
 
     // the board you visited last is remembered; /board follows it
     const cookie = boardRes.headers.get("set-cookie") ?? "";

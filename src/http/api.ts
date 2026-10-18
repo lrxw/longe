@@ -136,6 +136,44 @@ export function openApiDocument(port: number, hub = false): Record<string, unkno
       },
     };
   }
+  paths[`${API_BASE}/inbox`] = {
+    get: {
+      operationId: "inbox",
+      summary: "The inbox, ready to display",
+      description:
+        "Every open question across the registered repos, in inbox order (blocking first, then oldest), with each option's role (approve, reject, neutral), the project's name and colour, and the semantic tokens (labels and icons by role). The web inbox and the longe-inbox mod for Claude Code show this. `version` changes when a field changes meaning.",
+      tags: ["human"],
+      parameters: [
+        {
+          name: "repo",
+          in: "query",
+          required: false,
+          schema: { type: "string" },
+          description: "Only this registered repo's questions",
+        },
+      ],
+      responses: {
+        "200": {
+          description: "OK",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["version", "tokens", "counts", "questions", "problems"],
+                properties: {
+                  version: { type: "integer" },
+                  tokens: { type: "object" },
+                  counts: { type: "object" },
+                  questions: { type: "array", items: { type: "object" } },
+                  problems: { type: "array", items: { type: "object" } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
   return {
     openapi: "3.1.0",
     info: {
@@ -156,7 +194,8 @@ export function docsPage(port: number, hub = false): string {
   const paths = doc.paths as Record<
     string,
     {
-      post: {
+      get?: { description: string; tags: string[] };
+      post?: {
         description: string;
         tags: string[];
         requestBody: { content: { "application/json": { schema: unknown } } };
@@ -165,7 +204,13 @@ export function docsPage(port: number, hub = false): string {
   >;
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const sections = Object.entries(paths)
-    .map(([p, { post }]) => {
+    .map(([p, { get, post }]) => {
+      if (!post)
+        return `<section>
+<h2><code>GET ${esc(p)}</code> <span class="tag">${get?.tags[0] ?? ""}</span></h2>
+<p>${esc(get?.description ?? "")}</p>
+<p><a href="${esc(p)}">${esc(p)}</a></p>
+</section>`;
       const schema = JSON.stringify(post.requestBody.content["application/json"].schema, null, 2);
       const example = JSON.stringify(
         exampleFor(post.requestBody.content["application/json"].schema as never),

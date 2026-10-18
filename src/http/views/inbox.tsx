@@ -1,6 +1,7 @@
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import type { HookStatus } from "../../app/hooks.js";
+import { INBOX_TOKENS, type InboxSource, toViewQuestion } from "../../domain/inbox-view.js";
 import type { IndexedQuestion } from "../../index/index.js";
 import { ago, renderMarkdown } from "../format.js";
 import { Avatar, ErrorList, type RepoNav } from "./layout.js";
@@ -12,32 +13,52 @@ export interface InboxItem {
   showRepo: boolean;
 }
 
+/** The question as the inbox view model sees it (src/domain/inbox-view.ts). */
+export function inboxSource({ q, repo }: InboxItem): InboxSource {
+  return {
+    id: q.id,
+    repo: { name: repo.name, title: repo.title, color: repo.color, base: repo.base },
+    topic: q.fm.topic,
+    blocking: q.fm.blocking,
+    askedBy: q.fm.asked_by,
+    askedAt: q.fm.asked_at,
+    question: q.sections.Question,
+    context: q.sections.Context ?? "",
+    assumption: q.fm.assumption,
+    options: q.fm.options ?? [],
+    approveOptions: q.fm.approve_options ?? [],
+    rejectOptions: q.fm.reject_options ?? [],
+  };
+}
+
+const { roles, text } = INBOX_TOKENS;
+
+/** One question, drawn from the view model; the mod draws the same fields. */
 export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date }) {
-  const options = q.fm.options ?? [];
+  const v = toViewQuestion(inboxSource({ q, repo, showRepo }));
+  const blocking = v.kind === "blocking";
   const base = repo.base;
   return (
-    <article class={`card question ${q.fm.blocking ? "blocking" : ""}`} id={`q-${q.id}`}>
+    <article class={`card question ${blocking ? "blocking" : ""}`} id={`q-${q.id}`}>
       <header>
-        {q.fm.blocking ? (
-          <span class="tag block">blocking</span>
-        ) : (
-          <span class="tag">non-blocking</span>
-        )}
+        <span class={`tag ${blocking ? "block" : "nonblocking"}`}>
+          {roles[v.kind].icon} {roles[v.kind].label}
+        </span>
         {showRepo ? (
-          <a class="repo" href={`${base}/board`} style={`--repo:${repo.color}`}>
+          <a class="repo" href={v.links.board} style={`--repo:${v.color}`}>
             <Avatar repo={repo} />
-            {repo.title}
+            {v.project}
           </a>
         ) : null}
-        {q.fm.topic ? (
-          <a class="topic" href={`${base}/topics/${q.fm.topic}`}>
-            {q.fm.topic}
+        {v.topic && v.links.topic ? (
+          <a class="topic" href={v.links.topic}>
+            {v.topic}
           </a>
         ) : (
-          <span class="topic">project-wide</span>
+          <span class="topic">{text.projectWide}</span>
         )}
         <span class="meta">
-          {q.fm.asked_by} · {ago(q.fm.asked_at, now)} ago · <code>{q.id}</code>
+          {v.askedBy} · {ago(v.askedAt, now)} ago · <code>{v.id}</code>
         </span>
         <button
           type="button"
@@ -51,17 +72,17 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
           Delete
         </button>
       </header>
-      <div class="body md">{raw(renderMarkdown(q.sections.Question))}</div>
-      {q.sections.Context ? (
+      <div class="body md">{raw(renderMarkdown(v.question))}</div>
+      {v.context ? (
         // code is shown for the human to read: do not hide it behind a click
-        <details data-key={`context:${q.id}`} open={q.sections.Context.includes("```")}>
-          <summary>Context</summary>
-          <div class="md">{raw(renderMarkdown(q.sections.Context))}</div>
+        <details data-key={`context:${v.id}`} open={v.contextOpen}>
+          <summary>{text.context}</summary>
+          <div class="md">{raw(renderMarkdown(v.context))}</div>
         </details>
       ) : null}
-      {q.fm.assumption ? (
+      {v.assumption ? (
         <p class="assumption">
-          Assumption: <em>{q.fm.assumption}</em>
+          {text.workingOn} <em>{v.assumption}</em>
         </p>
       ) : null}
       <form
@@ -70,34 +91,31 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
         hx-target={`#q-${q.id}`}
         hx-swap="outerHTML"
       >
-        {options.length > 0 ? (
+        {v.options.length > 0 ? (
           <div class="options">
-            {options.map((o, i) => {
+            {v.options.map((o) => (
               // a reject option sends the topic back from review to active; an approve
               // option moves it to done
-              const reject = q.fm.reject_options?.includes(o);
-              const approve = q.fm.approve_options?.includes(o);
-              return (
-                <button
-                  type="submit"
-                  name="option_index"
-                  value={String(i)}
-                  class={reject ? "reject" : approve ? "approve" : undefined}
-                  title={
-                    reject
-                      ? "Rejects the work: the topic goes back to active"
-                      : approve
-                        ? "Approves the work: the topic moves to done"
-                        : undefined
-                  }
-                >
-                  {o}
-                </button>
-              );
-            })}
+              <button
+                type="submit"
+                name="option_index"
+                value={String(o.index)}
+                class={o.role === "neutral" ? undefined : o.role}
+                title={
+                  o.role === "reject"
+                    ? "Rejects the work: the topic goes back to active"
+                    : o.role === "approve"
+                      ? "Approves the work: the topic moves to done"
+                      : undefined
+                }
+              >
+                {o.role === "neutral" ? "" : `${roles[o.role].icon} `}
+                {o.label}
+              </button>
+            ))}
           </div>
         ) : null}
-        <label for={`reply-${q.id}`}>Reply</label>
+        <label for={`reply-${q.id}`}>{text.reply}</label>
         <div class="row">
           <textarea
             id={`reply-${q.id}`}
@@ -111,10 +129,10 @@ export function QuestionCard({ q, repo, showRepo, now }: InboxItem & { now: Date
           </button>
         </div>
         <p class="meta" id={`reply-help-${q.id}`}>
-          {options.length > 0
+          {v.options.length > 0
             ? "Click an option to send it with your text, or Send reply to send just your text."
             : "Send your answer to the agent."}
-          {q.fm.approve_options?.length || q.fm.reject_options?.length
+          {v.review
             ? " A reply returns work in review to the agent for follow-up. Approval requires an approval option."
             : ""}
         </p>
@@ -319,11 +337,11 @@ export function InboxFragment({
       {hooks.map((h) => (
         <HookStatusLine hooks={h.status} label={h.label} now={now} />
       ))}
-      {total === 0 ? <p class="empty">Nothing is waiting on you.</p> : null}
+      {total === 0 ? <p class="empty">{text.empty}</p> : null}
       <ProjectChips items={items} repos={repos} filter={filter} />
       {total > 0 && shown.length === 0 ? (
         <p class="empty">
-          Nothing is waiting on you in this project. <a href="/">Show all</a>
+          {text.emptyProject} <a href="/">Show all</a>
         </p>
       ) : null}
       {blocking.map((i) => (
@@ -339,8 +357,8 @@ export function InboxFragment({
           open
         >
           <summary>
-            {other.length} non-blocking {other.length === 1 ? "question" : "questions"} (agent
-            continues on its assumption)
+            {roles.nonBlocking.icon} {other.length} {roles.nonBlocking.label}{" "}
+            {other.length === 1 ? "question" : "questions"} (agent continues on its assumption)
           </summary>
           {other.map((i) => (
             <QuestionCard {...i} now={now} />

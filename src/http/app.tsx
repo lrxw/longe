@@ -11,6 +11,7 @@ import { Hub, type HubRepo } from "../app/hub.js";
 import { createProject } from "../app/new-project.js";
 import { isProvider } from "../app/providers/index.js";
 import { DomainError } from "../domain/errors.js";
+import { buildInboxView, inboxOrder } from "../domain/inbox-view.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
 import { answerQuestion, deleteQuestion, human, setTopicStatus } from "../tools/ops.js";
 import { API_BASE, createApiApp, docsPage, openApiDocument } from "./api.js";
@@ -25,9 +26,11 @@ import { BoardBadge, type BoardCounts, InboxBadge, type InboxCounts } from "./vi
 import { BoardFragment } from "./views/board.js";
 import {
   AnsweredStub,
+  filterInbox,
   type InboxFilter,
   InboxFragment,
   type InboxItem,
+  inboxSource,
   parseInboxFilter,
   QuestionCard,
 } from "./views/inbox.js";
@@ -182,10 +185,12 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
     const items = live.flatMap((r) =>
       (r.ctx as AppContext).index.inbox().map((q) => ({ q, repo: nav(hub, r), showRepo })),
     );
-    return items.sort((a, b) => {
-      if (a.q.fm.blocking !== b.q.fm.blocking) return a.q.fm.blocking ? -1 : 1;
-      return a.q.fm.asked_at.localeCompare(b.q.fm.asked_at) || a.q.id.localeCompare(b.q.id);
+    const key = (i: InboxItem) => ({
+      blocking: i.q.fm.blocking,
+      askedAt: i.q.fm.asked_at,
+      id: i.q.id,
     });
+    return items.sort((a, b) => inboxOrder(key(a), key(b)));
   };
   const inboxErrors = (): { file: string; message: string; repo?: string }[] =>
     hub
@@ -355,6 +360,16 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
   }
 
   app.get("/fragments/inbox", (c) => c.html(inboxFragment(inboxFilter(c))));
+  // the inbox view model: the web inbox and the Claude Code mod show the same thing
+  // (src/domain/inbox-view.ts); hub-wide, `?repo=` narrows it to one project
+  app.get(`${API_BASE}/inbox`, (c) => {
+    const filter = inboxFilter(c);
+    const items = filterInbox(inboxItems(), filter);
+    const problems = inboxErrors().filter(
+      (e) => !filter.repo || e.repo === undefined || e.repo === hub.get(filter.repo)?.title,
+    );
+    return c.json(buildInboxView(items.map(inboxSource), problems));
+  });
   app.get("/fragments/inbox-badge", (c) => c.html(<InboxBadge counts={inboxCounts()} />));
   app.get("/fragments/repos", (c) =>
     c.html(<ReposNav repos={repoNavs()} current={c.req.query("current")} />),

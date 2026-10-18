@@ -64,7 +64,54 @@ const files: Record<string, string> = {
   ].join("\n"),
 };
 
-function fakeDisk(on: On, posts: string[], isDown = false) {
+// what a running longe answers on GET /api/v1/inbox (src/domain/inbox-view.ts)
+const VIEW = {
+  version: 1,
+  tokens: {
+    roles: {
+      blocking: { label: "blocking", icon: "●" },
+      nonBlocking: { label: "non-blocking", icon: "○" },
+      approve: { label: "approves the work", icon: "✓" },
+      reject: { label: "sends the work back", icon: "✗" },
+      muted: { label: "", icon: "" },
+      accent: { label: "", icon: "" },
+    },
+    text: {
+      workingOn: "Doing meanwhile:",
+      projectWide: "project-wide",
+      context: "Context",
+      reply: "Reply",
+      empty: "Nothing is waiting on you.",
+      emptyProject: "Nothing is waiting on you in this project.",
+    },
+  },
+  counts: { total: 1, blocking: 0, nonBlocking: 1, projects: 1 },
+  questions: [
+    {
+      id: "q-20261012-dddd",
+      repo: "demo",
+      project: "Server app",
+      color: "#2563eb",
+      topic: "export",
+      kind: "nonBlocking",
+      review: true,
+      askedBy: "codex",
+      askedAt: "2026-10-12T12:00:00+02:00",
+      question: "Please verify the export.",
+      context: "",
+      contextOpen: false,
+      assumption: "it works",
+      options: [
+        { index: 0, label: "Works", role: "approve" },
+        { index: 1, label: "Broken", role: "reject" },
+      ],
+      links: { board: "/r/demo/board", topic: "/r/demo/topics/export" },
+    },
+  ],
+  problems: [],
+};
+
+function fakeDisk(on: On, posts: string[], isDown = false, view: unknown = null) {
   mock.env(on, { HOME });
   on("fs.read", ($, e) => {
     const text = files[e.path];
@@ -87,6 +134,12 @@ function fakeDisk(on: On, posts: string[], isDown = false) {
   });
   on("http.fetch", ($, e) => {
     if (isDown) throw new Error("ECONNREFUSED");
+    if (e.url.endsWith("/api/v1/inbox")) {
+      // an older longe without the view model answers 404: the mod reads the files
+      return view
+        ? { value: { status: 200, ok: true, headers: {}, text: JSON.stringify(view) } }
+        : { value: { status: 404, ok: false, headers: {}, text: '{"code":"not_found"}' } };
+    }
     posts.push(e.init?.body ?? "");
     return {
       value: {
@@ -156,6 +209,46 @@ test("a written reply is sent as a custom answer", async ($, on) => {
     id: "q-20261012-aaaa",
     answer: "Only this repo, please",
   });
+  await pane.unmount();
+});
+
+test("with longe running, the pane draws longe's view model and its labels", async ($, on) => {
+  const posts: string[] = [];
+  fakeDisk(on, posts, false, VIEW);
+  await $.session.start({ cwd: "/work/demo", surface: "terminal", isInteractive: true });
+  const pane = await $.ui.mount({
+    plugin: "longe-inbox",
+    surface: "terminal",
+    component: "Pane",
+    requestId: "longe-inbox",
+    props: { title: "longe inbox", isFocused: true, bodyColumns: 80, placement: "dock" } as never,
+  });
+  // the server's question, not the files'; its token text, not the mod's copy
+  expect(await pane.find({ type: "Text", text: /Server app/ })).toBeDefined();
+  expect(await pane.find({ type: "Text", text: /Demo app/ })).toBeUndefined();
+  expect(await pane.find({ type: "Text", text: /Doing meanwhile:/ })).toBeDefined();
+  expect(await pane.find({ key: "opt-q-20261012-dddd-0" })).toBeDefined();
+  expect(await pane.find({ key: "opt-q-20261012-dddd-1" })).toBeDefined();
+  await pane.press({ key: "opt-q-20261012-dddd-0" });
+  expect(JSON.parse(posts[0] ?? "{}")).toEqual({
+    repo: "demo",
+    id: "q-20261012-dddd",
+    option_index: 0,
+  });
+  await pane.unmount();
+});
+
+test("an unknown view version falls back to the files and says why", async ($, on) => {
+  fakeDisk(on, [], false, { ...VIEW, version: 99 });
+  await $.session.start({ cwd: "/work/demo", surface: "terminal", isInteractive: true });
+  const pane = await $.ui.mount({
+    plugin: "longe-inbox",
+    surface: "terminal",
+    component: "Pane",
+    requestId: "longe-inbox",
+    props: { title: "longe inbox", isFocused: true, bodyColumns: 80, placement: "dock" } as never,
+  });
+  expect(await pane.find({ type: "Text", text: /Demo app/ })).toBeDefined();
   await pane.unmount();
 });
 
