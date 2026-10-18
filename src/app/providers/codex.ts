@@ -65,10 +65,15 @@ export const codex: ChatProvider = {
   },
   resumeCommand: (root, command, sessionId) =>
     `cd ${shellQuote(root)} && ${shellQuote(command)} resume ${shellQuote(sessionId)}`,
-  terminal: {
-    what: "a reply that ends with a question is sent back to ask it in the inbox (Stop hook; review it once with /hooks in Codex)",
-    file: codexHooksPath,
-    install: installCodexHook,
-    remove: removeCodexHook,
-  },
+  terminal: [
+    {
+      id: "hook",
+      label:
+        "Codex: ask-question reminder (a reply ending in a question is sent back to the inbox)",
+      what: "a reply that ends with a question is sent back to ask it in the inbox (Stop hook; review it once with /hooks in Codex)",
+      file: codexHooksPath,
+      install: installCodexHook,
+      remove: removeCodexHook,
+    },
+  ],
 };

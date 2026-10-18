@@ -1,3 +1,9 @@
+import {
+  claudeUserSettingsPath,
+  installMod,
+  modAvailable,
+  removeMod,
+} from "../../cli/claude-mod.js";
 import { installHook, removeHook, settingsPath } from "../../cli/hooks.js";
 import { type ChatProvider, shellQuote } from "./types.js";
 
@@ -64,10 +70,24 @@ export const claude: ChatProvider = {
     };
   },
   resumeCommand: (root, command, sessionId) => resumeCommand(root, sessionId, command),
-  terminal: {
-    what: "AskUserQuestion goes to the inbox (PreToolUse hook)",
-    file: settingsPath,
-    install: installHook,
-    remove: removeHook,
-  },
+  terminal: [
+    {
+      id: "hook",
+      label: "Claude Code: ask-question hook (its questions go to the inbox)",
+      what: "AskUserQuestion goes to the inbox (PreToolUse hook)",
+      file: settingsPath,
+      install: installHook,
+      remove: removeHook,
+    },
+    {
+      id: "mod",
+      label: "Claude Code: inbox mod (longe-inbox: answer questions inside Claude Code)",
+      what: "the longe-inbox mod: inbox band, pane and /longe in Claude Code (restart Claude Code)",
+      userOnly: true,
+      available: modAvailable,
+      file: () => claudeUserSettingsPath(),
+      install: () => installMod(),
+      remove: () => removeMod(),
+    },
+  ],
 };

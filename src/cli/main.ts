@@ -8,7 +8,11 @@ async function main(argv: string[]): Promise<number> {
 
   switch (cli.command) {
     case "init": {
-      const result = await initProject(repo, { shared: cli.shared });
+      const { promptedChoice } = await import("./deep-integrate.js");
+      const result = await initProject(repo, {
+        shared: cli.shared,
+        choose: () => promptedChoice(repo, cli),
+      });
       const { registerRepo } = await import("../store/registry.js");
       await registerRepo(repo).catch(() => undefined);
       for (const line of result.created) process.stdout.write(`created  ${line}\n`);
@@ -19,7 +23,7 @@ async function main(argv: string[]): Promise<number> {
       for (const line of result.skipped) process.stdout.write(`exists   ${line}\n`);
       // ask_in_inbox (default on): terminal sessions send their questions to the inbox
       for (const r of result.deepIntegration)
-        if (r.changed) process.stdout.write(`hook     ${r.provider} → ${r.file}: ${r.what}\n`);
+        if (r.changed) process.stdout.write(`added    ${r.key} → ${r.file}: ${r.what}\n`);
       if (result.deepIntegration.some((r) => r.changed))
         process.stdout.write(
           "         (optional; `longe provider deep-integrate --remove` undoes it)\n",
@@ -63,7 +67,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "provider": {
       const { runProvider } = await import("./deep-integrate.js");
-      return runProvider(cli.rest, repo, { shared: cli.shared, remove: cli.remove });
+      return runProvider(cli.rest, repo, cli);
     }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");

@@ -12,9 +12,13 @@ describe("parseCli", () => {
       daemon: false,
       shared: false,
       remove: false,
+      all: false,
+      hook: false,
+      mod: false,
       repoGiven: false,
       rest: [],
     });
+    expect(parseCli(["init", "--all"]).all).toBe(true);
   });
 
   it("parses serve with port and open", () => {
@@ -27,6 +31,9 @@ describe("parseCli", () => {
       daemon: false,
       shared: false,
       remove: false,
+      all: false,
+      hook: false,
+      mod: false,
       repoGiven: true,
       rest: [],
     });
@@ -59,6 +66,16 @@ describe("parseCli", () => {
   it("reports missing option values and unknown flags with usage", () => {
     expect(() => parseCli(["serve", "--repo"])).toThrow(/argument missing[\s\S]*Usage:/);
     expect(() => parseCli(["serve", "--bogus"])).toThrow(/Unknown option[\s\S]*Usage:/);
+  });
+
+  it("accepts explicit integration flags and rejects conflicting or misplaced flags", () => {
+    expect(parseCli(["init", "--hook"])).toMatchObject({ hook: true, mod: false });
+    expect(
+      parseCli(["provider", "deep-integrate", "claude", "--mod", "--hook", "--remove"]),
+    ).toMatchObject({ hook: true, mod: true, remove: true });
+    expect(() => parseCli(["init", "--all", "--hook"])).toThrow(/Use --all or/);
+    expect(() => parseCli(["init", "--shared", "--mod"])).toThrow(/user settings/);
+    expect(() => parseCli(["serve", "--mod"])).toThrow(/only supported by/);
   });
 
   it("rejects unknown command", () => {

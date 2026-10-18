@@ -10,6 +10,8 @@ let dir: string;
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "longe-init-"));
+  await rm(path.join(process.env.CODEX_HOME as string, "hooks.json"), { force: true });
+  await rm(path.join(process.env.CLAUDE_CONFIG_DIR as string, "settings.json"), { force: true });
 });
 
 afterEach(async () => {
@@ -83,9 +85,10 @@ describe("longe init", () => {
 
   it("initProject deep-integrates every provider, unless ask_in_inbox is off", async () => {
     const first = await initProject(dir, { name: "P" });
-    expect(first.deepIntegration.map((r) => [r.provider, r.file, r.changed])).toEqual([
-      ["claude", ".claude/settings.local.json", true],
-      ["codex", path.join(process.env.CODEX_HOME as string, "hooks.json"), true],
+    expect(first.deepIntegration.map((r) => [r.key, r.file, r.changed])).toEqual([
+      ["claude:hook", ".claude/settings.local.json", true],
+      ["claude:mod", path.join(process.env.CLAUDE_CONFIG_DIR as string, "settings.json"), true],
+      ["codex:hook", path.join(process.env.CODEX_HOME as string, "hooks.json"), true],
     ]);
     expect(first.created).toContain("AGENTS.md");
     const settings = JSON.parse(
@@ -110,10 +113,27 @@ describe("longe init", () => {
 
   it("--shared puts the deep integration into the files committed with the repo", async () => {
     const shared = await initProject(dir, { shared: true });
+    // the mod's path is this machine's: it never goes into a committed file
     expect(shared.deepIntegration.map((r) => r.file)).toEqual([
       ".claude/settings.json",
       ".codex/hooks.json",
     ]);
+  });
+
+  it("initProject adds only what was chosen", async () => {
+    const result = await initProject(dir, { choose: async () => ["claude:mod"] });
+    expect(result.deepIntegration.map((r) => r.key)).toEqual(["claude:mod"]);
+    await expect(stat(path.join(dir, ".claude/settings.local.json"))).rejects.toThrow();
+    expect((await initProject(dir, { choose: async () => [] })).deepIntegration).toEqual([]);
+  });
+
+  it("reports integration errors instead of pretending nothing was needed", async () => {
+    const file = path.join(process.env.CLAUDE_CONFIG_DIR as string, "settings.json");
+    await writeFile(file, "{broken");
+    await expect(initProject(dir, { choose: async () => ["claude:mod"] })).rejects.toThrow(
+      /fix it first/,
+    );
+    expect(await readFile(file, "utf8")).toBe("{broken");
   });
 
   it("a CLAUDE.md that already names the protocol directly counts as linked", async () => {

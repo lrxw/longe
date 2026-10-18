@@ -50,8 +50,19 @@ export interface ProviderProcess {
  * through the inbox. Each provider does what its CLI supports.
  */
 export interface TerminalIntegration {
+  /** Short id within the provider ("hook", "mod"); `<provider>:<id>` names it. */
+  id: string;
+  /** Asked about in `longe provider deep-integrate`'s manual mode. */
+  label: string;
   /** One line for `longe provider deep-integrate` output. */
   what: string;
+  /**
+   * Lives only in the user's own files (machine-specific paths): skipped with `shared`,
+   * whose files are committed with the repo.
+   */
+  userOnly?: boolean;
+  /** False when this install of longe cannot offer it; it is then left out. */
+  available?(): boolean;
   /** The file it writes: the user's own (default) or the committed one (`shared`). */
   file(repo: string, shared: boolean): string;
   /** False when it was already there. */
@@ -62,8 +73,8 @@ export interface TerminalIntegration {
 
 /** A coding agent longe can chat with. One file per provider, listed in index.ts. */
 export interface ChatProvider {
-  /** Absent: the provider offers no hook longe can use. */
-  terminal?: TerminalIntegration;
+  /** What `longe provider deep-integrate` can add to its own CLI; absent: nothing. */
+  terminal?: TerminalIntegration[];
   /**
    * The provider reports the subagents it starts, in the runner's event model (see
    * ../subagents.ts), so the Agents page can show them.

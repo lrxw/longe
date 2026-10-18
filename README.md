@@ -193,12 +193,26 @@ Agents have their own ways to ask you in the terminal. With the option on:
   longe reminds it once to use the inbox.
 - `longe provider deep-integrate` is an optional deeper integration with each agent's own
   CLI: hooks that make its terminal and IDE sessions use the inbox more reliably, as far
-  as the CLI allows. Agents work with longe without it (MCP and `AGENTS.md` do that);
-  `longe init` adds it for you. `longe provider deep-integrate claude` / `codex` picks
-  one, `--remove` takes it out again.
-  - **Claude Code:** a PreToolUse hook sends AskUserQuestion to the inbox (blocking, with
-    its options) and tells the agent the question id, so it can wait for the answer or
-    continue on an assumption.
+  as the CLI allows, and the inbox mod for Claude Code. Agents work with longe without it
+  (MCP and `AGENTS.md` do that); `longe init` adds it for you. In a terminal, both ask
+  first: Enter installs everything, `n` lets you choose each one. `--all` skips the
+  question; without a terminal (scripts, "+ New project" in the web UI) everything is
+  added. `longe provider deep-integrate claude` / `codex` picks one agent, `--remove`
+  takes it out again.
+  Use `--hook` or `--mod` to select just that kind without a prompt, or combine them
+  to select both. For example, `longe provider deep-integrate claude --hook` adds only
+  Claude's question hook; `longe init --hook` sets up a project with the hooks only.
+  `longe provider deep-integrate --mod --remove` removes only the mod, keeping the hooks.
+  These flags cannot be combined with `--all`; `--mod` requires Claude and cannot be
+  combined with `--shared`. Removing without `--shared` cleans both local and shared
+  hook files; removing with `--shared` touches only the shared hook files.
+  - **Claude Code, ask-question hook:** a PreToolUse hook sends AskUserQuestion to the
+    inbox (blocking, with its options) and tells the agent the question id, so it can
+    wait for the answer or continue on an assumption.
+  - **Claude Code, inbox mod:** [`mods/longe-inbox`](mods/longe-inbox/README.md) shows
+    the inbox inside Claude Code: a band above the prompt, a pane to answer, and `/longe`.
+    It is enabled in your own `~/.claude/settings.json` (`mods/` as the marketplace
+    `longe-mods`), never with `--shared`. Restart Claude Code to load it.
   - **Codex** has no hook for its question tool. A Stop hook sends the turn back when a
     reply ends with a question, telling Codex to ask it with `ask_question`. Review the
     hook once with `/hooks` in Codex.

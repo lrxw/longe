@@ -24,6 +24,10 @@ export interface ParsedCli {
   shared: boolean;
   /** provider deep-integrate: take it out again. */
   remove: boolean;
+  /** init, provider deep-integrate: add every integration without asking. */
+  all: boolean;
+  hook: boolean;
+  mod: boolean;
   /** `--repo` was given explicitly (serve: single mode even without .longe/ in cwd). */
   repoGiven: boolean;
   /** Positional arguments after the command (repos add <path> …). */
@@ -34,17 +38,18 @@ export interface ParsedCli {
 export const DEFAULT_PORT = 7311;
 
 const USAGE = `Usage:
-  longe init   [--repo <dir>] [--shared]
+  longe init   [--repo <dir>] [--shared] [--all | --hook --mod]
   longe serve  [--repo <dir>] [--port <n>] [--open] [--daemon|-d]
                # one server for every registered repo; run inside a project to register it
   longe repos  [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
   longe status                              # is the server running, which repos
   longe stop                                # stop the background server
   longe mcp    [--repo <dir>]
-  longe provider deep-integrate [claude|codex …] [--repo <dir>] [--shared] [--remove]
+  longe provider deep-integrate [claude|codex …] [--repo <dir>] [--all | --hook --mod] [--shared] [--remove]
                # optional: hooks into each agent's own CLI (terminal, IDE) so it uses the
-               # inbox more reliably, as far as the CLI allows. Agents work without it.
-               # No names: every agent. init adds it.
+               # inbox more reliably, as far as the CLI allows, and the longe-inbox mod for
+               # Claude Code. Agents work without it. No names: every agent. init adds it.
+               # In a terminal it asks: everything (default) or choose each one.
 
 Options:
   --repo   Repository root containing (or to receive) .longe/  (default: .)
@@ -55,6 +60,11 @@ Options:
   --shared With init and deep-integrate: write the files committed with the repo (.claude/settings.json,
            .codex/hooks.json) instead of your own (.claude/settings.local.json, ~/.codex/hooks.json)
   --remove With deep-integrate: take it out again (your own and the shared files)
+  --all    With init and deep-integrate: add every integration without asking
+           (without a terminal, e.g. in scripts, everything is added anyway)
+  --hook   Select only question hooks, without asking (also with --remove)
+  --mod    Select only the Claude inbox mod, without asking (user settings only)
+           Combine --hook and --mod to select both; do not combine either with --all
   -h, --help
   -v, --version
 `;
@@ -66,6 +76,8 @@ const OPTIONS = {
   json: { type: "boolean", default: false },
   daemon: { type: "boolean", short: "d", default: false },
   all: { type: "boolean", default: false },
+  hook: { type: "boolean", default: false },
+  mod: { type: "boolean", default: false },
   name: { type: "string" },
   shared: { type: "boolean", default: false },
   remove: { type: "boolean", default: false },
@@ -137,6 +149,15 @@ export function parseCli(argv: string[]): ParsedCli {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new CliError(`Invalid --port: ${values.port}`);
   }
+  if (values.hook || values.mod) {
+    if (command !== "init" && !(command === "provider" && positionals[1] === "deep-integrate"))
+      throw new CliError("--hook and --mod are only supported by init and provider deep-integrate");
+    if (values.all) throw new CliError("Use --all or --hook/--mod, not both");
+    if (values.shared && values.mod)
+      throw new CliError(
+        "--mod cannot be combined with --shared: the Claude mod uses user settings",
+      );
+  }
 
   return {
     command: command as Command,
@@ -147,6 +168,9 @@ export function parseCli(argv: string[]): ParsedCli {
     daemon: values.daemon,
     shared: values.shared,
     remove: values.remove,
+    all: values.all,
+    hook: values.hook,
+    mod: values.mod,
     repoGiven: argv.includes("--repo") || argv.some((a) => a.startsWith("--repo=")),
     rest: positionals.slice(1),
     ...(values.name !== undefined ? { name: values.name } : {}),

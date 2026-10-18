@@ -98,14 +98,22 @@ export interface InitProjectResult extends InitResult {
  */
 export async function initProject(
   repoRoot: string,
-  opts: { name?: string | undefined; shared?: boolean } = {},
+  opts: {
+    name?: string | undefined;
+    shared?: boolean;
+    /** Which integrations to add (keys); undefined: all of them. The CLI asks in a terminal. */
+    choose?: () => Promise<string[] | undefined>;
+  } = {},
 ): Promise<InitProjectResult> {
   const result = await runInit(repoRoot, opts.name);
   const { askInInboxEnabled } = await import("./hooks.js");
   const { deepIntegrate } = await import("./deep-integrate.js");
-  const deepIntegration = (await askInInboxEnabled(repoRoot))
-    ? await deepIntegrate(repoRoot, { shared: opts.shared ?? false }).catch(() => [])
-    : [];
+  if (!(await askInInboxEnabled(repoRoot))) return { ...result, deepIntegration: [] };
+  const only = await opts.choose?.();
+  const deepIntegration = await deepIntegrate(repoRoot, {
+    shared: opts.shared ?? false,
+    only,
+  });
   return { ...result, deepIntegration };
 }
 
