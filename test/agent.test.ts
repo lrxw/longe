@@ -182,8 +182,15 @@ describe("AgentRunner", () => {
     expect(runner.status().costUsd).toBeCloseTo(0.02);
     expect(runner.status().sessionId).toBe("sess-1");
     await waitFor(() => runner.status().exitCode === 0);
-    await new Promise((r) => setTimeout(r, 50)); // the log line is written after the state change
-    expect(await readFile(runner.logFile, "utf8")).toContain("=== exit 0 ===");
+    // the log line is written after the state change and the session save: poll for it
+    // instead of guessing a delay (a slow CI disk took longer than 50ms)
+    let log = "";
+    for (let start = Date.now(); Date.now() - start < 5000; ) {
+      log = await readFile(runner.logFile, "utf8");
+      if (log.includes("=== exit 0 ===")) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(log).toContain("=== exit 0 ===");
 
     // next message: new process resumes the session, cost adds up
     await runner.say("human", "third");
