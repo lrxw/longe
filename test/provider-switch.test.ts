@@ -2,11 +2,13 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { handoffPrompt } from "../src/app/agent.js";
+import { handoffPrompt, todoPrompt } from "../src/app/agent.js";
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
 import { attachChatQueue } from "../src/app/todo-queue.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import * as ids from "../src/store/ids.js";
+import * as messages from "../src/store/messages.js";
 import { topicsDir } from "../src/store/paths.js";
 import { newTopicText } from "../src/store/topic.js";
 
@@ -203,6 +205,14 @@ describe("UI provider switching", () => {
   });
 
   it("rejects conflicting actions during a switch instead of changing the wrong session", async () => {
+    // Both writes can finish in the same millisecond. Force the later message's
+    // random id to sort first, so this case does not depend on filesystem timing.
+    const now = new Date("2026-10-24T12:00:00.000Z");
+    const writeMessage = messages.writeMessage;
+    vi.spyOn(messages, "writeMessage").mockImplementation((root, input) =>
+      writeMessage(root, { ...input, now }),
+    );
+    vi.spyOn(ids, "randomBase36").mockReturnValueOnce("zzzz").mockReturnValueOnce("0000");
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {
       release = resolve;
@@ -237,12 +247,22 @@ describe("UI provider switching", () => {
     }
     expect((await switching).status).toBe(200);
     expect(ctx.agent.status().modelOverride).toBe("codex-user");
-    // the handoff, then the todo topic that arrived during the switch
+    // Check what reached the new provider, not just that some turn was started.
+    const expected = [handoffPrompt("claude", "codex"), todoPrompt({ id: "next", title: "Next" })];
     await vi.waitFor(async () => expect(await ctx.agent.messages()).toHaveLength(2));
-    expect((await ctx.agent.messages())[0]?.text).toBe(handoffPrompt("claude", "codex"));
     await idle();
-    expect(await readFile(path.join(dir, "codex-input"), "utf8")).toContain(
-      '"method":"turn/start"',
-    );
+    const input = (await readFile(path.join(dir, "codex-input"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((m) => m.method === "turn/start")
+      .map((m) => m.params.input[0].text);
+    expect(input).toEqual(expected);
+    // The history breaks timestamp ties by id. Its order is deliberately opposite
+    // here; delivery must still send the waiting handoff before the queued topic.
+    const stored = await ctx.agent.messages();
+    expect(stored[0]?.fm.at).toBe(stored[1]?.fm.at);
+    expect(stored.map((m) => m.text)).toEqual([...expected].reverse());
+    expect(stored.every((m) => m.fm.delivered_at)).toBe(true);
   });
 });
