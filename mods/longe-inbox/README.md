@@ -1,5 +1,9 @@
 # longe-inbox
 
+This mod is a client of **longe ask**, the question-and-answer part of longe.
+It shows the same Inbox for standalone questions and questions from **longe board** topics.
+The plugin name remains `longe-inbox`; the Ask / Board names do not change its installation.
+
 A Claude Code mod that brings longe's question inbox into Claude Code, so you can answer your agents
 without switching to the browser.
 

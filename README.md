@@ -14,7 +14,18 @@ inbox. You answer when you are ready; the agent reads the answer, acknowledges i
 Requests, decisions and results are kept as readable markdown on your machine, next to the
 repository rather than in it: the repository stays code, the board is the conversation about it.
 
-![Agents working on different topics ask with ask_question; each question becomes a markdown file that waits in one inbox; you pick an answer and it goes back to the agent that asked, which acknowledges it and continues.](docs/assets/architecture.svg)
+longe has two parts:
+
+- **longe ask** handles questions, answers, waiting and notifications. Use it from an agent,
+  shell or script without adopting the topic workflow. The question list is called the **Inbox**.
+- **longe board** tracks topics, plans, decisions and progress, with a managed chat. It uses
+  longe ask whenever work needs your input, including review and approval.
+
+They share one installation and the same question files. `longe ask` is also the command for
+submitting a question; **longe board** names the work-tracking part, not a CLI command.
+Start the web interface with `longe serve -d`.
+
+![longe board agents and standalone longe ask clients share question files and one Inbox; answers return through the managed chat or explicit waiting and checking.](docs/assets/architecture.svg)
 
 1. **Send work.** Start from Chat or put a topic in the todo queue.
 2. **Decide in one place.** Questions from your repositories collect in one inbox, with blocking
@@ -186,8 +197,8 @@ HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, opencode uses
 
 The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
-**Inbox only.** An agent that should only ask you questions, without the board (topics,
-plans, statuses), gets just the inbox's tools with `longe mcp --inbox-only`:
+**longe ask without the board workflow.** An agent that should only ask you questions,
+without topics, plans or statuses, gets just the inbox's tools with `longe mcp --inbox-only`:
 `ask_question`, `check_answers`, `acknowledge_answers`, `wait_for_answer`,
 `withdraw_question`. A question can name any `subject` (an issue, a pull request,
 `{ "kind": "issue", "id": "42", "url": "…" }`); it shows in the same inbox, on the web and
@@ -196,6 +207,12 @@ in Claude Code. A `subject` of kind `topic` is a board topic, and the board stil
 ```json
 { "mcpServers": { "longe-inbox": { "command": "longe", "args": ["mcp", "--repo", ".", "--inbox-only"] } } }
 ```
+
+This is an alternative mode of the same MCP server. Default `longe mcp` exposes both board
+and inbox tools; the existing HTTP MCP endpoints also expose both. You do not need two MCP
+connections. The inbox-only mode is selected for stdio clients; `longe-inbox` above is just
+the client's connection label. Both modes use the project's existing `.longe/config.yml`
+and question files; no separate package or storage migration is needed.
 
 From a shell, a script or CI, `longe ask` does the same without an agent:
 

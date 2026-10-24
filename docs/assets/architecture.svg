@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
-  <title id="title">The idea behind longe: agents keep working, their questions wait in one inbox</title>
-  <desc id="desc">Agents working on different topics of one repository ask with ask_question over MCP. Each question becomes a markdown file with status open, which the server shows in one inbox. You pick an answer; the file becomes answered and the answer is handed back to the agent, which acknowledges it and continues.</desc>
+  <title id="title">longe ask and longe board share one Inbox</title>
+  <desc id="desc">longe board agents and standalone longe ask clients create question files in the same project storage. Questions may refer to a board topic, another subject, or neither. The Inbox shows them for the human to answer. The managed board chat receives answers when free; external agents check or wait, and scripts can use longe ask with --wait.</desc>
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10z" fill="#4f46e5"/>
@@ -29,30 +29,31 @@
   </defs>
 
   <rect width="1200" height="640" rx="18" fill="#fff"/>
-  <text x="40" y="46" class="h" style="font-size:24px">Agents keep working. Their questions wait for you in one inbox.</text>
-  <text x="40" y="72" class="t">A question is a file on your machine, not a prompt in some terminal: it waits until you answer, and the answer finds its way back.</text>
+  <text x="40" y="46" class="h" style="font-size:24px">longe ask handles questions. longe board tracks the work.</text>
+  <text x="40" y="72" class="t">One installation, shared question files, one Inbox. Ask also works without the topic workflow.</text>
 
   <!-- agents -->
   <rect x="30" y="100" width="300" height="390" rx="14" class="zone"/>
-  <text x="50" y="130" class="h">Agents on your project</text>
+  <text x="50" y="130" class="h">Agents and scripts</text>
   <rect x="50" y="146" width="260" height="104" rx="10" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
-  <text x="64" y="176" class="b" style="font-size:16px">Chat in longe</text>
-  <text x="64" y="200" class="t">Claude Code or Codex, run by longe</text>
+  <text x="64" y="176" class="b" style="font-size:16px">Chat in longe board</text>
+  <text x="64" y="200" class="t">Managed agent with a topic workflow</text>
   <text x="64" y="222" class="s">working on topic "billing"</text>
   <text x="64" y="240" class="s">gets answers without asking for them</text>
-  <text x="50" y="290" class="s">Also works with any agent over MCP:</text>
+  <text x="50" y="290" class="s">Use longe ask without a board topic:</text>
   <rect x="50" y="300" width="260" height="48" rx="8" fill="#fff" stroke="#cbd5e1" stroke-dasharray="4 3"/>
-  <text x="64" y="320" class="s" style="font-weight:600">Your terminal · Codex</text>
-  <text x="64" y="338" class="s">topic "search"</text>
+  <text x="64" y="320" class="s" style="font-weight:600">Your shell / script · longe ask</text>
+  <text x="64" y="338" class="s">subject pr:128 · --wait for an answer</text>
   <rect x="50" y="358" width="260" height="48" rx="8" fill="#fff" stroke="#cbd5e1" stroke-dasharray="4 3"/>
-  <text x="64" y="378" class="s" style="font-weight:600">Your IDE · Cursor, Gemini CLI, …</text>
+  <text x="64" y="378" class="s" style="font-weight:600">External agent · inbox-only MCP</text>
   <text x="64" y="396" class="s">check for answers themselves</text>
-  <text x="50" y="456" class="s">They talk to longe over MCP and follow</text>
-  <text x="50" y="474" class="s">AGENTS.md → .longe/AGENT-INSTRUCTIONS.md</text>
+  <text x="50" y="456" class="s">Board agents follow the topic protocol.</text>
+  <text x="50" y="474" class="s">Ask-only clients use question tools.</text>
 
   <!-- question file -->
   <rect x="420" y="150" width="360" height="290" rx="12" class="file"/>
-  <text x="440" y="180" class="b">questions/q-20260930-a1b2.md</text>
+  <text x="440" y="180" class="b">longe ask · question storage</text>
+  <text x="440" y="198" class="s">questions/q-20260930-a1b2.md</text>
   <text x="440" y="212" class="k">topic: billing</text>
   <text x="440" y="234" class="k">blocking: true</text>
   <text x="440" y="256" class="k">options: [monthly, yearly]</text>
@@ -66,7 +67,7 @@
 
   <!-- inbox -->
   <rect x="870" y="100" width="300" height="390" rx="14" class="inbox"/>
-  <text x="890" y="130" class="h">Your inbox</text>
+  <text x="890" y="130" class="h">Inbox</text>
   <text x="890" y="150" class="s">every open question · blocking first</text>
   <rect x="890" y="164" width="260" height="120" rx="10" class="card"/>
   <text x="904" y="188" class="b">billing <tspan class="s">· blocking</tspan></text>
@@ -77,11 +78,11 @@
   <text x="1026" y="246" class="n">yearly</text>
   <text x="904" y="274" class="s">or answer in your own words</text>
   <rect x="890" y="296" width="260" height="92" rx="10" class="card"/>
-  <text x="904" y="320" class="b">search</text>
-  <text x="904" y="342" class="t">Index titles only?</text>
+  <text x="904" y="320" class="b">pr:128</text>
+  <text x="904" y="342" class="t">Include a migration note?</text>
   <text x="904" y="364" class="s">non-blocking · assumption: yes,</text>
   <text x="904" y="380" class="s">working on meanwhile</text>
-  <text x="890" y="420" class="t">Live: the server watches .longe/</text>
+  <text x="890" y="420" class="t">The server watches project files</text>
   <text x="890" y="440" class="t">and pushes changes to the page (SSE).</text>
   <text x="890" y="470" class="s">You answer when it suits you.</text>
 
@@ -103,8 +104,8 @@
   <!-- how the answer gets back -->
   <rect x="30" y="512" width="1140" height="104" rx="14" class="zone"/>
   <circle cx="58" cy="540" r="12" fill="#15803d"/><text x="54" y="545" class="n">4</text>
-  <text x="80" y="545" class="b">The answer goes back to the agent that asked</text>
-  <text x="80" y="570" class="t">Chat in longe: handed over as soon as its current turn ends (answers before new todo work).</text>
-  <text x="80" y="592" class="t">Terminal / IDE: the agent waits with <tspan class="m">wait_for_answer</tspan> or picks it up with <tspan class="m">check_answers</tspan>; it then calls</text>
-  <text x="80" y="610" class="t"><tspan class="m">acknowledge_answers</tspan> and continues. A blocking question pauses only its topic (needs-decision); the agent works on elsewhere.</text>
+  <text x="80" y="545" class="b">Receive the answer, then continue</text>
+  <text x="80" y="570" class="t">longe board chat: unread answers arrive when it is free, before new todo work. Scripts: <tspan class="m">longe ask --wait</tspan>.</text>
+  <text x="80" y="592" class="t">External agents use <tspan class="m">wait_for_answer</tspan> or <tspan class="m">check_answers</tspan>, then <tspan class="m">acknowledge_answers</tspan>.</text>
+  <text x="80" y="610" class="t">For topic-linked questions, longe board reacts to Ask events: block, unblock, approve or return the topic.</text>
 </svg>
