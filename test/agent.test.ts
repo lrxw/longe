@@ -22,6 +22,7 @@ import { type AppContext, closeAppContext, createAppContext } from "../src/app/c
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
 import { ContextMeter } from "../src/http/views/agent.js";
+import { newQuestionText } from "../src/inbox/store.js";
 import {
   clearMessages,
   listMessages,
@@ -30,7 +31,6 @@ import {
   writeMessage,
 } from "../src/store/messages.js";
 import { messagesDir, questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 import { answerQuestion, setTopicStatus } from "../src/tools/ops.js";
 

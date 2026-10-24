@@ -2,12 +2,11 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import type { AppContext } from "../app/context.js";
 import { DomainError } from "../domain/errors.js";
-import { acknowledgeQuestion, withdrawQuestion } from "../domain/question-ops.js";
 import { askQuestionInputSchema } from "../domain/schemas.js";
-import { effectsForQuestionClosed, effectsForQuestionCreated } from "../domain/side-effects.js";
 import { addDecision, appendLog, setPlan } from "../domain/topic-ops.js";
 import { TOPIC_STATUSES } from "../domain/types.js";
-import { applyEffects } from "../index/effects.js";
+import { acknowledgeQuestion, withdrawQuestion } from "../inbox/ops.js";
+import { questionSections } from "../inbox/store.js";
 import type { IndexedQuestion, IndexedTopic } from "../index/index.js";
 import { QUESTION_ID_RE, SLUG_RE, slugify } from "../store/ids.js";
 import { instructionsPath } from "../store/paths.js";
@@ -75,21 +74,6 @@ function requireQuestion(ctx: AppContext, id: string): IndexedQuestion {
   const q = ctx.index.questions.get(id);
   if (!q) throw new DomainError("not_found", `question ${id} not found`);
   return q;
-}
-
-async function runEffects(ctx: AppContext, effects: ReturnType<typeof effectsForQuestionCreated>) {
-  for (const e of effects) if (e.kind === "set_topic_status") ctx.runner.expect(e.topic, e.to);
-  await applyEffects(effects, ctx.repo, ctx.notify, ctx.now, ctx.index);
-}
-
-function topicView(ctx: AppContext, topicId: string | null | undefined, excludeQuestion?: string) {
-  if (!topicId) return undefined;
-  const t = ctx.index.topics.get(topicId);
-  if (!t) return undefined;
-  const openBlockingCount = ctx.index
-    .questionsForTopic(topicId)
-    .filter((q) => q.fm.status === "open" && q.fm.blocking && q.id !== excludeQuestion).length;
-  return { fm: t.fm, openBlockingCount };
 }
 
 function def<S extends z.ZodObject>(d: ToolDef<S>): ToolDef {
@@ -255,10 +239,7 @@ export const AGENT_TOOLS: ToolDef[] = [
       ctx.runner.expect(id, "open");
       await ctx.index.refresh("question", id);
       const q = requireQuestion(ctx, id);
-      await runEffects(
-        ctx,
-        effectsForQuestionCreated(q.fm, q.sections.Question, topicView(ctx, input.topic)),
-      );
+      await ctx.inbox.emit({ kind: "asked", question: q.fm, text: q.sections.Question });
       return {
         id,
         topic_status: input.topic ? ctx.index.topics.get(input.topic)?.fm.status : null,
@@ -341,7 +322,11 @@ export const AGENT_TOOLS: ToolDef[] = [
         withdrawQuestion(question, reason, ctx.now()),
       );
       await ctx.index.refresh("question", id);
-      await runEffects(ctx, effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id)));
+      await ctx.inbox.emit({
+        kind: "withdrawn",
+        question: q.fm,
+        text: questionSections(q).Question,
+      });
       return { id, status: "withdrawn" };
     },
   }),

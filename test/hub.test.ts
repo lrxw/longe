@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createMultiHub, createRegistryHub, type Hub } from "../src/app/hub.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { newQuestionText } from "../src/inbox/store.js";
 import { questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText } from "../src/store/question.js";
 import { readRegistry, registerRepo, renameRepo, unregisterRepo } from "../src/store/registry.js";
 import { newTopicText } from "../src/store/topic.js";
 

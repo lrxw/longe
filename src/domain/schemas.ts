@@ -1,7 +1,10 @@
 import { z } from "zod";
-import { QUESTION_ID_RE, SLUG_RE } from "../store/ids.js";
+import { SLUG_RE } from "../store/ids.js";
 import { isIsoTimestamp } from "./time.js";
-import { QUESTION_STATUSES, TOPIC_STATUSES } from "./types.js";
+import { TOPIC_STATUSES } from "./types.js";
+
+// the question file format belongs to the inbox (src/inbox/); the board reuses it
+export { formatZodIssues, questionFrontmatterSchema } from "../inbox/schema.js";
 
 const isoTimestamp = z
   .string()
@@ -21,27 +24,6 @@ export const topicFrontmatterSchema = z.looseObject({
     .transform((v) => v ?? []),
   branch: nullishString,
 });
-
-export const questionFrontmatterSchema = z
-  .looseObject({
-    id: z.string().regex(QUESTION_ID_RE, "id must look like q-YYYYMMDD-xxxx"),
-    topic: z.string().regex(SLUG_RE).nullish(),
-    asked_by: z.string().trim().min(1),
-    asked_at: isoTimestamp,
-    status: z.enum(QUESTION_STATUSES),
-    blocking: z.boolean(),
-    options: z.array(z.string().trim().min(1)).min(2).max(4).nullish(),
-    reject_options: z.array(z.string().trim().min(1)).nullish(),
-    approve_options: z.array(z.string().trim().min(1)).nullish(),
-    selected_option: nullishString,
-    assumption: nullishString,
-    answered_at: isoTimestamp.nullish(),
-    acknowledged_at: isoTimestamp.nullish(),
-  })
-  .refine((q) => q.blocking || (typeof q.assumption === "string" && q.assumption.trim() !== ""), {
-    message: "a non-blocking question requires an assumption (blocking: false ⇒ assumption)",
-    path: ["assumption"],
-  });
 
 /** Input shape for creating a question through the tool (§7.1 ask_question). */
 export const askQuestionInputSchema = z
@@ -81,9 +63,3 @@ export const askQuestionInputSchema = z
     path: ["approve_options"],
   });
 export type AskQuestionInput = z.infer<typeof askQuestionInputSchema>;
-
-export function formatZodIssues(error: z.ZodError): string {
-  return error.issues
-    .map((i) => (i.path.length ? `${i.path.map(String).join(".")}: ${i.message}` : i.message))
-    .join("; ");
-}

@@ -11,8 +11,8 @@ import { Hub, type HubRepo } from "../app/hub.js";
 import { createProject } from "../app/new-project.js";
 import { isProvider } from "../app/providers/index.js";
 import { DomainError } from "../domain/errors.js";
-import { buildInboxView, inboxOrder } from "../domain/inbox-view.js";
 import { TOPIC_STATUSES, type TopicStatus } from "../domain/types.js";
+import { buildInboxView, inboxOrder } from "../inbox/view.js";
 import { answerQuestion, deleteQuestion, human, setTopicStatus } from "../tools/ops.js";
 import { API_BASE, createApiApp, docsPage, openApiDocument } from "./api.js";
 import { statusFor } from "./errors.js";
@@ -361,7 +361,7 @@ function buildApp(hub: Hub, opts: HttpOptions): Hono {
 
   app.get("/fragments/inbox", (c) => c.html(inboxFragment(inboxFilter(c))));
   // the inbox view model: the web inbox and the Claude Code mod show the same thing
-  // (src/domain/inbox-view.ts); hub-wide, `?repo=` narrows it to one project
+  // (src/inbox/view.ts); hub-wide, `?repo=` narrows it to one project
   app.get(`${API_BASE}/inbox`, (c) => {
     const filter = inboxFilter(c);
     const items = filterInbox(inboxItems(), filter);

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { effectsForQuestionClosed, effectsForQuestionCreated } from "../src/domain/side-effects.js";
-import type { QuestionFrontmatter, TopicFrontmatter, TopicStatus } from "../src/domain/types.js";
+import { type TopicView, topicEffects } from "../src/board/question-effects.js";
+import type { TopicFrontmatter, TopicStatus } from "../src/domain/types.js";
+import type { QuestionEvent } from "../src/inbox/events.js";
+import { askedNotification } from "../src/inbox/notify.js";
+import type { QuestionFrontmatter } from "../src/inbox/types.js";
 
 const topic = (status: TopicStatus): TopicFrontmatter => ({
   id: "t1",
@@ -22,14 +25,25 @@ const q = (
   blocking,
   ...(blocking ? {} : { assumption: "x" }),
 });
+const view = (status: TopicStatus, openBlockingCount = 0): TopicView => ({
+  fm: topic(status),
+  openBlockingCount,
+});
 
-describe("§5 side effects", () => {
-  it("blocking question on active topic → needs-decision + log + notify", () => {
-    const fx = effectsForQuestionCreated(q(true), "Which DB?", {
-      fm: topic("active"),
-      openBlockingCount: 1,
-    });
-    expect(fx).toEqual([
+const asked = (question: QuestionFrontmatter, text = "Q"): QuestionEvent => ({
+  kind: "asked",
+  question,
+  text,
+});
+/** answered or withdrawn, from the question's status */
+const closed = (question: QuestionFrontmatter, answer = ""): QuestionEvent =>
+  question.status === "withdrawn"
+    ? { kind: "withdrawn", question, text: "Q" }
+    : { kind: "answered", question, text: "Q", answer };
+
+describe("§5 the board as an inbox consumer", () => {
+  it("blocking question on active topic → needs-decision (board) + notification (inbox)", () => {
+    expect(topicEffects(asked(q(true), "Which DB?"), view("active", 1))).toEqual([
       {
         kind: "set_topic_status",
         topic: "t1",
@@ -37,42 +51,35 @@ describe("§5 side effects", () => {
         to: "needs-decision",
         note: "blocked on q-20260922-aaaa",
       },
-      { kind: "notify", title: "Which DB?", body: "Blocking · Topic one" },
     ]);
+    expect(askedNotification(q(true), "Which DB?", "Topic one")).toEqual({
+      title: "Which DB?",
+      body: "Blocking · Topic one",
+    });
   });
 
-  it("blocking question on non-active topic → notify only", () => {
-    for (const s of ["backlog", "review", "needs-decision", "done"] as const) {
-      const fx = effectsForQuestionCreated(q(true), "Q", { fm: topic(s), openBlockingCount: 1 });
-      expect(fx.map((e) => e.kind)).toEqual(["notify"]);
-    }
+  it("blocking question on non-active topic → no topic move", () => {
+    for (const s of ["backlog", "review", "needs-decision", "done"] as const)
+      expect(topicEffects(asked(q(true)), view(s, 1))).toEqual([]);
   });
 
-  it("project-wide blocking question → notify only", () => {
+  it("project-wide blocking question → notification only", () => {
     const { topic: _omit, ...projectWide } = q(true);
-    expect(effectsForQuestionCreated(projectWide, "Q", undefined)).toEqual([
-      { kind: "notify", title: "Q", body: "Blocking · project-wide" },
-    ]);
+    expect(topicEffects(asked(projectWide), undefined)).toEqual([]);
+    expect(askedNotification(projectWide, "Q", "project-wide")).toEqual({
+      title: "Q",
+      body: "Blocking · project-wide",
+    });
   });
 
   it("non-blocking question never changes status or notifies", () => {
-    expect(
-      effectsForQuestionCreated(q(false), "Q", { fm: topic("active"), openBlockingCount: 0 }),
-    ).toEqual([]);
-    expect(
-      effectsForQuestionClosed(q(false, "answered"), {
-        fm: topic("needs-decision"),
-        openBlockingCount: 0,
-      }),
-    ).toEqual([]);
+    expect(topicEffects(asked(q(false)), view("active"))).toEqual([]);
+    expect(askedNotification(q(false), "Q", "Topic one")).toBeNull();
+    expect(topicEffects(closed(q(false, "answered")), view("needs-decision"))).toEqual([]);
   });
 
   it("closing the last open blocking question returns topic to active", () => {
-    const fx = effectsForQuestionClosed(q(true, "answered"), {
-      fm: topic("needs-decision"),
-      openBlockingCount: 0,
-    });
-    expect(fx).toEqual([
+    expect(topicEffects(closed(q(true, "answered")), view("needs-decision"))).toEqual([
       {
         kind: "set_topic_status",
         topic: "t1",
@@ -81,26 +88,17 @@ describe("§5 side effects", () => {
         note: "q-20260922-aaaa answered, unblocked",
       },
     ]);
-    const wd = effectsForQuestionClosed(q(true, "withdrawn"), {
-      fm: topic("needs-decision"),
-      openBlockingCount: 0,
+    expect(topicEffects(closed(q(true, "withdrawn")), view("needs-decision"))[0]).toMatchObject({
+      note: "q-20260922-aaaa withdrawn, unblocked",
     });
-    expect(wd[0]).toMatchObject({ note: "q-20260922-aaaa withdrawn, unblocked" });
   });
 
   it("closing a blocking question while others remain open does nothing", () => {
-    expect(
-      effectsForQuestionClosed(q(true, "answered"), {
-        fm: topic("needs-decision"),
-        openBlockingCount: 1,
-      }),
-    ).toEqual([]);
+    expect(topicEffects(closed(q(true, "answered")), view("needs-decision", 1))).toEqual([]);
   });
 
   it("closing a blocking question on a topic not in needs-decision does nothing", () => {
-    expect(
-      effectsForQuestionClosed(q(true, "answered"), { fm: topic("review"), openBlockingCount: 0 }),
-    ).toEqual([]);
+    expect(topicEffects(closed(q(true, "answered")), view("review"))).toEqual([]);
   });
 
   it("picking a reject option sends a review topic back to active", () => {
@@ -109,8 +107,7 @@ describe("§5 side effects", () => {
       options: ["Works", "Broken"],
       reject_options: ["Broken"],
     };
-    const review = { fm: topic("review"), openBlockingCount: 0 };
-    expect(effectsForQuestionClosed(verify, review, "Broken\n\nmenu never opens")).toEqual([
+    expect(topicEffects(closed(verify, "Broken\n\nmenu never opens"), view("review"))).toEqual([
       {
         kind: "set_topic_status",
         topic: "t1",
@@ -120,16 +117,12 @@ describe("§5 side effects", () => {
       },
     ]);
     // an unmarked option or a topic no longer in review: nothing happens
-    expect(effectsForQuestionClosed(verify, review, "Works")).toEqual([]);
-    expect(effectsForQuestionClosed(verify, review, "Broken, sort of")[0]).toMatchObject({
+    expect(topicEffects(closed(verify, "Works"), view("review"))).toEqual([]);
+    expect(topicEffects(closed(verify, "Broken, sort of"), view("review"))[0]).toMatchObject({
       to: "active",
     });
-    expect(
-      effectsForQuestionClosed(verify, { fm: topic("active"), openBlockingCount: 0 }, "Broken"),
-    ).toEqual([]);
-    expect(effectsForQuestionClosed({ ...verify, status: "withdrawn" }, review, "Broken")).toEqual(
-      [],
-    );
+    expect(topicEffects(closed(verify, "Broken"), view("active"))).toEqual([]);
+    expect(topicEffects(closed({ ...verify, status: "withdrawn" }), view("review"))).toEqual([]);
   });
 
   it("picking an approve option moves a review topic to done", () => {
@@ -139,8 +132,7 @@ describe("§5 side effects", () => {
       approve_options: ["Good"],
       reject_options: ["Broken"],
     };
-    const review = { fm: topic("review"), openBlockingCount: 0 };
-    expect(effectsForQuestionClosed(verify, review, "Good")).toEqual([
+    expect(topicEffects(closed(verify, "Good"), view("review"))).toEqual([
       {
         kind: "set_topic_status",
         topic: "t1",
@@ -149,9 +141,7 @@ describe("§5 side effects", () => {
         note: "approved in q-20260922-aaaa: Good",
       },
     ]);
-    expect(
-      effectsForQuestionClosed(verify, { fm: topic("active"), openBlockingCount: 0 }, "Good"),
-    ).toEqual([]);
+    expect(topicEffects(closed(verify, "Good"), view("active"))).toEqual([]);
   });
 
   it("custom review feedback follows up even when it starts with an approval label", () => {
@@ -162,9 +152,7 @@ describe("§5 side effects", () => {
       selected_option: null,
     };
     const answer = "Good\n\nBut please change the layout.";
-    expect(
-      effectsForQuestionClosed(verify, { fm: topic("review"), openBlockingCount: 0 }, answer),
-    ).toEqual([
+    expect(topicEffects(closed(verify, answer), view("review"))).toEqual([
       {
         kind: "set_topic_status",
         topic: "t1",
@@ -173,24 +161,21 @@ describe("§5 side effects", () => {
         note: "follow-up in q-20260922-aaaa: Good But please change the layout.",
       },
     ]);
-    for (const status of ["active", "done", "cancelled", "needs-decision"] as const) {
-      expect(
-        effectsForQuestionClosed(verify, { fm: topic(status), openBlockingCount: 0 }, answer),
-      ).toEqual([]);
-    }
+    for (const status of ["active", "done", "cancelled", "needs-decision"] as const)
+      expect(topicEffects(closed(verify, answer), view(status))).toEqual([]);
+    expect(topicEffects(closed({ ...verify, status: "withdrawn" }), view("review"))).toEqual([]);
+    // ordinary questions do not become review decisions
     expect(
-      effectsForQuestionClosed(
-        { ...verify, status: "withdrawn" },
-        { fm: topic("review"), openBlockingCount: 0 },
-        answer,
+      topicEffects(
+        closed({ ...q(false, "answered"), selected_option: null }, answer),
+        view("review"),
       ),
     ).toEqual([]);
-    expect(
-      effectsForQuestionClosed(
-        { ...q(false, "answered"), selected_option: null },
-        { fm: topic("review"), openBlockingCount: 0 },
-        answer,
-      ),
-    ).toEqual([]); // ordinary questions do not become review decisions
+  });
+
+  it("a subject of another kind is not the board's", () => {
+    const { topic: _omit, ...rest } = q(true);
+    const issue = { ...rest, subject: { kind: "issue", id: "42" } };
+    expect(topicEffects(asked(issue), undefined)).toEqual([]);
   });
 });

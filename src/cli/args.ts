@@ -28,6 +28,8 @@ export interface ParsedCli {
   all: boolean;
   hook: boolean;
   mod: boolean;
+  /** mcp: only the inbox's tools, no board. */
+  inboxOnly: boolean;
   /** `--repo` was given explicitly (serve: single mode even without .longe/ in cwd). */
   repoGiven: boolean;
   /** Positional arguments after the command (repos add <path> …). */
@@ -44,7 +46,10 @@ const USAGE = `Usage:
   longe repos  [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
   longe status                              # is the server running, which repos
   longe stop                                # stop the background server
-  longe mcp    [--repo <dir>]
+  longe mcp    [--repo <dir>] [--inbox-only]
+               # --inbox-only: just the inbox (ask the human, read answers), no board tools
+  longe ask    "<question>" [--option <label> …] [--assumption <text>] [--subject kind:id] [--wait <s>]
+               # put a question into the inbox from a shell or script; longe ask --help
   longe provider deep-integrate [claude|codex …] [--repo <dir>] [--all | --hook --mod] [--shared] [--remove]
                # optional: hooks into each agent's own CLI (terminal, IDE) so it uses the
                # inbox more reliably, as far as the CLI allows, and the longe-inbox mod for
@@ -77,6 +82,7 @@ const OPTIONS = {
   daemon: { type: "boolean", short: "d", default: false },
   all: { type: "boolean", default: false },
   hook: { type: "boolean", default: false },
+  "inbox-only": { type: "boolean", default: false },
   mod: { type: "boolean", default: false },
   name: { type: "string" },
   shared: { type: "boolean", default: false },
@@ -149,6 +155,8 @@ export function parseCli(argv: string[]): ParsedCli {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new CliError(`Invalid --port: ${values.port}`);
   }
+  if (values["inbox-only"] && command !== "mcp")
+    throw new CliError("--inbox-only is only supported by mcp");
   if (values.hook || values.mod) {
     if (command !== "init" && !(command === "provider" && positionals[1] === "deep-integrate"))
       throw new CliError("--hook and --mod are only supported by init and provider deep-integrate");
@@ -171,6 +179,7 @@ export function parseCli(argv: string[]): ParsedCli {
     all: values.all,
     hook: values.hook,
     mod: values.mod,
+    inboxOnly: values["inbox-only"],
     repoGiven: argv.includes("--repo") || argv.some((a) => a.startsWith("--repo=")),
     rest: positionals.slice(1),
     ...(values.name !== undefined ? { name: values.name } : {}),

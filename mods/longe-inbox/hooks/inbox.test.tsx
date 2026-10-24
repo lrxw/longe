@@ -64,7 +64,7 @@ const files: Record<string, string> = {
   ].join("\n"),
 };
 
-// what a running longe answers on GET /api/v1/inbox (src/domain/inbox-view.ts)
+// what a running longe answers on GET /api/v1/inbox (src/inbox/view.ts)
 const VIEW = {
   version: 1,
   tokens: {

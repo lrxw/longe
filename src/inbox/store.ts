@@ -1,7 +1,5 @@
 import { DomainError, ParseError } from "../domain/errors.js";
-import { formatZodIssues, questionFrontmatterSchema } from "../domain/schemas.js";
 import { toLocalIso } from "../domain/time.js";
-import type { QuestionFrontmatter } from "../domain/types.js";
 import {
   findSection,
   frontmatterObject,
@@ -9,9 +7,12 @@ import {
   parseMarkdown,
   sectionText,
   serializeMarkdown,
-} from "./markdown.js";
-import { yamlString } from "./topic.js";
+  yamlString,
+} from "../store/markdown.js";
+import { formatZodIssues, questionFrontmatterSchema } from "./schema.js";
+import type { QuestionFrontmatter, Subject } from "./types.js";
 
+/** One question file: frontmatter plus `## Question`, `## Context`, `## Answer`. */
 export interface Question {
   fm: QuestionFrontmatter;
   doc: MdDoc;
@@ -65,7 +66,10 @@ export interface NewQuestionInput {
   id: string;
   question: string;
   context?: string | undefined;
+  /** Board questions: stored as `topic: <id>`. Same as `subject: { kind: "topic", id }`. */
   topic?: string | undefined;
+  /** What the question is about, for any consumer; `kind: "topic"` is written as `topic:`. */
+  subject?: Subject | undefined;
   options?: string[] | undefined;
   reject_options?: string[] | undefined;
   approve_options?: string[] | undefined;
@@ -78,7 +82,14 @@ export interface NewQuestionInput {
 /** Builds the text of a fresh question file in `open` (§3.4). Caller validates input. */
 export function newQuestionText(input: NewQuestionInput): string {
   const fm: string[] = ["---", `id: ${input.id}`];
-  if (input.topic) fm.push(`topic: ${input.topic}`);
+  const topic = input.topic ?? (input.subject?.kind === "topic" ? input.subject.id : undefined);
+  if (topic) fm.push(`topic: ${topic}`);
+  else if (input.subject) {
+    fm.push("subject:");
+    fm.push(`  kind: ${yamlString(input.subject.kind)}`);
+    fm.push(`  id: ${yamlString(input.subject.id)}`);
+    if (input.subject.url) fm.push(`  url: ${yamlString(input.subject.url)}`);
+  }
   fm.push(`asked_by: ${yamlString(input.asked_by)}`);
   fm.push(`asked_at: ${toLocalIso(input.now)}`);
   fm.push("status: open");

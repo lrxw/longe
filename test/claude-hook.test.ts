@@ -4,8 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { askToInbox, HOOK_COMMAND, installHook, removeHook } from "../src/cli/hooks.js";
 import { runInit } from "../src/cli/init.js";
+import { parseQuestion } from "../src/inbox/store.js";
 import { questionsDir } from "../src/store/paths.js";
-import { parseQuestion } from "../src/store/question.js";
 
 let dir: string;
 beforeEach(async () => {

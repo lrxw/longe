@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { attachBoard, describeTopic } from "../board/question-effects.js";
 import { AGENT_INSTRUCTIONS } from "../domain/agent-instructions.js";
-import { EffectRunner, type Notifier, type EffectRunner as Runner } from "../index/effects.js";
+import { InboxEvents } from "../inbox/events.js";
+import { attachNotifications, type Notifier } from "../inbox/notify.js";
+import { EffectRunner, type EffectRunner as Runner } from "../index/effects.js";
 import { AiIndex, type IndexOptions } from "../index/index.js";
 import { type Config, parseConfig } from "../store/config.js";
 import { migrateBoardDir, refreshInstructions } from "../store/migrate.js";
@@ -16,6 +19,8 @@ export interface AppContext {
   config: Config;
   repo: Repo;
   index: AiIndex;
+  /** The inbox's question events; the board and the notifications subscribe. */
+  inbox: InboxEvents;
   runner: Runner;
   notify: Notifier;
   now: () => Date;
@@ -63,7 +68,12 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
     path.basename(root),
   ]);
   agent.askInInbox = config.ask_in_inbox !== false;
-  const runner = new EffectRunner(index, repo, notify, (name, vars) => hooks.trigger(name, vars));
+  const now = opts.now ?? (() => new Date());
+  // the inbox emits question events; the board (topic moves) and notifications consume them
+  const inbox = new InboxEvents();
+  const runner = new EffectRunner(index, inbox, (name, vars) => hooks.trigger(name, vars));
+  attachBoard(inbox, { index, repo, now, expect: (id, state) => runner.expect(id, state) });
+  attachNotifications(inbox, notify, describeTopic(index));
   runner.attach();
   // answers (unless the repo's own on_answer hook owns that job), then todo topics,
   // each handed to the chat only when it is free (see todo-queue.ts)
@@ -81,9 +91,10 @@ export async function createAppContext(root: string, opts: AppOptions = {}): Pro
     config,
     repo,
     index,
+    inbox,
     runner,
     notify,
-    now: opts.now ?? (() => new Date()),
+    now,
     hooks,
     agent,
     startChat,

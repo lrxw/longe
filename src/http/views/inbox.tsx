@@ -1,7 +1,8 @@
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import type { HookStatus } from "../../app/hooks.js";
-import { INBOX_TOKENS, type InboxSource, toViewQuestion } from "../../domain/inbox-view.js";
+import { subjectOf } from "../../inbox/subject.js";
+import { INBOX_TOKENS, type InboxSource, toViewQuestion } from "../../inbox/view.js";
 import type { IndexedQuestion } from "../../index/index.js";
 import { ago, renderMarkdown } from "../format.js";
 import { Avatar, ErrorList, type RepoNav } from "./layout.js";
@@ -13,12 +14,21 @@ export interface InboxItem {
   showRepo: boolean;
 }
 
-/** The question as the inbox view model sees it (src/domain/inbox-view.ts). */
+/**
+ * The question as the inbox view model sees it (src/inbox/view.ts). The links are the
+ * board's: a topic subject opens its topic page; any other subject its own `url`.
+ */
 export function inboxSource({ q, repo }: InboxItem): InboxSource {
+  const subject = subjectOf(q.fm);
   return {
     id: q.id,
-    repo: { name: repo.name, title: repo.title, color: repo.color, base: repo.base },
-    topic: q.fm.topic,
+    repo: { name: repo.name, title: repo.title, color: repo.color },
+    subject,
+    links: {
+      project: `${repo.base}/board`,
+      subject:
+        subject?.kind === "topic" ? `${repo.base}/topics/${subject.id}` : (subject?.url ?? null),
+    },
     blocking: q.fm.blocking,
     askedBy: q.fm.asked_by,
     askedAt: q.fm.asked_at,

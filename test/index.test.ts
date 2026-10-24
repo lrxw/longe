@@ -2,11 +2,14 @@ import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { attachBoard, describeTopic } from "../src/board/question-effects.js";
 import { runInit } from "../src/cli/init.js";
+import { InboxEvents } from "../src/inbox/events.js";
+import { attachNotifications } from "../src/inbox/notify.js";
+import { newQuestionText } from "../src/inbox/store.js";
 import { EffectRunner } from "../src/index/effects.js";
 import { AiIndex, type QuestionChange, type TopicChange } from "../src/index/index.js";
 import { questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText } from "../src/store/question.js";
 import { Repo } from "../src/store/repo.js";
 import { newTopicText } from "../src/store/topic.js";
 
@@ -160,8 +163,20 @@ describe("EffectRunner (§7.4 external changes)", () => {
       ),
     );
     index = new AiIndex(dir, { debounceMs: 20, usePolling: true });
-    runner = new EffectRunner(index, new Repo(dir), (title, body) =>
-      notifications.push(`${title}: ${body}`),
+    // the watcher emits inbox events; the board and the notifications consume them,
+    // wired the way createAppContext does
+    const events = new InboxEvents();
+    runner = new EffectRunner(index, events);
+    attachBoard(events, {
+      index,
+      repo: new Repo(dir),
+      now: () => new Date(),
+      expect: (id, state) => runner.expect(id, state),
+    });
+    attachNotifications(
+      events,
+      (title, body) => notifications.push(`${title}: ${body}`),
+      describeTopic(index),
     );
     runner.attach();
     await index.start();

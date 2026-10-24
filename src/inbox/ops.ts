@@ -1,7 +1,9 @@
+import { DomainError } from "../domain/errors.js";
+import { minuteStamp, toLocalIso } from "../domain/time.js";
 import { appendLine, replaceSection, setField } from "../store/markdown.js";
-import { type Question, refreshQuestion } from "../store/question.js";
-import { DomainError } from "./errors.js";
-import { minuteStamp, toLocalIso } from "./time.js";
+import { type Question, refreshQuestion } from "./store.js";
+
+/** A question's life: open → answered → acknowledged, or open → withdrawn. */
 
 export interface AnswerInput {
   answer?: string | undefined;

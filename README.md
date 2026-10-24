@@ -186,6 +186,27 @@ HTTP variants: Gemini CLI uses `"httpUrl"`, Cursor uses `"url"`, opencode uses
 
 The MCP server also offers the protocol as the resource `longe://agent-instructions`.
 
+**Inbox only.** An agent that should only ask you questions, without the board (topics,
+plans, statuses), gets just the inbox's tools with `longe mcp --inbox-only`:
+`ask_question`, `check_answers`, `acknowledge_answers`, `wait_for_answer`,
+`withdraw_question`. A question can name any `subject` (an issue, a pull request,
+`{ "kind": "issue", "id": "42", "url": "…" }`); it shows in the same inbox, on the web and
+in Claude Code. A `subject` of kind `topic` is a board topic, and the board still reacts.
+
+```json
+{ "mcpServers": { "longe-inbox": { "command": "longe", "args": ["mcp", "--repo", ".", "--inbox-only"] } } }
+```
+
+From a shell, a script or CI, `longe ask` does the same without an agent:
+
+```sh
+longe ask "Deploy to production?" --option "Deploy" --option "Not now" --subject pr:128 --wait 600
+```
+
+It prints the question id, or with `--wait` the answer (exit 3 when none came in time,
+4 when the question was withdrawn). Without `--assumption` the question is blocking.
+`longe ask --help` lists every option.
+
 **Questions go to the inbox, also from the terminal** (`ask_in_inbox`, on by default).
 Agents have their own ways to ask you in the terminal. With the option on:
 
@@ -461,7 +482,8 @@ longe serve   [--repo <dir>] [--port 7311] [--open] [-d]   start the server (one
 longe status                                         is it running, which repositories
 longe stop                                           stop the background server
 longe repos   [list | add <dir> [--name <n>] | remove <dir> | rename <dir> <name> | prune]
-longe mcp     [--repo <dir>]                         MCP server over stdio
+longe mcp     [--repo <dir>] [--inbox-only]          MCP server over stdio (--inbox-only: no board)
+longe ask     "<question>" [--option …] [--wait <s>]  ask the human from a shell or script
 longe answers [--repo <dir>] [--json]                answers not yet picked up
 ```
 

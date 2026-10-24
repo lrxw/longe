@@ -5,12 +5,14 @@ import {
   INBOX_TOKENS,
   INBOX_VIEW_VERSION,
   type InboxSource,
-} from "../src/domain/inbox-view.js";
+} from "../src/inbox/view.js";
 
-const repo = { name: "shop", title: "Shop", color: "#123456", base: "/r/shop" };
+const repo = { name: "shop", title: "Shop", color: "#123456" };
 const src = (over: Partial<InboxSource>): InboxSource => ({
   id: "q-20261018-aaaa",
   repo,
+  subject: null,
+  links: { project: "/r/shop/board", subject: null },
   blocking: false,
   askedBy: "claude",
   askedAt: "2026-10-18T10:00:00+02:00",
@@ -31,7 +33,8 @@ describe("inbox view model", () => {
         options: ["Works", "Broken", "Later"],
         approveOptions: ["Works"],
         rejectOptions: ["Broken"],
-        topic: "export",
+        subject: { kind: "topic", id: "export" },
+        links: { project: "/r/shop/board", subject: "/r/shop/topics/export" },
         context: "```ts\nx\n```",
       }),
       src({ id: "q-20261018-blok", blocking: true, askedAt: "2026-10-18T13:00:00+02:00" }),
@@ -48,6 +51,8 @@ describe("inbox view model", () => {
     expect(review?.review).toBe(true);
     expect(review?.contextOpen).toBe(true);
     expect(review?.links).toEqual({ board: "/r/shop/board", topic: "/r/shop/topics/export" });
+    expect(review?.subject).toEqual({ kind: "topic", id: "export" });
+    expect(review?.topic).toBe("export");
     expect(view.questions[0]?.kind).toBe("blocking");
     expect(view.questions[2]?.topic).toBeNull();
   });

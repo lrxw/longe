@@ -15,6 +15,7 @@ describe("parseCli", () => {
       all: false,
       hook: false,
       mod: false,
+      inboxOnly: false,
       repoGiven: false,
       rest: [],
     });
@@ -34,6 +35,7 @@ describe("parseCli", () => {
       all: false,
       hook: false,
       mod: false,
+      inboxOnly: false,
       repoGiven: true,
       rest: [],
     });
@@ -41,6 +43,8 @@ describe("parseCli", () => {
 
   it("parses mcp and answers", () => {
     expect(parseCli(["mcp"]).command).toBe("mcp");
+    expect(parseCli(["mcp", "--inbox-only"]).inboxOnly).toBe(true);
+    expect(() => parseCli(["serve", "--inbox-only"])).toThrow(/only supported by mcp/);
     expect(parseCli(["answers", "--json"])).toMatchObject({ command: "answers", json: true });
     expect(parseCli(["serve", "-d"])).toMatchObject({ command: "serve", daemon: true });
     expect(parseCli(["stop"]).command).toBe("stop");

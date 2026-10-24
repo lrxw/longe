@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { headline } from "../src/domain/side-effects.js";
+import { headline } from "../src/inbox/notify.js";
 import { coalescing } from "../src/notify/notifier.js";
 
 describe("notifications", () => {

@@ -1,16 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  acknowledgeQuestion,
-  answerQuestion,
-  withdrawQuestion,
-} from "../src/domain/question-ops.js";
 import { askQuestionInputSchema } from "../src/domain/schemas.js";
+import { acknowledgeQuestion, answerQuestion, withdrawQuestion } from "../src/inbox/ops.js";
 import {
   newQuestionText,
   parseQuestion,
   questionSections,
   serializeQuestion,
-} from "../src/store/question.js";
+} from "../src/inbox/store.js";
 
 const now = new Date(2026, 8, 22, 15, 2, 0);
 const later = new Date(2026, 8, 22, 16, 30, 0);

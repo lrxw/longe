@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppContext } from "../app/context.js";
 import type { Hub } from "../app/hub.js";
 import { DomainError } from "../domain/errors.js";
+import { INBOX_ONLY_INSTRUCTIONS, INBOX_ONLY_TOOLS } from "../tools/inbox-tools.js";
 import { AGENT_TOOLS, invokeTool, readAgentInstructions, type ToolDef } from "../tools/registry.js";
 
 export const MCP_SERVER_NAME = "longe";
@@ -40,13 +41,16 @@ function registerInstructions(server: McpServer, read: () => Promise<string>): v
   );
 }
 
-/** One MCP server for one repo, exposing every agent-facing registry entry (§7.2). */
-export function createMcpServer(ctx: AppContext): McpServer {
+/**
+ * One MCP server for one repo, exposing every agent-facing registry entry (§7.2).
+ * `inboxOnly`: just the inbox's tools (ask, answers, wait, withdraw), no board.
+ */
+export function createMcpServer(ctx: AppContext, opts: { inboxOnly?: boolean } = {}): McpServer {
   const server = new McpServer(
     { name: MCP_SERVER_NAME, version: "0.1.0" },
-    { instructions: INSTRUCTIONS },
+    { instructions: opts.inboxOnly ? INBOX_ONLY_INSTRUCTIONS : INSTRUCTIONS },
   );
-  for (const tool of AGENT_TOOLS) {
+  for (const tool of opts.inboxOnly ? INBOX_ONLY_TOOLS : AGENT_TOOLS) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.input },
@@ -59,7 +63,8 @@ export function createMcpServer(ctx: AppContext): McpServer {
       },
     );
   }
-  registerInstructions(server, () => readAgentInstructions(ctx));
+  // the board protocol is the board's; the inbox-only server has none
+  if (!opts.inboxOnly) registerInstructions(server, () => readAgentInstructions(ctx));
   return server;
 }
 

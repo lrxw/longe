@@ -1,69 +1,28 @@
-import {
-  type Effect,
-  effectsForQuestionClosed,
-  effectsForQuestionCreated,
-} from "../domain/side-effects.js";
-import { transitionTopic } from "../domain/topic-ops.js";
-import type { Repo } from "../store/repo.js";
+import type { InboxEvents, QuestionEvent } from "../inbox/events.js";
+import { subjectId } from "../inbox/subject.js";
 import type { AiIndex, QuestionChange, TopicChange } from "./index.js";
 
-export type Notifier = (title: string, body: string) => void;
+export type { Notifier } from "../inbox/notify.js";
+
 export type HookTrigger = (
   hook: "on_answer",
   vars: { question_id: string; topic_id?: string; answer: string; question: string },
 ) => void;
 
 /**
- * Executes effects. Topic status changes go through the normal read–modify–write
- * path as the `system` actor; notifications go to `notify` and never throw.
- */
-export async function applyEffects(
-  effects: Effect[],
-  repo: Repo,
-  notify: Notifier,
-  now: () => Date = () => new Date(),
-  index?: AiIndex,
-): Promise<void> {
-  for (const e of effects) {
-    switch (e.kind) {
-      case "set_topic_status":
-        try {
-          await repo.modifyTopic(e.topic, (topic) => {
-            // re-check on the fresh file: someone may have moved it already
-            if (topic.fm.status !== e.from) return;
-            transitionTopic(topic, e.to, "system", now(), e.note);
-          });
-          await index?.refresh("topic", e.topic);
-        } catch {
-          // topic vanished or is unparsable — the index will surface that
-        }
-        break;
-      case "notify":
-        try {
-          notify(e.title, e.body);
-        } catch {
-          // notifications must never fail an operation (§10)
-        }
-        break;
-    }
-  }
-}
-
-/**
- * Reacts to changes the index observed but the tool did not perform itself
- * (§7.4): a blocking question file appearing, a question being answered by
- * hand.
+ * Turns changes the index observed but no tool performed (§7.4) into inbox events: a
+ * question file appearing, a question answered or withdrawn by hand. Consumers (the
+ * notifications, the board) subscribe to the events.
  *
- * Tool handlers apply their own effects synchronously and call `expect()`
- * beforehand so that the watcher does not apply them twice.
+ * Tool handlers emit their own events and call `expect()` beforehand so the watcher
+ * does not emit them a second time.
  */
 export class EffectRunner {
   private readonly expected = new Map<string, string>();
 
   constructor(
     private readonly index: AiIndex,
-    private readonly repo: Repo,
-    private readonly notify: Notifier,
+    private readonly events: InboxEvents,
     private readonly hook: HookTrigger = () => {},
   ) {}
 
@@ -89,7 +48,7 @@ export class EffectRunner {
   /** Wakes the configured agent hook for an answered question (tool-driven or hand-edited). */
   fireAnswerHook(q: {
     id: string;
-    fm: { topic?: string | null | undefined };
+    fm: { topic?: string | null | undefined; subject?: { kind: string; id: string } | null };
     sections: { Question: string; Answer: string };
   }): void {
     const vars: Parameters<HookTrigger>[1] = {
@@ -97,12 +56,13 @@ export class EffectRunner {
       answer: q.sections.Answer,
       question: q.sections.Question,
     };
-    if (q.fm.topic) vars.topic_id = q.fm.topic;
+    const topic = subjectId(q.fm, "topic");
+    if (topic) vars.topic_id = topic;
     this.hook("on_answer", vars);
   }
 
   async handle(topics: TopicChange[], questions: QuestionChange[]): Promise<void> {
-    const effects: import("../domain/side-effects.js").Effect[] = [];
+    const events: QuestionEvent[] = [];
 
     for (const c of questions) {
       const cur = c.current;
@@ -110,20 +70,23 @@ export class EffectRunner {
       const state = cur.fm.status;
       const before = c.previous?.fm.status;
       if (before === state) continue; // body edit only
-      if (this.consume(cur.id, state)) continue; // tool did this and already applied effects
-      const topic = cur.fm.topic ? this.index.topics.get(cur.fm.topic) : undefined;
-      const view = topic
-        ? { fm: topic.fm, openBlockingCount: this.index.openBlockingCount(topic.id) }
-        : undefined;
+      if (this.consume(cur.id, state)) continue; // a tool did this and emitted the event
       if (state === "open" && before === undefined) {
-        effects.push(...effectsForQuestionCreated(cur.fm, cur.sections.Question, view));
-      } else if (before === "open" && (state === "answered" || state === "withdrawn")) {
-        effects.push(...effectsForQuestionClosed(cur.fm, view, cur.sections.Answer));
-        if (state === "answered") this.fireAnswerHook(cur);
+        events.push({ kind: "asked", question: cur.fm, text: cur.sections.Question });
+      } else if (before === "open" && state === "answered") {
+        events.push({
+          kind: "answered",
+          question: cur.fm,
+          text: cur.sections.Question,
+          answer: cur.sections.Answer,
+        });
+        this.fireAnswerHook(cur);
+      } else if (before === "open" && state === "withdrawn") {
+        events.push({ kind: "withdrawn", question: cur.fm, text: cur.sections.Question });
       }
     }
 
-    // topic moves have no effects of their own (no notification since the human asked
+    // topic moves have no events of their own (no notification since the human asked
     // for questions only); clear what a tool announced so the map does not grow
     for (const c of topics) {
       const cur = c.current;
@@ -131,8 +94,6 @@ export class EffectRunner {
         this.consume(cur.id, cur.fm.status);
     }
 
-    // a system status change we are about to write will show up in the next batch: expect it
-    for (const e of effects) if (e.kind === "set_topic_status") this.expect(e.topic, e.to);
-    await applyEffects(effects, this.repo, this.notify, () => new Date(), this.index);
+    for (const e of events) await this.events.emit(e);
   }
 }

@@ -7,9 +7,9 @@ import { expandCommand, HookRunner, shellQuote } from "../src/app/hooks.js";
 import { collectAnswers, formatAnswersForAgent } from "../src/cli/answers.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { newQuestionText } from "../src/inbox/store.js";
 import { parseConfig } from "../src/store/config.js";
 import { questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;

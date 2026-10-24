@@ -11,14 +11,19 @@ export type TopicStatus = (typeof TOPIC_STATUSES)[number];
 
 export const TERMINAL_STATUSES: readonly TopicStatus[] = ["done", "cancelled"];
 
-export const QUESTION_STATUSES = ["open", "answered", "acknowledged", "withdrawn"] as const;
-export type QuestionStatus = (typeof QUESTION_STATUSES)[number];
+// questions belong to the inbox (src/inbox/); the board is one of its consumers
+export {
+  QUESTION_SECTIONS,
+  QUESTION_STATUSES,
+  type QuestionFrontmatter,
+  type QuestionStatus,
+  type Subject,
+} from "../inbox/types.js";
 
 export type Actor = "human" | "agent" | "system";
 export type BallHolder = "human" | "agent" | "none";
 
 export const TOPIC_SECTIONS = ["Goal", "Plan", "Decisions", "Log"] as const;
-export const QUESTION_SECTIONS = ["Question", "Context", "Answer"] as const;
 
 export interface TopicFrontmatter {
   id: string;
@@ -30,26 +35,6 @@ export interface TopicFrontmatter {
   branch?: string | null;
   /** Place in the todo queue, set when the human reorders it (1 = next). */
   rank?: number;
-  [key: string]: unknown;
-}
-
-export interface QuestionFrontmatter {
-  id: string;
-  topic?: string | null;
-  asked_by: string;
-  asked_at: string;
-  status: QuestionStatus;
-  blocking: boolean;
-  options?: string[] | null;
-  /** Options that reject the topic's reviewed work: picking one moves it review → active. */
-  reject_options?: string[] | null;
-  /** Options that approve the topic's reviewed work: picking one moves it review → done. */
-  approve_options?: string[] | null;
-  /** Submitted option label; null for a custom answer, absent on legacy answers. */
-  selected_option?: string | null;
-  assumption?: string | null;
-  answered_at?: string | null;
-  acknowledged_at?: string | null;
   [key: string]: unknown;
 }
 

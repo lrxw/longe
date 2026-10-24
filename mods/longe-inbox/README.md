@@ -21,7 +21,7 @@ It runs alongside the web board: both read the same files, so you can answer in 
   (✓ approves, ✗ sends back) as the web inbox. Roles map to Claude Code theme keys (blocking →
   `warning`, approve → `success`, reject → `error`); project colours are the same hex values.
   The view carries a version; one this mod does not know makes it fall back to the files and
-  say so. The shared contract is `src/domain/inbox-view.ts` in longe; `hooks/tokens.ts` is the
+  say so. The shared contract is `src/inbox/view.ts` in longe; `hooks/tokens.ts` is the
   mod's copy, kept equal by longe's tests.
 - **Offline**: while `longe serve` is stopped, the mod reads the board files directly, the way
   longe does. It takes repositories from `~/.config/longe/repos.yml`, each repository's `id`

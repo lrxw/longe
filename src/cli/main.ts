@@ -3,6 +3,11 @@ import { CliError, parseCli } from "./args.js";
 import { initProject } from "./init.js";
 
 async function main(argv: string[]): Promise<number> {
+  // `longe ask` has its own options (--option, --subject, --wait, …)
+  if (argv[0] === "ask") {
+    const { parseAskArgs, runAsk } = await import("./ask.js");
+    return runAsk(parseAskArgs(argv.slice(1)));
+  }
   const cli = parseCli(argv);
   const repo = path.resolve(cli.repo);
 
@@ -71,7 +76,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "mcp": {
       const { runMcpStdio } = await import("../mcp/stdio.js");
-      await runMcpStdio(repo);
+      await runMcpStdio(repo, { inboxOnly: cli.inboxOnly });
       return new Promise(() => {}); // runs until stdin closes
     }
   }

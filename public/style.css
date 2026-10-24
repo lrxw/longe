@@ -17,7 +17,7 @@
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
   --shadow-lg: 0 4px 12px rgba(16, 24, 40, 0.12);
   --radius: 10px;
-  /* inbox roles (src/domain/inbox-view.ts INBOX_TOKENS); the Claude Code mod maps the
+  /* inbox roles (src/inbox/view.ts INBOX_TOKENS); the Claude Code mod maps the
      same roles to its theme keys. They follow the light/dark values above. */
   --role-blocking: var(--block);
   --role-non-blocking: var(--muted);

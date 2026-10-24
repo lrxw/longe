@@ -1,3 +1,5 @@
+import type { Subject } from "./types.js";
+
 /**
  * The inbox as both surfaces show it: the web inbox (htmx) and the longe-inbox mod in
  * Claude Code. One view model (`GET /api/v1/inbox`) and one set of semantic tokens, so
@@ -5,6 +7,9 @@
  * name roles, not colours: the web maps them to CSS variables, the mod to Claude Code
  * theme keys. Bump INBOX_VIEW_VERSION when a field changes meaning or goes away; adding
  * fields keeps it.
+ *
+ * The inbox knows nothing about boards: where a question's links point is the
+ * caller's to say (`InboxSource.links`).
  *
  * The mod keeps a copy of the tokens (mods/longe-inbox/hooks/tokens.ts; a mod cannot
  * import files outside its folder); a test keeps the copy equal.
@@ -39,11 +44,17 @@ export const INBOX_TOKENS = {
 
 export type InboxTokens = typeof INBOX_TOKENS;
 
-/** What a question needs to become part of the view; filled from the index. */
+/** What a question needs to become part of the view; filled by the caller. */
 export interface InboxSource {
   id: string;
-  repo: { name: string; title: string; color: string; base: string };
-  topic?: string | null | undefined;
+  /** The project (repository) the question lives in. */
+  repo: { name: string; title: string; color: string };
+  subject: Subject | null;
+  /**
+   * Where a human looks, as paths or URLs: the project's page and the subject's page
+   * (null when there is none). The caller knows its routes; the inbox does not.
+   */
+  links: { project: string; subject: string | null };
   blocking: boolean;
   askedBy: string;
   askedAt: string;
@@ -67,6 +78,8 @@ export interface InboxViewQuestion {
   project: string;
   /** The project's colour (hex), the same on every surface. */
   color: string;
+  subject: Subject | null;
+  /** The subject's id (for board questions, the topic); null when there is none. */
   topic: string | null;
   kind: "blocking" | "nonBlocking";
   /** Has approve or reject options: a request to verify work in review. */
@@ -81,7 +94,7 @@ export interface InboxViewQuestion {
   contextOpen: boolean;
   assumption: string | null;
   options: InboxViewOption[];
-  /** Paths on the longe server. */
+  /** `board`: the project's page; `topic`: the subject's page (names kept from v1). */
   links: { board: string; topic: string | null };
 }
 
@@ -120,7 +133,8 @@ export function toViewQuestion(s: InboxSource): InboxViewQuestion {
     repo: s.repo.name,
     project: s.repo.title,
     color: s.repo.color,
-    topic: s.topic ?? null,
+    subject: s.subject,
+    topic: s.subject?.id ?? null,
     kind: s.blocking ? "blocking" : "nonBlocking",
     review: s.approveOptions.length > 0 || s.rejectOptions.length > 0,
     askedBy: s.askedBy,
@@ -130,10 +144,7 @@ export function toViewQuestion(s: InboxSource): InboxViewQuestion {
     contextOpen: s.context.includes("```"),
     assumption: s.assumption ?? null,
     options: s.options.map((label, index) => ({ index, label, role: optionRole(label, s) })),
-    links: {
-      board: `${s.repo.base}/board`,
-      topic: s.topic ? `${s.repo.base}/topics/${s.topic}` : null,
-    },
+    links: { board: s.links.project, topic: s.links.subject },
   };
 }
 

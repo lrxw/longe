@@ -1,39 +1,19 @@
 import type { AppContext } from "../app/context.js";
 import { DomainError } from "../domain/errors.js";
-import {
-  type AnswerInput,
-  answerQuestion as answerOp,
-  withdrawQuestion,
-} from "../domain/question-ops.js";
-import { type Effect, effectsForQuestionClosed } from "../domain/side-effects.js";
 import { setRank, transitionTopic } from "../domain/topic-ops.js";
 import type { Actor, TopicStatus } from "../domain/types.js";
-import { applyEffects } from "../index/effects.js";
+import { type AnswerInput, answerQuestion as answerOp, withdrawQuestion } from "../inbox/ops.js";
+import { type Question, questionSections } from "../inbox/store.js";
 import { slugify } from "../store/ids.js";
-import { type Question, questionSections } from "../store/question.js";
 import type { Topic } from "../store/topic.js";
 
 /**
  * Operations shared by the UI, REST and MCP. Each one:
  *  1. announces the state it is about to write (so the watcher skips it),
  *  2. does a read–modify–write on the file,
- *  3. computes §5/§10 effects from the *fresh* file and applies them.
+ *  3. for questions, emits the inbox event from the *fresh* file; the board and the
+ *     notifications react to it before the operation returns (§5/§10).
  */
-
-function topicView(ctx: AppContext, topicId: string | null | undefined, excludeQuestion?: string) {
-  if (!topicId) return undefined;
-  const topic = ctx.index.topics.get(topicId);
-  if (!topic) return undefined;
-  const openBlockingCount = ctx.index
-    .questionsForTopic(topicId)
-    .filter((q) => q.fm.status === "open" && q.fm.blocking && q.id !== excludeQuestion).length;
-  return { fm: topic.fm, openBlockingCount };
-}
-
-async function runEffects(ctx: AppContext, effects: Effect[]): Promise<void> {
-  for (const e of effects) if (e.kind === "set_topic_status") ctx.runner.expect(e.topic, e.to);
-  await applyEffects(effects, ctx.repo, ctx.notify, ctx.now, ctx.index);
-}
 
 export async function setTopicStatus(
   ctx: AppContext,
@@ -70,10 +50,13 @@ export async function answerQuestion(
     throw err;
   }
   await ctx.index.refresh("question", id);
-  await runEffects(
-    ctx,
-    effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id), questionSections(q).Answer),
-  );
+  const sections = questionSections(q);
+  await ctx.inbox.emit({
+    kind: "answered",
+    question: q.fm,
+    text: sections.Question,
+    answer: sections.Answer,
+  });
   const indexed = ctx.index.questions.get(id);
   if (indexed) ctx.runner.fireAnswerHook(indexed);
   return q;
@@ -92,7 +75,11 @@ export async function deleteQuestion(ctx: AppContext, id: string): Promise<void>
       withdrawQuestion(question, "deleted by the human", ctx.now()),
     );
     await ctx.index.refresh("question", id);
-    await runEffects(ctx, effectsForQuestionClosed(q.fm, topicView(ctx, q.fm.topic, id)));
+    await ctx.inbox.emit({
+      kind: "withdrawn",
+      question: q.fm,
+      text: questionSections(q).Question,
+    });
   }
   await ctx.repo.remove("question", id);
   await ctx.index.refresh("question", id);

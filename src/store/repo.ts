@@ -1,16 +1,16 @@
 import { access, mkdir, readdir, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { DomainError } from "../domain/errors.js";
-import { atomicCreate, modifyFile } from "./atomic.js";
-import { uniqueQuestionId, uniqueSlug } from "./ids.js";
-import { archiveDir, questionPath, questionsDir, stemOf, topicPath, topicsDir } from "./paths.js";
 import {
   type NewQuestionInput,
   newQuestionText,
   parseQuestion,
   type Question,
   serializeQuestion,
-} from "./question.js";
+} from "../inbox/store.js";
+import { atomicCreate, modifyFile } from "./atomic.js";
+import { uniqueQuestionId, uniqueSlug } from "./ids.js";
+import { archiveDir, questionPath, questionsDir, stemOf, topicPath, topicsDir } from "./paths.js";
 import {
   type NewTopicInput,
   newTopicText,

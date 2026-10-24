@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type AppContext, closeAppContext, createAppContext } from "../src/app/context.js";
 import { runInit } from "../src/cli/init.js";
 import { createHttpApp } from "../src/http/app.js";
+import { newQuestionText, parseQuestion, questionSections } from "../src/inbox/store.js";
 import { dataDir, questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText, parseQuestion, questionSections } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;

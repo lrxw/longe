@@ -12,9 +12,9 @@ import {
   sectionText,
   serializeMarkdown,
   setField,
+  yamlString,
 } from "./markdown.js";
 import { messagesDir, stemOf } from "./paths.js";
-import { yamlString } from "./topic.js";
 
 /**
  * Chat messages to the agent, one file each under the project's `messages/` (see

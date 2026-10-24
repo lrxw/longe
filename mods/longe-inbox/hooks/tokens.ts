@@ -1,4 +1,4 @@
-// A copy of longe's inbox view contract (src/domain/inbox-view.ts in longe): a mod
+// A copy of longe's inbox view contract (src/inbox/view.ts in longe): a mod
 // cannot import files outside its folder. longe's test suite checks that this copy
 // matches. The running longe also sends its tokens with GET /api/v1/inbox; the mod
 // uses those, and this copy only while longe is not running.

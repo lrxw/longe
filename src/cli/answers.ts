@@ -1,4 +1,4 @@
-import { questionSections } from "../store/question.js";
+import { questionSections } from "../inbox/store.js";
 import { Repo } from "../store/repo.js";
 
 export interface AnsweredQuestion {

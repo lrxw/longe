@@ -9,6 +9,7 @@ import {
   parseMarkdown,
   sectionText,
   serializeMarkdown,
+  yamlString,
 } from "./markdown.js";
 
 export interface Topic {
@@ -97,8 +98,3 @@ export function newTopicText(input: NewTopicInput): string {
 }
 
 /** Quotes a scalar for YAML when it could be misread as something else. */
-export function yamlString(s: string): string {
-  return /^[A-Za-z0-9][A-Za-z0-9 _.,()/-]*$/.test(s) && !/^(true|false|null|yes|no|~)$/i.test(s)
-    ? s
-    : JSON.stringify(s);
-}

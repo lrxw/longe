@@ -9,8 +9,9 @@ import type {
   TopicFrontmatter,
   TopicStatus,
 } from "../domain/types.js";
+import { parseQuestion, questionSections } from "../inbox/store.js";
+import { subjectId } from "../inbox/subject.js";
 import { questionsDir, stemOf, topicsDir } from "../store/paths.js";
-import { parseQuestion, questionSections } from "../store/question.js";
 import { parseTopic, topicSections } from "../store/topic.js";
 
 export interface IndexedTopic {
@@ -306,8 +307,9 @@ export class AiIndex extends EventEmitter<IndexEvents> {
 
   // ---- derived data -------------------------------------------------------
 
+  /** Questions whose subject is this topic (`topic:` or `subject: { kind: topic }`). */
   questionsForTopic(topicId: string): IndexedQuestion[] {
-    return [...this.questions.values()].filter((q) => q.fm.topic === topicId);
+    return [...this.questions.values()].filter((q) => subjectId(q.fm, "topic") === topicId);
   }
 
   openQuestionCount(topicId: string): number {

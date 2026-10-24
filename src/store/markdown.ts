@@ -79,6 +79,15 @@ function frontmatterToString(fm: YAML.Document): string {
   return s.endsWith("\n") ? s : `${s}\n`;
 }
 
+/**
+ * A YAML scalar for hand-written frontmatter: plain when it reads back as the same
+ * string, else JSON-quoted ("42", "true", "1.5" and the like would read back as
+ * numbers or booleans).
+ */
+export function yamlString(s: string): string {
+  return /^[A-Za-z0-9][A-Za-z0-9 _.,()/-]*$/.test(s) && YAML.parse(s) === s ? s : JSON.stringify(s);
+}
+
 /** Frontmatter as a plain object (unknown fields included). */
 export function frontmatterObject(doc: MdDoc): Record<string, unknown> {
   const v = doc.frontmatter.toJS() as unknown;

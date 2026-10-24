@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRunner } from "../src/app/agent.js";
 import { createMultiHub, type Hub } from "../src/app/hub.js";
 import { runInit } from "../src/cli/init.js";
-import { answerQuestion } from "../src/domain/question-ops.js";
 import { createHttpApp } from "../src/http/app.js";
+import { answerQuestion } from "../src/inbox/ops.js";
+import { newQuestionText, parseQuestion, serializeQuestion } from "../src/inbox/store.js";
 import type { Message } from "../src/store/messages.js";
 import { questionsDir, topicsDir } from "../src/store/paths.js";
-import { newQuestionText, parseQuestion, serializeQuestion } from "../src/store/question.js";
 import { newTopicText } from "../src/store/topic.js";
 
 let dir: string;
