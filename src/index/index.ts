@@ -287,8 +287,17 @@ export class AiIndex extends EventEmitter<IndexEvents> {
   /**
    * Re-reads one file right now, ahead of the watcher, so callers that just
    * wrote it can render fresh state. The watcher's later event is harmless.
+   * Queued behind any running watcher batch: that batch may have read the file
+   * before the write and would otherwise store the stale text after this one.
    */
   async refresh(kind: "topic" | "question", id: string): Promise<void> {
+    const run = this.flushing.then(() => this.refreshNow(kind, id));
+    // a failed read is the caller's error; later batches still run
+    this.flushing = run.catch(() => {});
+    return run;
+  }
+
+  private async refreshNow(kind: "topic" | "question", id: string): Promise<void> {
     const file =
       kind === "topic"
         ? path.join(topicsDir(this.root), `${id}.md`)
